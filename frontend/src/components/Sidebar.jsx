@@ -210,13 +210,15 @@ export default function Sidebar({
                   </div>
                 ) : (
                   conversations.filter(c => !c.spaceId).map((c) => {
-                    const name = c.name || partner?.displayName || partner?.username || 'Chat';
+                    const partner = c.participants?.find(p => String(p._id || p) !== String(activePersona?._id)) || c.participants?.[0];
+                    const name = c.name || partner?.displayName || (partner?.username ? `@${partner.username}` : 'Chat');
                     const avatar = getMediaUrl(partner?.avatar, partner?.displayName || partner?.username) || DEFAULT_AVATAR;
 
                     const partnerId = partner?._id ? String(partner._id) : null;
                     const isPartnerOnline = partnerId && safeOnlineIds.includes(partnerId);
 
                     const isLocked = lockedConversations.includes(String(c._id));
+                    const isSelected = activeType === 'conversation' && String(activeId) === String(c._id);
 
                     return (
                       <button
