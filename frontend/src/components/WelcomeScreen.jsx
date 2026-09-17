@@ -6,6 +6,8 @@ import {
   ChevronRight, Shield, Wifi, Menu, X, Loader2
 } from 'lucide-react';
 import api, { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
+import AvatarViewerModal from './AvatarViewerModal';
+import Logo from './Logo';
 
 export default function WelcomeScreen({
   onOpenNewChat,

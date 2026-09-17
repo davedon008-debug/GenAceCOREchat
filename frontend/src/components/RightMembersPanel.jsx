@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Search, ChevronRight, Plus, UserPlus, Upload, Zap, MoreHorizontal } from 'lucide-react';
 import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
+import { useSocket } from '../context/SocketContext';
+import AvatarViewerModal from './AvatarViewerModal';
 
 export default function RightMembersPanel({ 
   allContacts = [], 

@@ -4,6 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import api, { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
+import { getNotifPrefs, saveNotifPrefs, playNotificationSound } from '../lib/sound';
+import PasscodeModal from './PasscodeModal';
+import {
+  User, Palette, Bell, Shield, UserX, HelpCircle, Camera, Edit2,
+  Check, LogOut, Moon, Sun, Monitor, Lock, Eye, EyeOff, Key,
+  MessageSquare, ChevronRight, X, Save, Loader2, CheckCircle, AlertCircle, Volume2, ArrowLeft
+} from 'lucide-react';
 
 // ─── Inline editable field ────────────────────────────────────────────────────
 function EditableField({ label, value, onSave, type = 'text', placeholder, mono = false, multiline = false }) {

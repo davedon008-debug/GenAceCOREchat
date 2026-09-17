@@ -4,6 +4,12 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import api, { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
+import AvatarViewerModal from './AvatarViewerModal';
+import Logo from './Logo';
+import { 
+  MessageSquare, Zap, Users, Compass, Bell, Settings, Crown, 
+  ChevronRight, X, Check, Plus, LogOut, Shield, Lock
+} from 'lucide-react';
 
 export default function Sidebar({ 
   conversations = [], 

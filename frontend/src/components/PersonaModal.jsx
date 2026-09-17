@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api, { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
+import { User, Briefcase, Gamepad2, Ghost, X, Camera, Loader2 } from 'lucide-react';
 
 export default function PersonaModal({ onClose }) {
   const { createNewPersona } = useAuth();
