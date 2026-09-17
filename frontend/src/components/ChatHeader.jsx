@@ -76,7 +76,7 @@ export default function ChatHeader({
           </div>
         ) : (
           <img
-            src={getMediaUrl(avatar) || DEFAULT_AVATAR}
+            src={getMediaUrl(avatar, title) || DEFAULT_AVATAR}
             alt=""
             className="w-10 h-10 rounded-2xl object-cover border border-white/15 shadow-md shrink-0 cursor-pointer hover:scale-105 transition-transform"
             onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}

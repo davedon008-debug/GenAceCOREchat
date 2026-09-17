@@ -210,10 +210,8 @@ export default function Sidebar({
                   </div>
                 ) : (
                   conversations.filter(c => !c.spaceId).map((c) => {
-                    const isSelected = activeType === 'conversation' && String(activeId) === String(c._id);
-                    const partner = c.participants?.find(p => p._id !== activePersona?._id) || c.participants?.[0];
                     const name = c.name || partner?.displayName || partner?.username || 'Chat';
-                    const avatar = getMediaUrl(partner?.avatar) || DEFAULT_AVATAR;
+                    const avatar = getMediaUrl(partner?.avatar, partner?.displayName || partner?.username) || DEFAULT_AVATAR;
 
                     const partnerId = partner?._id ? String(partner._id) : null;
                     const isPartnerOnline = partnerId && safeOnlineIds.includes(partnerId);
@@ -234,7 +232,7 @@ export default function Sidebar({
                           <div className="relative shrink-0">
                             <img 
                               src={avatar} 
-                              alt={name} 
+                              alt="" 
                               className="w-6 h-6 rounded-full object-cover border border-white/10" 
                               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
                             />
@@ -301,8 +299,8 @@ export default function Sidebar({
                 title="Click to view profile picture"
               >
                 <img
-                  src={getMediaUrl(activePersona?.avatar) || DEFAULT_AVATAR}
-                  alt={activePersona?.displayName}
+                  src={getMediaUrl(activePersona?.avatar, activePersona?.displayName || activePersona?.username) || DEFAULT_AVATAR}
+                  alt=""
                   className="w-9 h-9 rounded-full object-cover border border-white/10 group-hover/avatar:scale-110 transition-transform"
                   onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
                 />
@@ -345,8 +343,8 @@ export default function Sidebar({
                   >
                     <div className="flex items-center gap-2">
                       <img 
-                        src={getMediaUrl(p.avatar) || DEFAULT_AVATAR} 
-                        alt={p.displayName || p.username} 
+                        src={getMediaUrl(p.avatar, p.displayName || p.username) || DEFAULT_AVATAR} 
+                        alt="" 
                         className="w-6 h-6 rounded-full object-cover" 
                         onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
                       />

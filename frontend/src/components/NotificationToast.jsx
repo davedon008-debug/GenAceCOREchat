@@ -43,7 +43,7 @@ export default function NotificationToast({ notification, onClick, onClose }) {
           {/* Sender / Space Icon */}
           <div className="relative shrink-0">
             <img 
-              src={getMediaUrl(senderAvatar) || DEFAULT_AVATAR} 
+              src={getMediaUrl(senderAvatar, senderName) || DEFAULT_AVATAR} 
               alt="" 
               onError={(e) => {
                 e.currentTarget.onerror = null;

@@ -35,7 +35,7 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
       handle: c.username,
       status: statusLabel,
       statusDotColor,
-      avatar: getMediaUrl(c.avatar) || DEFAULT_AVATAR,
+      avatar: getMediaUrl(c.avatar, c.displayName || c.username) || DEFAULT_AVATAR,
       online: isOnline,
       bio: c.bio,
       customStatus: c.customStatus

@@ -53,12 +53,64 @@ api.interceptors.response.use(
 
 export const DEFAULT_AVATAR = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzk0YTNiOCIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiIGZpbGw9IiMxZTI5M2IiLz48cGF0aCBkPSJNMTggMjBhNiA2IDAgMCAwLTEyIDAiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjEwIiByPSI0Ii8+PC9zdmc+";
 
-export const getMediaUrl = (url) => {
-  if (!url || typeof url !== 'string') return DEFAULT_AVATAR;
+export const createInitialsAvatar = (name = 'User') => {
+  const cleanName = (typeof name === 'string' && name.trim()) ? name.trim().replace(/^@/, '') : 'User';
+  const parts = cleanName.split(/\s+/).filter(Boolean);
+  let initials = 'US';
+  if (parts.length >= 2) {
+    initials = (parts[0][0] + parts[1][0]).toUpperCase();
+  } else if (parts.length === 1) {
+    initials = parts[0].substring(0, 2).toUpperCase();
+  }
+
+  let hash = 0;
+  for (let i = 0; i < cleanName.length; i++) {
+    hash = cleanName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  const gradients = [
+    { start: '#6366f1', end: '#a855f7' }, // Indigo -> Purple
+    { start: '#3b82f6', end: '#06b6d4' }, // Blue -> Cyan
+    { start: '#10b981', end: '#14b8a6' }, // Emerald -> Teal
+    { start: '#f43f5e', end: '#fb7185' }, // Rose -> Pink
+    { start: '#8b5cf6', end: '#ec4899' }, // Violet -> Pink
+    { start: '#f59e0b', end: '#ef4444' }, // Amber -> Red
+    { start: '#0ea5e9', end: '#6366f1' }, // Sky -> Indigo
+    { start: '#14b8a6', end: '#3b82f6' }  // Teal -> Blue
+  ];
+
+  const pair = gradients[Math.abs(hash) % gradients.length];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+    <defs>
+      <linearGradient id="g_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${pair.start}" />
+        <stop offset="100%" stop-color="${pair.end}" />
+      </linearGradient>
+    </defs>
+    <circle cx="64" cy="64" r="64" fill="url(#g_${Math.abs(hash)})" />
+    <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="46" font-weight="800" letter-spacing="1">${initials}</text>
+  </svg>`;
+
+  if (typeof btoa === 'function') {
+    return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+  }
+  return DEFAULT_AVATAR;
+};
+
+export const getMediaUrl = (url, name = '') => {
+  if (!url || typeof url !== 'string') {
+    return name ? createInitialsAvatar(name) : DEFAULT_AVATAR;
+  }
   const clean = url.trim();
   if (!clean || clean === 'undefined' || clean === 'null' || clean === '[object Object]' || clean === '{}') {
-    return DEFAULT_AVATAR;
+    return name ? createInitialsAvatar(name) : DEFAULT_AVATAR;
   }
+
+  // If unsplash url that fails or is default placeholder, fallback to custom initials avatar
+  if (clean.includes('unsplash.com')) {
+    return name ? createInitialsAvatar(name) : DEFAULT_AVATAR;
+  }
+
   if (clean.startsWith('data:')) return clean;
 
   const apiBase = getApiBaseUrl();
@@ -77,7 +129,7 @@ export const getMediaUrl = (url) => {
         const urlObj = new URL(clean);
         return `${serverBase}${urlObj.pathname}${urlObj.search}`;
       } catch {
-        return DEFAULT_AVATAR;
+        return name ? createInitialsAvatar(name) : DEFAULT_AVATAR;
       }
     }
   }

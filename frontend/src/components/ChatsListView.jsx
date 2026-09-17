@@ -55,7 +55,7 @@ export default function ChatsListView({
     const otherParticipant = c.participants?.find(p => String(p._id) !== String(activePersona?._id)) || c.participants?.[0];
     const username = otherParticipant?.username || 'user';
     const name = otherParticipant?.displayName || `@${username}`;
-    const avatar = getMediaUrl(otherParticipant?.avatar) || DEFAULT_AVATAR;
+    const avatar = getMediaUrl(otherParticipant?.avatar, name) || DEFAULT_AVATAR;
     const rawLastMsgContent = c.lastMessage?.content || (c.lastMessage?.contentType === 'voice' ? '🎙️ Voice note' : c.lastMessage?.contentType === 'image' ? '📷 Photo' : 'No messages yet');
     const lastMsgContent = isLocked ? '🔒 Chat is locked' : rawLastMsgContent;
 
@@ -82,7 +82,7 @@ export default function ChatsListView({
       convId: null,
       name: contact.displayName || `@${contact.username}`,
       username: contact.username,
-      avatar: getMediaUrl(contact.avatar) || DEFAULT_AVATAR,
+      avatar: getMediaUrl(contact.avatar, contact.displayName || contact.username) || DEFAULT_AVATAR,
       lastText: contact.bio || `@${contact.username} • Tap to start conversation`,
       time: '',
       unread: 0,

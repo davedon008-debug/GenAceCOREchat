@@ -15,7 +15,7 @@ export default function UserProfileBanner({
 
   const displayName = participant.displayName || participant.username || 'User';
   const username = participant.username || 'user';
-  const avatar = getMediaUrl(participant.avatar) || DEFAULT_AVATAR;
+  const avatar = getMediaUrl(participant.avatar, displayName) || DEFAULT_AVATAR;
   const userBio = participant.bio && participant.bio.trim() ? participant.bio.trim() : null;
   const customStatus = participant.customStatus && participant.customStatus.trim() ? participant.customStatus.trim() : null;
   const type = participant.type || 'personal';
