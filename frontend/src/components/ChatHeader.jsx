@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getMediaUrl } from '../lib/api';
+import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
 import {
   Shield, Zap, Bot, Flame, EyeOff, Lock, Clock, CheckCircle2, ChevronDown, Menu, UserPlus, MoreVertical, Sparkles, ArrowLeft, UserX, Trash2, Users
@@ -76,10 +76,10 @@ export default function ChatHeader({
           </div>
         ) : (
           <img
-            src={getMediaUrl(avatar) || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%231e293b'/%3E%3Cpath d='M18 20a6 6 0 0 0-12 0'/%3E%3Ccircle cx='12' cy='10' r='4'/%3E%3C/svg%3E"}
-            alt={title || 'User Avatar'}
+            src={getMediaUrl(avatar) || DEFAULT_AVATAR}
+            alt=""
             className="w-10 h-10 rounded-2xl object-cover border border-white/15 shadow-md shrink-0 cursor-pointer hover:scale-105 transition-transform"
-            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%231e293b'/%3E%3Cpath d='M18 20a6 6 0 0 0-12 0'/%3E%3Ccircle cx='12' cy='10' r='4'/%3E%3C/svg%3E"; }}
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
             onClick={() => setShowAvatarViewer(true)}
             title="Click to view full picture"
           />
