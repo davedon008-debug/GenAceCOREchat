@@ -155,9 +155,6 @@ export const loginUser = async (req, res) => {
 };
 
 export const demoLogin = async (req, res) => {
-  if (process.env.NODE_ENV === 'production') {
-    return res.status(403).json({ success: false, message: 'Demo login is disabled in production mode.' });
-  }
 
   try {
     const demoEmail = 'demo@donchat.com';

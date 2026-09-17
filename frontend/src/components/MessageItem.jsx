@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Flame, Smile, Play, Pause, CheckCheck, Trash2, Copy, Reply, Check, X, Plus, FileText, Download, Lock, Clock, Shield, EyeOff, Ghost, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
 
 const EMOJI_CATEGORIES = [
@@ -306,26 +307,6 @@ export default function MessageItem({
   } else if (senderUsername && currentUsername) {
     isMe = senderUsername === currentUsername;
   }
-
-  const getMediaUrl = (url) => {
-    if (!url) return '';
-    if (url.startsWith('data:')) {
-      return url.replace(/data:video\/([^;]+);codecs=[^;]+;base64,/, 'data:video/$1;base64,');
-    }
-    
-    // Extract relative /uploads/... path if present in URL
-    const uploadsMatch = url.match(/\/uploads\/[^\s?#]+/);
-    if (uploadsMatch && typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      return `http://${hostname}:5005${uploadsMatch[0]}`;
-    }
-    
-    if (url.startsWith('/') && typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      return `http://${hostname}:5005${url}`;
-    }
-    return url;
-  };
 
   const isAnonymous = message.privacyMode === 'anonymous';
   const rawSender = typeof message.senderPersonaId === 'object' && message.senderPersonaId
