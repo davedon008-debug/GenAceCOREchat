@@ -186,7 +186,12 @@ export default function WelcomeScreen({
                         onClick={() => { onSelectConversation && onSelectConversation(c._id); clearSearch(); setSearchFocused(false); }}
                         className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-indigo-500/10 transition text-left"
                       >
-                        <img src={getMediaUrl(other?.avatar) || DEFAULT_AVATAR} alt="" className="w-7 h-7 rounded-full object-cover border border-white/10 shrink-0" />
+                        <img 
+                          src={getMediaUrl(other?.avatar) || DEFAULT_AVATAR} 
+                          alt="" 
+                          className="w-7 h-7 rounded-full object-cover border border-white/10 shrink-0" 
+                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                        />
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-semibold text-white truncate">{c.name || other?.displayName || other?.username || 'Chat'}</p>
                           <p className="text-[10px] text-gray-400 truncate">Direct Message</p>
@@ -233,6 +238,7 @@ export default function WelcomeScreen({
                         src={getMediaUrl(p.avatar) || DEFAULT_AVATAR}
                         alt=""
                         className="w-7 h-7 rounded-full object-cover border border-white/10 shrink-0 hover:scale-110 transition-transform cursor-pointer"
+                        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
                         onClick={(e) => {
                           e.stopPropagation();
                           setAvatarViewerTarget({

@@ -258,9 +258,10 @@ function BlockedUsersTab() {
             >
               <div className="flex items-center gap-3">
                 <img
-                  src={user.avatar || DEFAULT_AVATAR}
+                  src={getMediaUrl(user.avatar) || DEFAULT_AVATAR}
                   alt={user.displayName || user.username}
                   className="w-10 h-10 rounded-full object-cover border border-white/10"
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
                 />
                 <div>
                   <h4 className="text-xs font-bold text-white">
@@ -661,6 +662,7 @@ export default function SettingsView({ onBack, defaultSection }) {
                     src={getMediaUrl(activePersona?.avatar) || DEFAULT_AVATAR}
                     alt={activePersona?.displayName}
                     className="w-24 h-24 rounded-full object-cover border-2 border-indigo-500/40 shadow-lg group-hover:opacity-80 transition"
+                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
                   />
                   <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
                     <Camera className="w-6 h-6 text-white" />

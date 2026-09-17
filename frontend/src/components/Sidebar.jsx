@@ -234,7 +234,12 @@ export default function Sidebar({
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div className="relative shrink-0">
-                            <img src={avatar} alt={name} className="w-6 h-6 rounded-full object-cover border border-white/10" />
+                            <img 
+                              src={avatar} 
+                              alt={name} 
+                              className="w-6 h-6 rounded-full object-cover border border-white/10" 
+                              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                            />
                             <span className={`w-2 h-2 rounded-full absolute bottom-0 right-0 border border-[#090d18] ${getStatusDotClass(partnerId)}`} />
                           </div>
                           <span className="truncate min-w-0 flex items-center gap-1">
@@ -301,6 +306,7 @@ export default function Sidebar({
                   src={getMediaUrl(activePersona?.avatar) || DEFAULT_AVATAR}
                   alt={activePersona?.displayName}
                   className="w-9 h-9 rounded-full object-cover border border-white/10 group-hover/avatar:scale-110 transition-transform"
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
                 />
                 <span className={`w-2.5 h-2.5 rounded-full ${activeStatusColor} absolute bottom-0 right-0 border-2 border-[#090d18]`} />
               </div>
@@ -340,7 +346,12 @@ export default function Sidebar({
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <img src={getMediaUrl(p.avatar) || DEFAULT_AVATAR} alt={p.displayName || p.username} className="w-6 h-6 rounded-full object-cover" />
+                      <img 
+                        src={getMediaUrl(p.avatar) || DEFAULT_AVATAR} 
+                        alt={p.displayName || p.username} 
+                        className="w-6 h-6 rounded-full object-cover" 
+                        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                      />
                       <div>
                         <p className="font-semibold text-white text-xs">{p.displayName || p.username}</p>
                         <p className="text-[9px] text-gray-400">@{p.username}</p>
