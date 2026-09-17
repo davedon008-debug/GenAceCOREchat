@@ -19,8 +19,20 @@ export const ThemeProvider = ({ children }) => {
   }, []);
 
   const applyTheme = (t) => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
     const root = document.documentElement;
-    const isLight = t === 'light' || (t === 'system' && !window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (!root) return;
+
+    let prefersDark = true;
+    try {
+      if (typeof window.matchMedia === 'function') {
+        prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+    } catch {
+      prefersDark = true;
+    }
+
+    const isLight = t === 'light' || (t === 'system' && !prefersDark);
     
     if (isLight) {
       root.classList.remove('dark');
@@ -56,7 +68,9 @@ export const ThemeProvider = ({ children }) => {
   };
 
   const applyFontScale = (scale) => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
     const root = document.documentElement;
+    if (!root) return;
     if (scale === 'small') {
       root.style.fontSize = '14px';
     } else if (scale === 'large') {

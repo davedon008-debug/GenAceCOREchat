@@ -206,28 +206,28 @@ export default function ChatPage() {
     });
 
     // Dispatch Native Browser Notification (if granted and tab is in background)
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'granted') {
-        try {
+    try {
+      if (typeof window !== 'undefined' && typeof window.Notification !== 'undefined' && window.Notification) {
+        if (window.Notification.permission === 'granted') {
           const notifTitle = isSpace ? `[Space] ${senderName}` : senderName || 'New Message';
           const notifBody = privacyMode === 'burn' ? '🔥 Burn on read message' : (content || 'Sent a message');
-          const n = new Notification(notifTitle, {
+          const n = new window.Notification(notifTitle, {
             body: notifBody,
             icon: getMediaUrl(senderAvatar),
           });
           n.onclick = () => {
-            window.focus();
+            if (typeof window !== 'undefined') window.focus();
             if (targetId) {
               if (targetType === 'space') selectSpace(targetId);
               else selectConversation(targetId);
             }
           };
-        } catch (err) {
-          console.warn('Native notification failed:', err);
+        } else if (window.Notification.permission === 'default' && typeof window.Notification.requestPermission === 'function') {
+          window.Notification.requestPermission().catch(() => {});
         }
-      } else if (Notification.permission === 'default') {
-        Notification.requestPermission().catch(() => {});
       }
+    } catch {
+      // Notification API restricted or not available on device
     }
   };
 
