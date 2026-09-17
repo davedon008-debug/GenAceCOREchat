@@ -16,7 +16,7 @@ const isConfigured = Boolean(
 );
 
 if (process.env.NODE_ENV === 'production' && !isConfigured) {
-  console.error('❌ [FATAL CONFIG ERROR] CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET must be configured in environment for production mode.');
+  console.log('ℹ️ [STORAGE NOTICE] Cloudinary credentials not set in production. App fallback: using local /uploads filesystem storage.');
 }
 
 if (isConfigured) {
