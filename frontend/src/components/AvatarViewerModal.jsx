@@ -1,18 +1,82 @@
 'use client';
 
-import { X, ZoomIn, Download } from 'lucide-react';
-import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
+import { useState, useRef } from 'react';
+import { X, Download, Camera, Loader2, Check } from 'lucide-react';
+import api, { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
-export default function AvatarViewerModal({ isOpen, onClose, avatarUrl, name, handle, bio, customStatus }) {
+export default function AvatarViewerModal({ isOpen, onClose, avatarUrl, name, handle, bio, customStatus, isSelf }) {
+  const { activePersona, setActivePersona } = useAuth();
+  const [uploading, setUploading] = useState(false);
+  const [flashMsg, setFlashMsg] = useState('');
+  const fileInputRef = useRef(null);
+
   if (!isOpen) return null;
 
-  const resolvedUrl = getMediaUrl(avatarUrl) || DEFAULT_AVATAR;
+  const cleanHandle = handle ? handle.replace(/^@/, '').toLowerCase() : '';
+  const activeHandle = activePersona?.username ? activePersona.username.replace(/^@/, '').toLowerCase() : '';
+  const isUserSelf = isSelf || (cleanHandle && activeHandle && cleanHandle === activeHandle);
+
+  const displayAvatar = isUserSelf && activePersona?.avatar ? activePersona.avatar : avatarUrl;
+  const resolvedUrl = getMediaUrl(displayAvatar) || DEFAULT_AVATAR;
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !activePersona?._id) return;
+
+    setUploading(true);
+    try {
+      let newAvatarUrl = '';
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await api.post('/upload', formData);
+        if (res.data?.success) {
+          newAvatarUrl = res.data.url || res.data.fileUrl;
+        }
+      } catch (fErr) {
+        const base64Str = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const b64Res = await api.post('/upload', { fileData: base64Str, fileName: file.name });
+        if (b64Res.data?.success) {
+          newAvatarUrl = b64Res.data.url || b64Res.data.fileUrl;
+        }
+      }
+
+      if (newAvatarUrl) {
+        const patchRes = await api.patch(`/personas/${activePersona._id}`, { avatar: newAvatarUrl });
+        if (patchRes.data?.success) {
+          setActivePersona(patchRes.data.persona);
+          setFlashMsg('Profile picture updated!');
+          setTimeout(() => setFlashMsg(''), 3000);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to upload profile photo:', err);
+      alert('Could not upload profile photo.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div
       className="fixed inset-0 z-[999999] bg-black/90 backdrop-blur-md flex flex-col items-center justify-between p-4 sm:p-6 animate-fadeIn select-none overflow-y-auto"
       onClick={onClose}
     >
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
+
       {/* Top Bar */}
       <div
         className="w-full max-w-2xl flex items-center justify-between text-white py-2.5 px-4 rounded-2xl bg-white/10 border border-white/10 shadow-2xl backdrop-blur-xl z-10 shrink-0"
@@ -20,14 +84,32 @@ export default function AvatarViewerModal({ isOpen, onClose, avatarUrl, name, ha
       >
         <div className="min-w-0 pr-4">
           <h3 className="text-sm sm:text-base font-bold text-white font-outfit truncate">
-            {name || 'Profile Picture'}
+            {isUserSelf ? (activePersona?.displayName || name) : (name || 'Profile Picture')}
           </h3>
           {handle && (
-            <p className="text-xs text-cyan-400 font-mono font-medium">@{handle.replace(/^@/, '')}</p>
+            <p className="text-xs text-cyan-400 font-mono font-medium">@{cleanHandle}</p>
           )}
         </div>
 
         <div className="flex items-center gap-2">
+          {flashMsg && (
+            <span className="text-xs text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/30">
+              <Check className="w-3.5 h-3.5" /> {flashMsg}
+            </span>
+          )}
+
+          {isUserSelf && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg transition"
+            >
+              {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+              <span>{uploading ? 'Uploading...' : 'Change Photo'}</span>
+            </button>
+          )}
+
           {resolvedUrl && !resolvedUrl.startsWith('data:') && (
             <a
               href={resolvedUrl}
@@ -64,6 +146,18 @@ export default function AvatarViewerModal({ isOpen, onClose, avatarUrl, name, ha
             className="max-w-full max-h-[50vh] sm:max-h-[60vh] w-auto h-auto rounded-3xl object-contain border-2 border-cyan-500/30 shadow-2xl shadow-cyan-500/20 transition-all duration-300 transform group-hover:scale-[1.02]"
             onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
           />
+
+          {isUserSelf && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="absolute inset-0 bg-black/40 rounded-3xl opacity-0 group-hover:opacity-100 flex items-center justify-center text-white font-bold text-xs gap-2 backdrop-blur-xs transition"
+            >
+              <Camera className="w-5 h-5" />
+              <span>Click to Change Profile Photo</span>
+            </button>
+          )}
         </div>
 
         {/* User Bio Card */}
