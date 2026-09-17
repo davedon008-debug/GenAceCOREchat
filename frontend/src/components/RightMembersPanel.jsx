@@ -190,6 +190,7 @@ export default function RightMembersPanel({
                           src={member.avatar}
                           alt={member.name}
                           className="w-8 h-8 rounded-full object-cover border border-white/10 group-hover/avatar:scale-110 transition-transform"
+                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
                         />
                         <span className={`w-2.5 h-2.5 rounded-full border-2 border-[#090d18] absolute bottom-0 right-0 ${member.statusDotColor}`} />
                       </div>
@@ -244,6 +245,7 @@ export default function RightMembersPanel({
                             src={member.avatar}
                             alt={member.name}
                             className="w-8 h-8 rounded-full object-cover border border-white/10 grayscale group-hover:grayscale-0 group-hover/avatar:scale-110 transition"
+                            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
                           />
                           <span className="w-2.5 h-2.5 rounded-full bg-gray-500 border-2 border-[#090d18] absolute bottom-0 right-0" />
                         </div>

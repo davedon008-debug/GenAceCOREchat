@@ -173,6 +173,7 @@ export default function MessageItem({
   const [showImageLightbox, setShowImageLightbox] = useState(false);
   const [showAvatarViewer, setShowAvatarViewer] = useState(false);
   const [lightboxImgError, setLightboxImgError] = useState(false);
+  const [imgLoadError, setImgLoadError] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const [burnCountdown, setBurnCountdown] = useState(10);
@@ -491,23 +492,30 @@ export default function MessageItem({
                     </button>
                   </div>
                 )}
-                <div 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setLightboxImgError(false);
-                    setShowImageLightbox(true);
-                  }}
-                  className="rounded-xl overflow-hidden border border-white/10 bg-black/20 group/img relative cursor-pointer"
-                >
-                  <img
-                    src={resolvedMediaUrl}
-                    alt={message.content || 'Image Attachment'}
-                    className="max-h-60 sm:max-h-72 w-full object-cover group-hover/img:scale-[1.02] hover:opacity-95 transition duration-200"
-                  />
-                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 flex items-center justify-center text-white text-[11px] font-medium backdrop-blur-[2px] transition duration-200 select-none">
-                    🔍 Click for Full Screen
+                {imgLoadError ? (
+                  <div className="p-3 text-xs text-rose-300 italic flex items-center gap-1.5 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+                    🖼️ Image attachment unavailable or expired
                   </div>
-                </div>
+                ) : (
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLightboxImgError(false);
+                      setShowImageLightbox(true);
+                    }}
+                    className="rounded-xl overflow-hidden border border-white/10 bg-black/20 group/img relative cursor-pointer"
+                  >
+                    <img
+                      src={resolvedMediaUrl}
+                      alt={message.content || 'Image Attachment'}
+                      className="max-h-60 sm:max-h-72 w-full object-cover group-hover/img:scale-[1.02] hover:opacity-95 transition duration-200"
+                      onError={() => setImgLoadError(true)}
+                    />
+                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 flex items-center justify-center text-white text-[11px] font-medium backdrop-blur-[2px] transition duration-200 select-none">
+                      🔍 Click for Full Screen
+                    </div>
+                  </div>
+                )}
                 {message.content && message.content !== 'Image Attachment' && (
                   <p className="text-xs text-gray-100 whitespace-pre-wrap break-words px-0.5">{message.content}</p>
                 )}
