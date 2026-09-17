@@ -201,30 +201,30 @@ export const sendMessage = async (req, res) => {
   try {
     const { conversationId, spaceId, content, contentType, mediaUrl, voiceDuration, replyTo, privacyMode } = req.body;
 
-    let conversation;
+    let conversation = null;
+    let targetSpace = null;
+    let recipientPersonaIds = [];
 
-    // Strict Authorization Verification
+    // Fast authorization & metadata fetch
     if (conversationId) {
       if (!mongoose.Types.ObjectId.isValid(conversationId)) {
         return res.status(400).json({ success: false, message: 'Invalid conversation ID' });
       }
-      conversation = await Conversation.findById(conversationId);
+      conversation = await Conversation.findById(conversationId).lean();
       if (!conversation) {
         return res.status(404).json({ success: false, message: 'Conversation not found' });
       }
 
-      const isParticipant = conversation.participants?.some(p => p.toString() === req.personaId.toString());
+      recipientPersonaIds = (conversation.participants || []).map(String);
+      const isParticipant = recipientPersonaIds.includes(req.personaId.toString());
       if (!isParticipant) {
         if (conversation.spaceId) {
-          const spaceObj = await Space.findById(conversation.spaceId);
+          const spaceObj = await Space.findById(conversation.spaceId).lean();
           if (spaceObj && (spaceObj.visibility === 'public' || !spaceObj.visibility || spaceObj.members?.some(m => m.personaId?.toString() === req.personaId.toString()))) {
             await Conversation.findByIdAndUpdate(conversationId, {
               $addToSet: { participants: req.personaId }
             });
-            if (!spaceObj.members?.some(m => m.personaId?.toString() === req.personaId.toString())) {
-              spaceObj.members.push({ personaId: req.personaId, role: 'member' });
-              await spaceObj.save();
-            }
+            recipientPersonaIds.push(req.personaId.toString());
           } else {
             return res.status(403).json({ success: false, message: 'Not authorized to send messages in this conversation' });
           }
@@ -236,20 +236,21 @@ export const sendMessage = async (req, res) => {
       if (!mongoose.Types.ObjectId.isValid(spaceId)) {
         return res.status(400).json({ success: false, message: 'Invalid space ID' });
       }
-      const spaceObj = await Space.findById(spaceId);
-      if (!spaceObj) {
+      targetSpace = await Space.findById(spaceId).lean();
+      if (!targetSpace) {
         return res.status(404).json({ success: false, message: 'Space not found' });
       }
 
-      const isMember = spaceObj.members?.some(m => m.personaId?.toString() === req.personaId.toString()) ||
-                       spaceObj.ownerPersonaId?.toString() === req.personaId.toString();
+      const isMember = targetSpace.members?.some(m => m.personaId?.toString() === req.personaId.toString()) ||
+                       targetSpace.ownerPersonaId?.toString() === req.personaId.toString();
 
       if (!isMember) {
-        if (spaceObj.visibility === 'public' || !spaceObj.visibility) {
-          spaceObj.members.push({ personaId: req.personaId, role: 'member' });
-          await spaceObj.save();
-          if (spaceObj.conversationId) {
-            await Conversation.findByIdAndUpdate(spaceObj.conversationId, {
+        if (targetSpace.visibility === 'public' || !targetSpace.visibility) {
+          await Space.findByIdAndUpdate(spaceId, {
+            $push: { members: { personaId: req.personaId, role: 'member' } }
+          });
+          if (targetSpace.conversationId) {
+            await Conversation.findByIdAndUpdate(targetSpace.conversationId, {
               $addToSet: { participants: req.personaId }
             });
           }
@@ -257,19 +258,21 @@ export const sendMessage = async (req, res) => {
           return res.status(403).json({ success: false, message: 'Not authorized to send messages in this space' });
         }
       }
+      recipientPersonaIds = (targetSpace.members || []).map(m => String(m.personaId));
     } else {
       return res.status(400).json({ success: false, message: 'conversationId or spaceId required' });
     }
 
-    // Check block status and DND status if sending a message in a direct conversation
-    if (conversation && conversation.type === 'direct' && conversation.participants?.length === 2) {
-      const otherPersonaId = conversation.participants.find(p => p.toString() !== req.personaId.toString());
+    // Check block status if direct 1-on-1 conversation
+    if (conversation && conversation.type === 'direct' && recipientPersonaIds.length === 2) {
+      const otherPersonaId = recipientPersonaIds.find(p => p !== req.personaId.toString());
       if (otherPersonaId) {
-        const senderPersona = await Persona.findById(req.personaId);
-        const recipientPersona = await Persona.findById(otherPersonaId);
+        const personas = await Persona.find({ _id: { $in: [req.personaId, otherPersonaId] } }, 'blockedPersonas').lean();
+        const mePersona = personas.find(p => p._id.toString() === req.personaId.toString());
+        const otherPersona = personas.find(p => p._id.toString() === otherPersonaId.toString());
 
-        const isSenderBlocking = senderPersona?.blockedPersonas?.some(id => id.toString() === otherPersonaId.toString());
-        const isRecipientBlocking = recipientPersona?.blockedPersonas?.some(id => id.toString() === req.personaId.toString());
+        const isSenderBlocking = mePersona?.blockedPersonas?.some(id => id.toString() === otherPersonaId.toString());
+        const isRecipientBlocking = otherPersona?.blockedPersonas?.some(id => id.toString() === req.personaId.toString());
 
         if (isSenderBlocking || isRecipientBlocking) {
           return res.status(403).json({
@@ -280,11 +283,6 @@ export const sendMessage = async (req, res) => {
       }
     }
 
-    let targetSpace;
-    if (spaceId) {
-      targetSpace = await Space.findById(spaceId);
-    }
-
     const activePrivacyMode = privacyMode || (conversation ? conversation.privacyMode : (targetSpace ? targetSpace.privacyMode : 'normal'));
     let expiresAt = null;
 
@@ -292,7 +290,8 @@ export const sendMessage = async (req, res) => {
       expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours TTL
     }
 
-    const message = await Message.create({
+    // 1. Create message document
+    const messageDoc = await Message.create({
       conversationId: conversationId || null,
       spaceId: spaceId || null,
       senderPersonaId: req.personaId,
@@ -305,39 +304,27 @@ export const sendMessage = async (req, res) => {
       expiresAt
     });
 
-    if (conversationId) {
-      await Conversation.findByIdAndUpdate(conversationId, {
-        lastMessage: message._id,
+    // 2. Parallel population & conversation lastMessage update
+    const [populated] = await Promise.all([
+      messageDoc.populate([
+        { path: 'senderPersonaId', select: 'username displayName avatar bio status customStatus type' },
+        { path: 'spaceId', select: 'title icon description' },
+        { path: 'reactions.personaId', select: 'username displayName' },
+        {
+          path: 'replyTo',
+          populate: { path: 'senderPersonaId', select: 'username displayName' }
+        }
+      ]),
+      conversationId ? Conversation.findByIdAndUpdate(conversationId, {
+        lastMessage: messageDoc._id,
         updatedAt: Date.now()
-      });
-    }
+      }) : Promise.resolve()
+    ]);
 
-    const populated = await Message.findById(message._id)
-      .populate('senderPersonaId', 'username displayName avatar bio status customStatus type')
-      .populate('spaceId', 'title icon description')
-      .populate('reactions.personaId', 'username displayName')
-      .populate({
-        path: 'replyTo',
-        populate: { path: 'senderPersonaId', select: 'username displayName' }
-      });
-
-    // Broadcast real-time message notification via Socket.IO
+    // 3. Fast socket broadcast to room and persona channels
     const io = getIO();
     if (io) {
       try {
-        let recipientPersonaIds = [];
-        if (conversationId) {
-          const conv = await Conversation.findById(conversationId).select('participants').lean();
-          if (conv && Array.isArray(conv.participants)) {
-            recipientPersonaIds = conv.participants.map(String);
-          }
-        } else if (spaceId) {
-          const space = await Space.findById(spaceId).select('members').lean();
-          if (space && Array.isArray(space.members)) {
-            recipientPersonaIds = space.members.map(m => String(m.personaId));
-          }
-        }
-
         const targetRoom = spaceId || conversationId;
         const msgObject = populated.toObject ? populated.toObject({ virtuals: true }) : populated;
 
