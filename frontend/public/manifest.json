@@ -1,0 +1,22 @@
+{
+  "short_name": "DonChat",
+  "name": "DonChat Messaging & Fluid Spaces",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0d0f17",
+  "theme_color": "#0d0f17",
+  "display": "standalone",
+  "orientation": "portrait"
+}

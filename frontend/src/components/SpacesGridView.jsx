@@ -1,0 +1,184 @@
+'use client';
+
+import { useState } from 'react';
+import { Search, Plus, Globe, Lock, Check, Menu, ArrowLeft } from 'lucide-react';
+
+export default function SpacesGridView({ spaces = [], onSelectSpace, onOpenCreateSpace, onOpenMobileSidebar, onBack }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('popular'); // 'popular' | 'my' | 'joined'
+  const [joinedSpaceIds, setJoinedSpaceIds] = useState([]);
+
+  const displaySpaces = spaces.map((s) => ({
+    id: s._id,
+    realSpace: s,
+    title: s.title,
+    icon: s.icon || '⚡',
+    members: `${s.members?.length || 0} members`,
+    isPublic: s.visibility === 'public',
+    tags: s.description || 'Fluid space room canvas.',
+    gradient: 'from-indigo-600/20 to-blue-600/20 border-indigo-500/30'
+  }));
+
+  const filteredSpaces = displaySpaces.filter(s =>
+    s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.tags.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const toggleJoin = (spaceId) => {
+    if (joinedSpaceIds.includes(spaceId)) {
+      setJoinedSpaceIds(joinedSpaceIds.filter(id => id !== spaceId));
+    } else {
+      setJoinedSpaceIds([...joinedSpaceIds, spaceId]);
+    }
+  };
+
+  return (
+    <div className="flex-1 flex flex-col h-full bg-[#090c15] p-6 overflow-y-auto select-none space-y-6">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1e293b] pb-5">
+        <div className="flex items-center gap-3">
+          {onOpenMobileSidebar && (
+            <button
+              onClick={onOpenMobileSidebar}
+              className="hidden sm:inline-flex lg:hidden p-2 text-gray-300 hover:text-white rounded-xl hover:bg-white/10 shrink-0"
+              title="Open Navigation Menu"
+            >
+              <Menu className="w-5 h-5 text-indigo-400" />
+            </button>
+          )}
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="p-2 text-gray-300 hover:text-white rounded-xl hover:bg-white/10 shrink-0"
+              title="Back to Chats"
+            >
+              <ArrowLeft className="w-5 h-5 text-indigo-400" />
+            </button>
+          )}
+          <div>
+            <h2 className="text-xl font-black text-white font-outfit tracking-tight">Spaces</h2>
+            <p className="text-xs text-gray-400">Discover and join active community spaces</p>
+          </div>
+        </div>
+        <button
+          onClick={onOpenCreateSpace}
+          className="flex items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition shrink-0"
+        >
+          <Plus className="w-4 h-4" /> <span>Create Space</span>
+        </button>
+      </div>
+
+      {/* Search Input & Navigation Tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+          <input
+            type="text"
+            placeholder="Search spaces..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 text-xs rounded-2xl bg-[#0f172a] border border-[#1e293b] text-white placeholder-gray-400 focus:outline-none focus:border-indigo-500 transition"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 bg-[#0f172a] p-1 rounded-2xl border border-[#1e293b]">
+          {['popular', 'my', 'joined'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-1.5 rounded-xl text-xs font-semibold capitalize transition ${
+                activeTab === tab
+                  ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-md'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {tab === 'my' ? 'My Spaces' : tab}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Grid of Spaces Cards */}
+      {filteredSpaces.length === 0 ? (
+        <div className="p-12 rounded-3xl bg-[#0f172a] border border-[#1e293b] text-center space-y-3">
+          <Globe className="w-10 h-10 text-indigo-400/50 mx-auto" />
+          <p className="text-xs text-gray-400">No public spaces found.</p>
+          <button
+            onClick={onOpenCreateSpace}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition inline-flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" /> Create First Space
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredSpaces.map((item) => {
+            const isJoined = joinedSpaceIds.includes(item.id);
+
+            return (
+              <div
+                key={item.id}
+                onClick={() => item.realSpace && onSelectSpace && onSelectSpace(item.realSpace._id)}
+                className={`p-5 rounded-3xl bg-gradient-to-br ${item.gradient} bg-[#0f172a] border backdrop-blur-md flex flex-col justify-between space-y-4 hover:border-indigo-400/50 cursor-pointer transition group shadow-xl`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-[#1e293b] flex items-center justify-center text-xl border border-white/10 group-hover:scale-105 transition">
+                      {item.icon}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white group-hover:text-indigo-300 transition font-outfit">
+                        {item.title}
+                      </h3>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <p className="text-[10px] text-gray-400 font-mono">{item.members}</p>
+                        {item.isPublic ? (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold">
+                            <Globe className="w-2 h-2" /> Public
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-300 border border-slate-500/30 font-semibold">
+                            <Lock className="w-2 h-2" /> Private
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-300 leading-relaxed line-clamp-2">
+                  {item.tags}
+                </p>
+
+                <div className="pt-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleJoin(item.id);
+                      if (item.realSpace && onSelectSpace) onSelectSpace(item.realSpace._id);
+                    }}
+                    className={`w-full py-2 rounded-2xl font-bold text-xs transition flex items-center justify-center gap-1.5 ${
+                      isJoined
+                        ? 'bg-indigo-600/30 text-indigo-200 border border-indigo-500/40 hover:bg-indigo-600/40'
+                        : 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white shadow-md shadow-indigo-600/25'
+                    }`}
+                  >
+                    {isJoined ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" /> <span>Joined</span>
+                      </>
+                    ) : item.isPublic ? (
+                      <span>Join</span>
+                    ) : (
+                      <span>Request to Join</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
