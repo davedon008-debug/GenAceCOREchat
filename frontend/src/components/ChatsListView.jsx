@@ -52,9 +52,18 @@ export default function ChatsListView({
     .filter(c => !c.spaceId)
     .map(c => {
     const isLocked = lockedConversations.includes(String(c._id));
-    const otherParticipant = c.participants?.find(p => String(p._id) !== String(activePersona?._id)) || c.participants?.[0];
+    const rawPartner = c.participants?.find(p => {
+      const idStr = typeof p === 'object' && p ? (p._id || p.id) : p;
+      return idStr && String(idStr) !== String(activePersona?._id);
+    }) || c.participants?.[0];
+
+    const partnerIdStr = typeof rawPartner === 'object' && rawPartner ? (rawPartner._id || rawPartner.id) : rawPartner;
+    const otherParticipant = (typeof rawPartner === 'object' && rawPartner?.displayName)
+      ? rawPartner
+      : ((allContacts || []).find(ac => String(ac._id) === String(partnerIdStr)) || rawPartner);
+
     const username = otherParticipant?.username || 'user';
-    const name = otherParticipant?.displayName || `@${username}`;
+    const name = otherParticipant?.displayName || (otherParticipant?.username ? `@${otherParticipant.username}` : 'User');
     const avatar = getMediaUrl(otherParticipant?.avatar, name) || DEFAULT_AVATAR;
     const rawLastMsgContent = c.lastMessage?.content || (c.lastMessage?.contentType === 'voice' ? '🎙️ Voice note' : c.lastMessage?.contentType === 'image' ? '📷 Photo' : 'No messages yet');
     const lastMsgContent = isLocked ? '🔒 Chat is locked' : rawLastMsgContent;

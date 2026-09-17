@@ -210,11 +210,20 @@ export default function Sidebar({
                   </div>
                 ) : (
                   conversations.filter(c => !c.spaceId).map((c) => {
-                    const partner = c.participants?.find(p => String(p._id || p) !== String(activePersona?._id)) || c.participants?.[0];
-                    const name = c.name || partner?.displayName || (partner?.username ? `@${partner.username}` : 'Chat');
-                    const avatar = getMediaUrl(partner?.avatar, partner?.displayName || partner?.username) || DEFAULT_AVATAR;
+                    const rawPartner = c.participants?.find(p => {
+                      const idStr = typeof p === 'object' && p ? (p._id || p.id) : p;
+                      return idStr && String(idStr) !== String(activePersona?._id);
+                    }) || c.participants?.[0];
 
-                    const partnerId = partner?._id ? String(partner._id) : null;
+                    const partnerIdStr = typeof rawPartner === 'object' && rawPartner ? (rawPartner._id || rawPartner.id) : rawPartner;
+                    const partner = (typeof rawPartner === 'object' && rawPartner?.displayName)
+                      ? rawPartner
+                      : ((allContacts || []).find(ac => String(ac._id) === String(partnerIdStr)) || rawPartner);
+
+                    const name = c.name || partner?.displayName || (partner?.username ? `@${partner.username}` : 'Chat');
+                    const avatar = getMediaUrl(partner?.avatar, name) || DEFAULT_AVATAR;
+
+                    const partnerId = partnerIdStr ? String(partnerIdStr) : null;
                     const isPartnerOnline = partnerId && safeOnlineIds.includes(partnerId);
 
                     const isLocked = lockedConversations.includes(String(c._id));

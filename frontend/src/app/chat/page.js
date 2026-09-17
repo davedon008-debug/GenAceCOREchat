@@ -835,20 +835,31 @@ export default function ChatPage() {
     }
   }, [loading, token, activePersona]);
 
+  const rawTargetParticipant = activeType === 'conversation'
+    ? activeObject?.participants?.find(p => {
+        const idStr = typeof p === 'object' && p ? (p._id || p.id) : p;
+        return idStr && String(idStr) !== String(activePersona?._id);
+      }) || activeObject?.participants?.[0]
+    : null;
+
+  const rawTargetId = typeof rawTargetParticipant === 'object' && rawTargetParticipant ? (rawTargetParticipant._id || rawTargetParticipant.id) : rawTargetParticipant;
+
+  const currentTargetParticipant = (typeof rawTargetParticipant === 'object' && rawTargetParticipant?.displayName)
+    ? rawTargetParticipant
+    : ((allContacts || []).find(ac => String(ac._id) === String(rawTargetId)) || rawTargetParticipant);
+
+  const currentTargetPersonaId = rawTargetId ? String(rawTargetId) : null;
+  const isCurrentTargetBlocked = currentTargetPersonaId && blockedUserIds.includes(String(currentTargetPersonaId));
+
   const headerTitle = activeType === 'space'
     ? activeObject?.title
-    : activeObject?.name || activeObject?.participants?.find(p => p._id !== activePersona?._id)?.displayName || 'Conversation';
-
-  const currentTargetParticipant = activeType === 'conversation'
-    ? activeObject?.participants?.find(p => String(p._id || p) !== String(activePersona?._id))
-    : null;
-  const currentTargetPersonaId = currentTargetParticipant?._id || currentTargetParticipant;
-  const isCurrentTargetBlocked = currentTargetPersonaId && blockedUserIds.includes(String(currentTargetPersonaId));
+    : activeObject?.name || currentTargetParticipant?.displayName || (currentTargetParticipant?.username ? `@${currentTargetParticipant.username}` : 'Conversation');
 
   const headerSubtitle = activeType === 'space'
     ? 'Synchronized room canvas'
     : (currentTargetParticipant?.bio || currentTargetParticipant?.customStatus || (currentTargetParticipant?.username ? `@${currentTargetParticipant.username}` : 'Direct Message'));
-  const headerAvatar = activeType === 'conversation' ? currentTargetParticipant?.avatar : null;
+
+  const headerAvatar = activeType === 'conversation' ? getMediaUrl(currentTargetParticipant?.avatar, headerTitle) : null;
 
   const handleToggleBlockUser = () => {
     if (activeType !== 'conversation' || !activeObject || !currentTargetPersonaId) return;
