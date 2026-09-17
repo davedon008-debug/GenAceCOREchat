@@ -56,8 +56,32 @@ export const AuthProvider = ({ children }) => {
   const fetchPersonas = async () => {
     try {
       const res = await api.get('/personas');
-      if (res.data.success) {
-        setPersonas(res.data.personas);
+      if (res.data.success && Array.isArray(res.data.personas)) {
+        const fetchedList = res.data.personas;
+        setPersonas(fetchedList);
+
+        // Auto-sync activePersona and localStorage with fresh data from database
+        const savedPersonaStr = typeof window !== 'undefined' ? localStorage.getItem('donchat_persona') : null;
+        let currentId = activePersona?._id;
+        if (!currentId && savedPersonaStr) {
+          try { currentId = JSON.parse(savedPersonaStr)?._id; } catch (e) {}
+        }
+
+        if (currentId) {
+          const freshActive = fetchedList.find(p => String(p._id) === String(currentId));
+          if (freshActive) {
+            setActivePersona(freshActive);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('donchat_persona', JSON.stringify(freshActive));
+            }
+          }
+        } else if (fetchedList.length > 0) {
+          const defaultP = fetchedList.find(p => p.isDefault) || fetchedList[0];
+          setActivePersona(defaultP);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('donchat_persona', JSON.stringify(defaultP));
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to fetch personas:', err);
