@@ -212,19 +212,7 @@ export default function MessageItem({
   };
 
   const { activePersona: contextPersona } = useAuth();
-
-  // Instant fallback to localStorage so activePersona is never null during async re-renders
-  const getSavedPersona = () => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const saved = localStorage.getItem('donchat_persona');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  };
-
-  const resolvedPersona = propPersona || contextPersona || getSavedPersona();
+  const resolvedPersona = propPersona || contextPersona;
 
   // Touch Long-Press handlers for phone devices
   const handleTouchStart = () => {
@@ -453,7 +441,7 @@ export default function MessageItem({
                 )}
                 <VoicePlayer src={resolvedMediaUrl} duration={message.voiceDuration} />
                 <div className="flex items-center gap-1 justify-end text-[10px] text-gray-300 pt-0.5">
-                  <span>{formattedTime}</span>
+                  <span suppressHydrationWarning>{formattedTime}</span>
                   {renderTickStatus()}
                 </div>
               </div>
@@ -501,7 +489,7 @@ export default function MessageItem({
                   <p className="text-xs text-gray-100 whitespace-pre-wrap break-words px-0.5">{message.content}</p>
                 )}
                 <div className="flex items-center gap-1 justify-end text-[10px] opacity-75 shrink-0 select-none pt-0.5">
-                  <span>{formattedTime}</span>
+                  <span suppressHydrationWarning>{formattedTime}</span>
                   {renderTickStatus()}
                 </div>
               </div>
@@ -555,7 +543,7 @@ export default function MessageItem({
                     <span className="text-gray-400 font-medium">🎥 Video Note</span>
                   )}
                   <div className="flex items-center gap-1 ml-auto">
-                    <span>{formattedTime}</span>
+                    <span suppressHydrationWarning>{formattedTime}</span>
                     {renderTickStatus()}
                   </div>
                 </div>
@@ -598,7 +586,7 @@ export default function MessageItem({
                   )}
                 </div>
                 <div className="flex items-center gap-1 justify-end text-[10px] opacity-75 shrink-0 select-none pt-0.5">
-                  <span>{formattedTime}</span>
+                  <span suppressHydrationWarning>{formattedTime}</span>
                   {renderTickStatus()}
                 </div>
               </div>
@@ -625,7 +613,7 @@ export default function MessageItem({
                   </p>
                   <div className="flex items-center gap-1.5 ml-auto text-[10px] opacity-75 shrink-0 select-none self-end mt-0.5">
                     {renderPrivacyBadge()}
-                    <span>{formattedTime}</span>
+                    <span suppressHydrationWarning>{formattedTime}</span>
                     {renderTickStatus()}
                   </div>
                 </div>

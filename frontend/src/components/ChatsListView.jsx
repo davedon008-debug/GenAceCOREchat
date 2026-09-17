@@ -245,7 +245,7 @@ export default function ChatsListView({
                             <span>{item.name}</span>
                             {item.isLocked && <Lock className="w-3 h-3 text-indigo-400 shrink-0" />}
                           </h4>
-                          {item.time && <span className="text-[10px] text-gray-500 font-mono">{item.time}</span>}
+                          {item.time && <span suppressHydrationWarning className="text-[10px] text-gray-500 font-mono">{item.time}</span>}
                         </div>
                         <p className="text-[11px] text-gray-400 truncate">{item.lastText}</p>
                       </div>

@@ -965,6 +965,28 @@ export default function ChatPage() {
     });
   };
 
+  if (loading) {
+    return (
+      <div className="h-[100dvh] w-full flex items-center justify-center bg-[#090c15]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+          <p className="text-xs text-cyan-400 font-semibold tracking-wider">Loading Workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!token || !activePersona) {
+    return (
+      <div className="h-[100dvh] w-full flex items-center justify-center bg-[#090c15]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+          <p className="text-xs text-cyan-400 font-semibold tracking-wider">Authenticating...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-[100dvh] w-full flex overflow-hidden bg-background select-none relative">
       {/* Mobile Backdrop Overlay */}
