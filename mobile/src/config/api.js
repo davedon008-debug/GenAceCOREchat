@@ -68,11 +68,11 @@ export const getApiBaseUrl = () => {
   }
 
   const detected = getDetectedIps();
-  if (detected.length > 0) {
+  if (detected.length > 0 && process.env.NODE_ENV !== 'production') {
     return `http://${detected[0]}:5005/api`;
   }
 
-  return `http://10.4.234.175:5005/api`;
+  return 'https://genacecorechat.onrender.com/api';
 };
 
 export const getMediaUrl = (url) => {
