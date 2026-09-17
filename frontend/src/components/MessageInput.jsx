@@ -81,24 +81,34 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
   };
 
   const handleSend = async () => {
-    const hasText = text.trim().length > 0;
-    const hasFile = !!selectedFile;
+    const messageText = text.trim();
+    const fileToUpload = selectedFile;
+    const currentReplyTo = replyingTo;
+
+    const hasText = messageText.length > 0;
+    const hasFile = !!fileToUpload;
 
     if (!hasText && !hasFile) return;
     if (isReadingFile || isSending) return;
+
+    // ⚡ OPTIMISTIC CLEAR: Instantly clear text and file inputs (0ms delay)
+    setText('');
+    setSelectedFile(null);
+    if (onCancelReply) onCancelReply();
+    if (onTyping) onTyping(false);
 
     setIsSending(true);
     try {
       if (hasFile) {
         let contentType = 'file';
-        if (selectedFile.isImage) contentType = 'image';
-        else if (selectedFile.isVideo) contentType = 'video';
+        if (fileToUpload.isImage) contentType = 'image';
+        else if (fileToUpload.isVideo) contentType = 'video';
 
         let uploadedMediaUrl = '';
 
         try {
           const formData = new FormData();
-          formData.append('file', selectedFile.file);
+          formData.append('file', fileToUpload.file);
 
           const uploadRes = await api.post('/upload', formData);
           if (uploadRes.data.success && uploadRes.data.url) {
@@ -111,12 +121,12 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
               const r = new FileReader();
               r.onload = () => resolve(r.result);
               r.onerror = reject;
-              r.readAsDataURL(selectedFile.file);
+              r.readAsDataURL(fileToUpload.file);
             });
 
             const uploadRes = await api.post('/upload', {
               fileData: base64Data,
-              fileName: selectedFile.name
+              fileName: fileToUpload.name
             });
             if (uploadRes.data.success && uploadRes.data.url) {
               uploadedMediaUrl = uploadRes.data.url;
@@ -124,6 +134,7 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
           } catch (fallbackErr) {
             console.error('Base64 fallback upload also failed:', fallbackErr);
             setInputError('Failed to upload attachment. Please check your network connection.');
+            setSelectedFile(fileToUpload);
             setIsSending(false);
             return;
           }
@@ -134,25 +145,23 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
         }
 
         await onSendMessage({
-          content: hasText ? text.trim() : selectedFile.name,
+          content: hasText ? messageText : fileToUpload.name,
           contentType,
           mediaUrl: uploadedMediaUrl,
-          replyTo: replyingTo ? replyingTo._id : null
+          replyTo: currentReplyTo ? currentReplyTo._id : null
         });
       } else {
         await onSendMessage({
-          content: text.trim(),
+          content: messageText,
           contentType: 'text',
-          replyTo: replyingTo ? replyingTo._id : null
+          replyTo: currentReplyTo ? currentReplyTo._id : null
         });
       }
-
-      setText('');
-      setSelectedFile(null);
-      if (onCancelReply) onCancelReply();
-      if (onTyping) onTyping(false);
     } catch (err) {
       console.error('Send error:', err);
+      // Restore input text if send failed
+      setText(messageText);
+      setInputError('Failed to send message. Please try again.');
     } finally {
       setIsSending(false);
     }
