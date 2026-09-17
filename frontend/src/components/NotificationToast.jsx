@@ -44,7 +44,11 @@ export default function NotificationToast({ notification, onClick, onClose }) {
           <div className="relative shrink-0">
             <img 
               src={getMediaUrl(senderAvatar) || DEFAULT_AVATAR} 
-              alt={senderName || 'Notification'} 
+              alt="" 
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = DEFAULT_AVATAR;
+              }}
               className="w-11 h-11 rounded-full object-cover border-2 border-emerald-500/60 group-hover:scale-105 transition-transform" 
             />
             <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#18252d] absolute bottom-0 right-0 flex items-center justify-center text-[8px] font-bold text-slate-950">

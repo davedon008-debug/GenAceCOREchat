@@ -149,7 +149,8 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
                   >
                     <img
                       src={user.avatar}
-                      alt={user.name}
+                      alt=""
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
                       className="w-10 h-10 rounded-full object-cover border border-white/10 group-hover/avatar:scale-110 transition-transform"
                     />
                     {user.online && (

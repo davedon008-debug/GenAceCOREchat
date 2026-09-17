@@ -229,7 +229,12 @@ export default function ChatsListView({
                         }}
                         title="Click to view profile picture"
                       >
-                        <img src={item.avatar} alt={item.name} className="w-10 h-10 rounded-full object-cover border border-white/10 group-hover/avatar:scale-110 transition-transform" />
+                        <img 
+                          src={item.avatar} 
+                          alt="" 
+                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                          className="w-10 h-10 rounded-full object-cover border border-white/10 group-hover/avatar:scale-110 transition-transform" 
+                        />
                         {item.targetPersonaId && getStatusDotClass(item.targetPersonaId) && (
                           <span className={`w-2.5 h-2.5 rounded-full border-2 border-[#0f172a] absolute bottom-0 right-0 ${getStatusDotClass(item.targetPersonaId)}`} />
                         )}

@@ -61,19 +61,34 @@ export const getMediaUrl = (url) => {
   }
   if (clean.startsWith('data:')) return clean;
 
+  const apiBase = getApiBaseUrl();
+  const serverBase = apiBase.replace(/\/api\/?$/, '');
+
   // Dynamically rewrite /uploads/ URLs to active server base URL regardless of hardcoded host/IP
   if (clean.includes('/uploads/')) {
     const relativePath = clean.substring(clean.indexOf('/uploads/'));
-    const apiBase = getApiBaseUrl();
-    const serverBase = apiBase.replace(/\/api\/?$/, '');
     return `${serverBase}${relativePath}`;
   }
 
+  // Rewrite hardcoded local IP/localhost URLs on remote deployments to active serverBase
+  if (clean.includes('localhost:') || clean.includes('127.0.0.1:') || clean.includes('192.168.') || clean.includes('10.0.') || clean.includes('172.16.')) {
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      try {
+        const urlObj = new URL(clean);
+        return `${serverBase}${urlObj.pathname}${urlObj.search}`;
+      } catch {
+        return DEFAULT_AVATAR;
+      }
+    }
+  }
+
   if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && clean.startsWith('http://')) {
+      return clean.replace(/^http:\/\//i, 'https://');
+    }
     return clean;
   }
-  const apiBase = getApiBaseUrl();
-  const serverBase = apiBase.replace(/\/api\/?$/, '');
+
   return `${serverBase}${clean.startsWith('/') ? '' : '/'}${clean}`;
 };
 
