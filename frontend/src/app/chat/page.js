@@ -28,6 +28,7 @@ import SettingsView from '../../components/SettingsView';
 import DiscoverView from '../../components/DiscoverView';
 import AdminView from '../../components/AdminView';
 import PasscodeModal from '../../components/PasscodeModal';
+import MobileBottomNav from '../../components/MobileBottomNav';
 import { playNotificationSound, getNotifPrefs } from '../../lib/sound';
 
 import { Plus, Search, User, X, Bell, UserX } from 'lucide-react';
@@ -1219,6 +1220,49 @@ export default function ChatPage() {
                 setActiveNavView('chats');
               }}
             />
+          ) : activeNavView === 'chats' ? (
+            <div className="flex-1 flex flex-col h-full overflow-hidden">
+              {/* Desktop WelcomeScreen */}
+              <div className="hidden md:block flex-1 h-full overflow-hidden">
+                <WelcomeScreen
+                  onOpenNewChat={() => setShowNewChatModal(true)}
+                  onOpenCreateSpace={() => setShowCreateSpaceModal(true)}
+                  onOpenNewPersona={() => setShowPersonaModal(true)}
+                  activePersona={activePersona}
+                  onLogout={logout}
+                  onSelectNav={(nav) => setActiveNavView(nav)}
+                  onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+                  conversations={conversations}
+                  spaces={spaces}
+                  onSelectConversation={(id) => handleSelectConversationWithLock(id)}
+                  onSelectSpace={(id) => selectSpace(id)}
+                  onStartDM={(id) => startNewDirectMessage(id)}
+                />
+              </div>
+
+              {/* Mobile Full-Screen Main Tab List View matching MainTabScreen.js */}
+              <div className="block md:hidden flex-1 h-full overflow-hidden pb-14">
+                <Sidebar
+                  conversations={conversations}
+                  spaces={spaces}
+                  allContacts={allContacts}
+                  lockedConversations={passcodeStatus.chatLockEnabled ? (passcodeStatus.lockedConversations || []) : []}
+                  lockedSpaces={passcodeStatus.chatLockEnabled ? (passcodeStatus.lockedSpaces || []) : []}
+                  activeId={activeId}
+                  activeType={activeType}
+                  activeNav={activeNavView}
+                  onSelectNav={(nav) => setActiveNavView(nav)}
+                  onSelectConversation={(id, conv) => handleSelectConversationWithLock(id, conv)}
+                  onSelectSpace={(id) => handleSelectSpaceWithLock(id)}
+                  onStartDM={(id) => startNewDirectMessage(id)}
+                  onOpenNewChat={() => setShowNewChatModal(true)}
+                  onOpenCreateSpace={() => setShowCreateSpaceModal(true)}
+                  onOpenNewPersona={() => setShowPersonaModal(true)}
+                  onResetActive={() => setActiveId(null)}
+                  isMobileView={true}
+                />
+              </div>
+            </div>
           ) : (
             <WelcomeScreen
               onOpenNewChat={() => setShowNewChatModal(true)}
@@ -1237,11 +1281,24 @@ export default function ChatPage() {
           )}
         </div>
 
+        {/* Mobile Fixed Bottom Navigation Bar matching MainTabScreen */}
+        {!activeId && (
+          <MobileBottomNav
+            activeTab={activeNavView}
+            onSelectTab={(tab) => {
+              setActiveNavView(tab);
+              setActiveId(null);
+            }}
+            unreadChatsCount={(conversations || []).reduce((sum, c) => sum + (c.unreadCount || 0), 0)}
+            onlineFriendsCount={(allContacts || []).filter(c => onlineUserIds.includes(String(c._id))).length}
+          />
+        )}
+
         {/* Floating Members Panel Button — visible on mobile/tablet for non-chat views */}
         {!activeId && (
           <button
             onClick={() => setShowRightPanel(prev => !prev)}
-            className="xl:hidden fixed bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-2xl shadow-indigo-500/30 transition active:scale-95"
+            className="hidden sm:flex xl:hidden fixed bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-2xl shadow-indigo-500/30 transition active:scale-95"
           >
             <span>👥</span>
             <span>{showRightPanel ? 'Hide' : 'Members'}</span>
