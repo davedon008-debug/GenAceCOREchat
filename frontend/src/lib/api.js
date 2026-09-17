@@ -91,8 +91,16 @@ export const createInitialsAvatar = (name = 'User') => {
     <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="46" font-weight="800" letter-spacing="1">${initials}</text>
   </svg>`;
 
-  if (typeof btoa === 'function') {
-    return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+  try {
+    if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
+      const base64 = window.btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
+      return `data:image/svg+xml;base64,${base64}`;
+    }
+    if (typeof Buffer !== 'undefined') {
+      return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+    }
+  } catch {
+    return DEFAULT_AVATAR;
   }
   return DEFAULT_AVATAR;
 };
