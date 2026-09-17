@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
-import api from '../../lib/api';
+import api, { getMediaUrl } from '../../lib/api';
 
 import Sidebar from '../../components/Sidebar';
 import ChatHeader from '../../components/ChatHeader';
@@ -188,6 +188,31 @@ export default function ChatPage() {
       targetId,
       targetType
     });
+
+    // Dispatch Native Browser Notification (if granted and tab is in background)
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        try {
+          const notifTitle = isSpace ? `[Space] ${senderName}` : senderName || 'New Message';
+          const notifBody = privacyMode === 'burn' ? '🔥 Burn on read message' : (content || 'Sent a message');
+          const n = new Notification(notifTitle, {
+            body: notifBody,
+            icon: getMediaUrl(senderAvatar),
+          });
+          n.onclick = () => {
+            window.focus();
+            if (targetId) {
+              if (targetType === 'space') selectSpace(targetId);
+              else selectConversation(targetId);
+            }
+          };
+        } catch (err) {
+          console.warn('Native notification failed:', err);
+        }
+      } else if (Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
+    }
   };
 
   const handleTestNotification = () => {

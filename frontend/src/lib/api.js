@@ -6,9 +6,12 @@ const getApiBaseUrl = () => {
   }
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    return `http://${hostname}:5005/api`;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return `http://${hostname}:5005/api`;
+    }
+    return 'https://genacecorechat.onrender.com/api';
   }
-  return 'http://localhost:5005/api';
+  return 'https://genacecorechat.onrender.com/api';
 };
 
 const api = axios.create();

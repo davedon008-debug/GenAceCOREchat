@@ -6,11 +6,17 @@ const getSocketUrl = () => {
   if (process.env.NEXT_PUBLIC_SOCKET_URL) {
     return process.env.NEXT_PUBLIC_SOCKET_URL;
   }
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/?$/, '');
+  }
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    return `http://${hostname}:5005`;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return `http://${hostname}:5005`;
+    }
+    return 'https://genacecorechat.onrender.com';
   }
-  return 'http://localhost:5005';
+  return 'https://genacecorechat.onrender.com';
 };
 
 export const getSocket = () => {
