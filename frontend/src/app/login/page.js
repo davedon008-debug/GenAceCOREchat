@@ -15,6 +15,9 @@ export default function LoginPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('mode=register')) {
+      setIsRegister(true);
+    }
     if (token && activePersona) {
       router.push('/chat');
     }
