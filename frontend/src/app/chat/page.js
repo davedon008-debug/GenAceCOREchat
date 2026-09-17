@@ -472,6 +472,7 @@ export default function ChatPage() {
       if (msgRes.data.success) {
         setMessages(msgRes.data.messages);
       }
+      markActiveRoomAsRead(convId, 'conversation');
       return true;
     } catch (err) {
       console.error('Failed to load conversation messages:', err);
@@ -589,6 +590,7 @@ export default function ChatPage() {
         if (msgRes.data.success) {
           setMessages(msgRes.data.messages);
         }
+        markActiveRoomAsRead(spaceId, 'space');
         return true;
       }
       return false;

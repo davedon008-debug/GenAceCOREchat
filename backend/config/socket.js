@@ -35,20 +35,20 @@ export const broadcastPresence = async () => {
 
     validIds.forEach(pId => {
       const p = onlinePersonas.find(item => String(item._id) === String(pId));
-      const status = p?.status || 'online';
-      const isAdmin = p?.userId && p.userId.role === 'admin';
+      const dbStatus = p?.status;
+      const effectiveStatus = (dbStatus && dbStatus !== 'offline') ? dbStatus : 'online';
 
-      if (status !== 'offline' || isAdmin) {
-        onlinePersonaIds.push(pId);
-        personaStatuses[pId] = (status === 'offline' && isAdmin) ? 'online' : status;
-      }
+      onlinePersonaIds.push(pId);
+      personaStatuses[pId] = effectiveStatus;
     });
 
     ioServer.emit('presence:update', { onlinePersonaIds, personaStatuses });
   } catch (err) {
     console.error('[Socket] Presence broadcast error:', err);
     const fallbackIds = Array.from(new Set(connectedPersonas.values())).filter(Boolean).map(String);
-    ioServer.emit('presence:update', { onlinePersonaIds: fallbackIds, personaStatuses: {} });
+    const fallbackStatuses = {};
+    fallbackIds.forEach(id => { fallbackStatuses[id] = 'online'; });
+    ioServer.emit('presence:update', { onlinePersonaIds: fallbackIds, personaStatuses: fallbackStatuses });
   }
 };
 
@@ -260,24 +260,32 @@ export const initSocketServer = (httpServer) => {
 
       try {
         const filter = {
-          senderPersonaId: { $ne: socket.personaId },
-          status: { $ne: 'read' }
+          senderPersonaId: { $ne: socket.personaId }
         };
         if (conversationId) filter.conversationId = conversationId;
         else if (spaceId) filter.spaceId = spaceId;
         else filter.$or = [{ conversationId: targetRoom }, { spaceId: targetRoom }];
 
-        const result = await Message.updateMany(filter, {
+        await Message.updateMany(filter, {
           $set: { status: 'read' },
           $addToSet: { readBy: socket.personaId }
         });
 
-        if (result.modifiedCount > 0) {
-          io.to(String(targetRoom)).emit('messages:read', {
-            conversationId,
-            spaceId,
-            readerPersonaId: socket.personaId
-          });
+        const readPayload = {
+          conversationId,
+          spaceId,
+          readerPersonaId: socket.personaId
+        };
+
+        io.to(String(targetRoom)).emit('messages:read', readPayload);
+
+        if (conversationId && mongoose.Types.ObjectId.isValid(conversationId)) {
+          const conv = await Conversation.findById(conversationId).select('participants').lean();
+          if (conv && Array.isArray(conv.participants)) {
+            conv.participants.forEach(pId => {
+              if (pId) io.to(`persona:${pId}`).emit('messages:read', readPayload);
+            });
+          }
         }
       } catch (err) {
         console.error('[Socket] message:read handling error:', err);
