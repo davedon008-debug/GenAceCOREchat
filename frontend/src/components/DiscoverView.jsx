@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { Search, Globe, Users, Zap, Menu, ArrowLeft, LogIn, Check } from 'lucide-react';
 import api, { getMediaUrl } from '../lib/api';
@@ -8,7 +9,8 @@ import AvatarViewerModal from './AvatarViewerModal';
 
 const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%231e293b'/%3E%3Cpath d='M18 20a6 6 0 0 0-12 0'/%3E%3Ccircle cx='12' cy='10' r='4'/%3E%3C/svg%3E";
 
-export default function DiscoverView({ allContacts = [], onSelectSpace, onStartDM, onOpenMobileSidebar, onBack }) {
+export default function DiscoverView({ allContacts = [], onSelectSpace, onStartDM, onOpenMobileSidebar, onBack, onRefreshSpaces }) {
+  const { activePersona } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [publicSpaces, setPublicSpaces] = useState([]);
   const [joiningId, setJoiningId] = useState(null);
@@ -19,6 +21,14 @@ export default function DiscoverView({ allContacts = [], onSelectSpace, onStartD
   const onlineUserIds = socketCtx?.onlineUserIds || [];
   const personaStatuses = socketCtx?.personaStatuses || {};
   const safeOnlineIds = Array.isArray(onlineUserIds) ? onlineUserIds.map(String) : [];
+
+  const isMemberOfSpace = (space) => {
+    if (!space || !space.members || !activePersona?._id) return false;
+    return space.members.some(m => {
+      const mId = typeof m.personaId === 'object' && m.personaId ? (m.personaId._id || m.personaId.id) : m.personaId;
+      return String(mId) === String(activePersona._id);
+    });
+  };
 
   const getStatusDotClass = (personaId) => {
     if (!personaId) return 'bg-gray-500';
@@ -52,7 +62,7 @@ export default function DiscoverView({ allContacts = [], onSelectSpace, onStartD
       const res = await api.post(`/spaces/${spaceId}/join`);
       if (res.data.success) {
         setJoinedIds(prev => new Set([...prev, spaceId]));
-        // Navigate into the space
+        if (onRefreshSpaces) onRefreshSpaces();
         if (onSelectSpace) onSelectSpace(spaceId);
       }
     } catch (err) {
@@ -132,7 +142,7 @@ export default function DiscoverView({ allContacts = [], onSelectSpace, onStartD
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {filteredSpaces.map((space) => {
-              const isJoined = joinedIds.has(space._id);
+              const isJoined = isMemberOfSpace(space) || joinedIds.has(space._id);
               const isJoining = joiningId === space._id;
               return (
                 <div

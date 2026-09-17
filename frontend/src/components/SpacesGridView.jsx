@@ -1,12 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { Search, Plus, Globe, Lock, Check, Menu, ArrowLeft } from 'lucide-react';
 
 export default function SpacesGridView({ spaces = [], onSelectSpace, onOpenCreateSpace, onOpenMobileSidebar, onBack }) {
+  const { activePersona } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('popular'); // 'popular' | 'my' | 'joined'
   const [joinedSpaceIds, setJoinedSpaceIds] = useState([]);
+
+  const isMemberOfSpace = (space) => {
+    if (!space || !space.members || !activePersona?._id) return false;
+    return space.members.some(m => {
+      const mId = typeof m.personaId === 'object' && m.personaId ? (m.personaId._id || m.personaId.id) : m.personaId;
+      return String(mId) === String(activePersona._id);
+    });
+  };
 
   const displaySpaces = spaces.map((s) => ({
     id: s._id,
@@ -113,7 +122,7 @@ export default function SpacesGridView({ spaces = [], onSelectSpace, onOpenCreat
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredSpaces.map((item) => {
-            const isJoined = joinedSpaceIds.includes(item.id);
+            const isJoined = isMemberOfSpace(item.realSpace) || joinedSpaceIds.includes(item.id);
 
             return (
               <div
