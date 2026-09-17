@@ -1,9 +1,7 @@
 'use client';
 
 import { X, ZoomIn, Download } from 'lucide-react';
-import { getMediaUrl } from '../lib/api';
-
-const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%231e293b'/%3E%3Cpath d='M18 20a6 6 0 0 0-12 0'/%3E%3Ccircle cx='12' cy='10' r='4'/%3E%3C/svg%3E";
+import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 
 export default function AvatarViewerModal({ isOpen, onClose, avatarUrl, name, handle, bio, customStatus }) {
   if (!isOpen) return null;
@@ -64,6 +62,7 @@ export default function AvatarViewerModal({ isOpen, onClose, avatarUrl, name, ha
             src={resolvedUrl}
             alt={name || 'User Profile Picture'}
             className="max-w-full max-h-[50vh] sm:max-h-[60vh] w-auto h-auto rounded-3xl object-contain border-2 border-cyan-500/30 shadow-2xl shadow-cyan-500/20 transition-all duration-300 transform group-hover:scale-[1.02]"
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
           />
         </div>
 

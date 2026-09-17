@@ -3,15 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
-import api, { getMediaUrl } from '../lib/api';
-import AvatarViewerModal from './AvatarViewerModal';
-import Logo from './Logo';
-import { 
-  MessageSquare, Zap, Users, Compass, Bell, Settings, Crown, 
-  ChevronRight, X, Check, Plus, LogOut, Shield, Lock
-} from 'lucide-react';
-
-const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%231e293b'/%3E%3Cpath d='M18 20a6 6 0 0 0-12 0'/%3E%3Ccircle cx='12' cy='10' r='4'/%3E%3C/svg%3E";
+import api, { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 
 export default function Sidebar({ 
   conversations = [], 
