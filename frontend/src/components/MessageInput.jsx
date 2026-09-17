@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Mic, Paperclip, Plus, Square, Trash2, Reply, X, FileText, Image as ImageIcon } from 'lucide-react';
 import api from '../lib/api';
+import AttachmentPickerModal from './AttachmentPickerModal';
 
 export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCancelReply, onFocus }) {
   const [text, setText] = useState('');
@@ -12,12 +13,16 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
   const [isReadingFile, setIsReadingFile] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [inputError, setInputError] = useState(null);
+  const [isAttachmentModalOpen, setIsAttachmentModalOpen] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
   const streamRef = useRef(null);
   const fileInputRef = useRef(null);
+  const docInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   useEffect(() => {
     return () => {
@@ -25,8 +30,7 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
     };
   }, []);
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files?.[0];
+  const processFileObject = (file) => {
     if (!file) return;
 
     const maxMB = 250;
@@ -59,6 +63,12 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
       isVideo,
       previewUrl
     });
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processFileObject(file);
     e.target.value = '';
   };
 
@@ -260,12 +270,50 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
 
   return (
     <div className="p-3 md:p-4 glass-panel border-t border-white/10 select-none">
-      {/* Hidden File Input */}
+      {/* Attachment Picker Modal */}
+      <AttachmentPickerModal
+        isOpen={isAttachmentModalOpen}
+        onClose={() => setIsAttachmentModalOpen(false)}
+        onSelectDocument={() => docInputRef.current?.click()}
+        onSelectGallery={() => galleryInputRef.current?.click()}
+        onSelectCameraFile={(capturedFile) => {
+          if (capturedFile) {
+            processFileObject(capturedFile);
+          } else {
+            cameraInputRef.current?.click();
+          }
+        }}
+        onSelectVoice={() => startRecording()}
+      />
+
+      {/* Hidden File Inputs for Different Types */}
       <input
         type="file"
         ref={fileInputRef}
         onChange={handleFileSelect}
         accept="*/*"
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={docInputRef}
+        onChange={handleFileSelect}
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar,.7z,*/*"
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={galleryInputRef}
+        onChange={handleFileSelect}
+        accept="image/*,video/*"
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={cameraInputRef}
+        onChange={handleFileSelect}
+        accept="image/*"
+        capture="environment"
         className="hidden"
       />
 
@@ -345,9 +393,9 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
       <div className="flex items-center gap-2 bg-[#1e293b] border border-[#2b374e] rounded-full p-2 focus-within:border-indigo-500/60 shadow-lg transition">
         {/* Attachment Button (+) */}
         <button
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => setIsAttachmentModalOpen(true)}
           className="p-2 text-gray-400 hover:text-indigo-400 rounded-full hover:bg-white/5 transition shrink-0"
-          title="Attach File or Media"
+          title="Add Attachment"
         >
           <Plus className="w-5 h-5" />
         </button>
@@ -396,9 +444,9 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
         {!isRecording && (
           <div className="flex items-center gap-1">
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => setIsAttachmentModalOpen(true)}
               className="p-2 rounded-full text-gray-400 hover:text-indigo-400 hover:bg-white/5 transition"
-              title="Attach Image"
+              title="Add Media Attachment"
             >
               <ImageIcon className="w-4.5 h-4.5" />
             </button>
