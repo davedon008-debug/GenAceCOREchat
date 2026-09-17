@@ -115,6 +115,15 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 
+app.get(['/', '/api'], (req, res) => {
+  res.json({
+    status: 'online',
+    message: 'DONCHAT Core API Server is active.',
+    healthCheck: 'https://genacecorechat.onrender.com/api/health',
+    version: '1.0.0'
+  });
+});
+
 app.get('/api/health', async (req, res) => {
   const memoryUsage = process.memoryUsage();
   const uptime = process.uptime();
