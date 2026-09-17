@@ -485,20 +485,47 @@ export default function SettingsView({ onBack, defaultSection }) {
 
     setUploadingAvatar(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      let newAvatarUrl = '';
 
-      const uploadRes = await api.post('/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadRes = await api.post('/upload', formData);
+        if (uploadRes.data?.success) {
+          newAvatarUrl = uploadRes.data.url || uploadRes.data.fileUrl;
+        }
+      } catch (fErr) {
+        console.warn('FormData upload failed, trying base64 fallback:', fErr?.message);
+        const base64Str = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
 
-      if (uploadRes.data?.success) {
-        const newAvatarUrl = uploadRes.data.url;
-        await patchPersona({ avatar: newAvatarUrl });
+        const b64Res = await api.post('/upload', {
+          fileData: base64Str,
+          fileName: file.name
+        });
+        if (b64Res.data?.success) {
+          newAvatarUrl = b64Res.data.url || b64Res.data.fileUrl;
+        }
+      }
+
+      if (newAvatarUrl) {
+        const err = await patchPersona({ avatar: newAvatarUrl });
+        if (err) {
+          alert(`Profile update error: ${err}`);
+        } else {
+          setSavedFlash('Profile picture updated!');
+          setTimeout(() => setSavedFlash(''), 3000);
+        }
+      } else {
+        alert('Could not process image upload.');
       }
     } catch (err) {
       console.error('Failed to upload avatar:', err);
-      alert('Failed to upload profile picture.');
+      alert('Failed to upload profile picture: ' + (err.response?.data?.message || err.message));
     } finally {
       setUploadingAvatar(false);
     }

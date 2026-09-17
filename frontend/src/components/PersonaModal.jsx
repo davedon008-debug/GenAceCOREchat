@@ -25,19 +25,40 @@ export default function PersonaModal({ onClose }) {
 
     setUploadingAvatar(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      let newAvatarUrl = '';
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadRes = await api.post('/upload', formData);
+        if (uploadRes.data?.success) {
+          newAvatarUrl = uploadRes.data.url || uploadRes.data.fileUrl;
+        }
+      } catch (fErr) {
+        console.warn('FormData upload failed, trying base64 fallback:', fErr?.message);
+        const base64Str = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
 
-      const uploadRes = await api.post('/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+        const b64Res = await api.post('/upload', {
+          fileData: base64Str,
+          fileName: file.name
+        });
+        if (b64Res.data?.success) {
+          newAvatarUrl = b64Res.data.url || b64Res.data.fileUrl;
+        }
+      }
 
-      if (uploadRes.data?.success) {
-        setAvatar(uploadRes.data.url);
+      if (newAvatarUrl) {
+        setAvatar(newAvatarUrl);
+      } else {
+        alert('Could not upload profile picture.');
       }
     } catch (err) {
       console.error('Failed to upload persona avatar:', err);
-      alert('Could not upload profile picture.');
+      alert('Could not upload profile picture: ' + (err.response?.data?.message || err.message));
     } finally {
       setUploadingAvatar(false);
     }

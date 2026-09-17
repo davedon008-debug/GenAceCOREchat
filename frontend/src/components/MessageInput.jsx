@@ -90,9 +90,7 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
           const formData = new FormData();
           formData.append('file', selectedFile.file);
 
-          const uploadRes = await api.post('/upload', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
+          const uploadRes = await api.post('/upload', formData);
           if (uploadRes.data.success && uploadRes.data.url) {
             uploadedMediaUrl = uploadRes.data.url;
           }
