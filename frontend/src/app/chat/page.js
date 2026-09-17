@@ -160,6 +160,22 @@ export default function ChatPage() {
     }
   }, [activePersona]);
 
+  useEffect(() => {
+    if (socket && Array.isArray(conversations) && conversations.length > 0) {
+      conversations.forEach(c => {
+        if (c?._id) joinRoom(c._id);
+      });
+    }
+  }, [socket, conversations]);
+
+  useEffect(() => {
+    if (socket && Array.isArray(spaces) && spaces.length > 0) {
+      spaces.forEach(s => {
+        if (s?._id) joinRoom(s._id);
+      });
+    }
+  }, [socket, spaces]);
+
   // Real-time Notification Sound & Toast Listener
   const triggerNotification = (senderName, senderAvatar, content, targetId, targetType, isSpace = false, privacyMode = 'normal') => {
     const prefs = getNotifPrefs();
@@ -291,6 +307,7 @@ export default function ChatPage() {
         });
 
         if (!isFromMe) {
+          playNotificationSound();
           markActiveRoomAsRead(activeId, activeType);
         }
       }

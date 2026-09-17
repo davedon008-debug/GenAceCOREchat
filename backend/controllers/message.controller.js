@@ -339,22 +339,17 @@ export const sendMessage = async (req, res) => {
         }
 
         const targetRoom = spaceId || conversationId;
-        const roomsToEmit = new Set();
+        const msgObject = populated.toObject ? populated.toObject({ virtuals: true }) : populated;
+
         if (targetRoom) {
-          roomsToEmit.add(String(targetRoom));
-        }
-        if (recipientPersonaIds.length > 0) {
-          recipientPersonaIds.forEach(pId => {
-            if (pId) roomsToEmit.add(`persona:${pId}`);
-          });
+          io.to(String(targetRoom)).emit('message:new', msgObject);
         }
 
-        const roomList = Array.from(roomsToEmit);
-        if (roomList.length > 0) {
-          io.to(roomList).emit('message:new', populated);
-        } else {
-          io.emit('message:new', populated);
-        }
+        recipientPersonaIds.forEach(pId => {
+          if (pId) {
+            io.to(`persona:${pId}`).emit('message:new', msgObject);
+          }
+        });
       } catch (socketErr) {
         console.error('[sendMessage Controller] Socket dispatch error:', socketErr);
       }

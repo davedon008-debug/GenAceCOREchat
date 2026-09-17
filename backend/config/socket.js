@@ -77,6 +77,29 @@ export const evictUserSockets = async (userIds = [], personaIds = []) => {
   await broadcastPresence();
 };
 
+const autoJoinUserRooms = async (socket, personaId) => {
+  if (!socket || !personaId) return;
+  try {
+    const pIdStr = String(personaId);
+    socket.join(`persona:${pIdStr}`);
+
+    const [convs, spaces] = await Promise.all([
+      Conversation.find({ participants: personaId }).select('_id').lean(),
+      Space.find({ 'members.personaId': personaId }).select('_id conversationId').lean()
+    ]);
+
+    (convs || []).forEach(c => socket.join(String(c._id)));
+    (spaces || []).forEach(s => {
+      socket.join(String(s._id));
+      if (s.conversationId) socket.join(String(s.conversationId));
+    });
+
+    console.log(`[Socket] Persona ${pIdStr} auto-joined ${convs.length} conversations & ${spaces.length} spaces`);
+  } catch (err) {
+    console.error(`[Socket] autoJoinUserRooms error for persona ${personaId}:`, err);
+  }
+};
+
 export const initSocketServer = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
@@ -105,27 +128,27 @@ export const initSocketServer = (httpServer) => {
     }
   });
 
-  io.on('connection', (socket) => {
+  io.on('connection', async (socket) => {
     console.log(`[Socket] Connected: PersonaId ${socket.personaId} (Socket: ${socket.id})`);
     
     if (socket.personaId) {
       connectedPersonas.set(socket.id, String(socket.personaId));
-      socket.join(`persona:${socket.personaId}`);
       if (socket.userId) {
         socket.join(`user:${socket.userId}`);
       }
+      await autoJoinUserRooms(socket, socket.personaId);
       broadcastPresence();
     }
 
-    socket.on('presence:announce', (data) => {
+    socket.on('presence:announce', async (data) => {
       const targetId = data?.personaId || socket.personaId;
       if (targetId) {
         socket.personaId = String(targetId);
         connectedPersonas.set(socket.id, String(targetId));
-        socket.join(`persona:${targetId}`);
         if (socket.userId) {
           socket.join(`user:${socket.userId}`);
         }
+        await autoJoinUserRooms(socket, targetId);
         broadcastPresence();
       }
     });
@@ -141,17 +164,9 @@ export const initSocketServer = (httpServer) => {
         if (!mongoose.Types.ObjectId.isValid(roomId)) {
           return;
         }
-        const isAuthorized = await Conversation.exists({ _id: roomId, participants: socket.personaId }) ||
-                             await Space.exists({ _id: roomId, 'members.personaId': socket.personaId }) ||
-                             await Space.exists({ conversationId: roomId, 'members.personaId': socket.personaId }) ||
-                             await Space.exists({ _id: roomId, visibility: 'public' }) ||
-                             await Space.exists({ conversationId: roomId, visibility: 'public' });
-        if (isAuthorized) {
-          socket.join(roomId);
-          console.log(`[Socket] Persona ${socket.personaId} joined room: ${roomId}`);
-        } else {
-          console.warn(`[Socket] Persona ${socket.personaId} unauthorized room join attempt: ${roomId}`);
-        }
+        const roomIdStr = String(roomId);
+        socket.join(roomIdStr);
+        console.log(`[Socket] Persona ${socket.personaId || 'unknown'} joined room: ${roomIdStr}`);
       } catch (err) {
         console.error(`[Socket] Join room verification error:`, err);
       }
@@ -160,7 +175,7 @@ export const initSocketServer = (httpServer) => {
     // Leave room
     socket.on('leave:room', ({ roomId }) => {
       if (roomId) {
-        socket.leave(roomId);
+        socket.leave(String(roomId));
         console.log(`[Socket] Persona ${socket.personaId} left room: ${roomId}`);
       }
     });
@@ -185,21 +200,17 @@ export const initSocketServer = (httpServer) => {
           }
         }
 
-        // Build target room set using Socket.IO chaining to avoid duplicate message emissions
-        let targets = io;
+        const msgObject = message?.toObject ? message.toObject({ virtuals: true }) : message;
+
         if (targetRoom) {
-          targets = targets.to(String(targetRoom));
+          io.to(String(targetRoom)).emit('message:new', msgObject);
         }
 
-        if (recipientPersonaIds.length > 0) {
-          recipientPersonaIds.forEach(pId => {
-            if (pId) {
-              targets = targets.to(`persona:${pId}`);
-            }
-          });
-        }
-
-        targets.emit('message:new', message);
+        recipientPersonaIds.forEach(pId => {
+          if (pId) {
+            io.to(`persona:${pId}`).emit('message:new', msgObject);
+          }
+        });
       } catch (err) {
         console.error('[Socket] Error dispatching message:', err);
         if (targetRoom) {
