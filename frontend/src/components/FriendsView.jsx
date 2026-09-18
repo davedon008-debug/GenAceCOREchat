@@ -136,7 +136,7 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
             return (
               <div
                 key={user.id}
-                className="flex items-center justify-between gap-3 p-3 sm:p-3.5 rounded-2xl bg-[#101625] border border-[#1d273e] hover:border-indigo-500/30 transition group min-w-0 w-full"
+                className="flex items-center justify-between gap-2.5 sm:gap-4 p-3 sm:p-3.5 rounded-2xl bg-[#101625] border border-[#1d273e] hover:border-indigo-500/30 transition group min-w-0 w-full"
               >
                 <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 overflow-hidden">
                   <div
@@ -157,12 +157,12 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
                       <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-emerald-500 border-2 border-[#0f172a] absolute bottom-0 right-0" />
                     )}
                   </div>
-                  <div className="min-w-0 flex-1 overflow-hidden">
+                  <div className="min-w-0 flex-1 overflow-hidden pr-2 sm:pr-3">
                     <h4 className="text-xs font-bold text-white group-hover:text-indigo-300 transition truncate">
                       {user.name}
                     </h4>
                     <p className="text-[10px] sm:text-[11px] text-gray-400 font-mono truncate">
-                      @{user.handle}
+                      {user.handle ? (user.handle.startsWith('@') ? user.handle : `@${user.handle}`) : ''}
                     </p>
                   </div>
                 </div>
@@ -179,7 +179,7 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
 
                   <button
                     onClick={() => toggleAdd(user.id)}
-                    className="px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-[11px] sm:text-xs font-semibold transition shrink-0"
+                    className="px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-[11px] sm:text-xs font-semibold transition shrink-0"
                     title="Remove from contacts"
                   >
                     Remove
