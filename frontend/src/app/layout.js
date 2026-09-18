@@ -12,6 +12,9 @@ export const metadata = {
     statusBarStyle: 'black-translucent',
     title: 'DonChat',
   },
+  icons: {
+    apple: '/icon.png',
+  },
 };
 
 export const viewport = {
