@@ -1,6 +1,8 @@
 {
+  "id": "genace-pwa",
+  "name": "GenAce",
   "short_name": "GenAce",
-  "name": "GenAce — Next-Gen Messaging & Fluid Spaces",
+  "description": "GenAce — Next-Gen Messaging & Fluid Spaces",
   "icons": [
     {
       "src": "/icon.png",
@@ -11,17 +13,20 @@
     {
       "src": "/icon.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/apple-touch-icon.png",
       "sizes": "180x180",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "start_url": "/",
-  "background_color": "#090d18",
-  "theme_color": "#090d18",
+  "scope": "/",
+  "background_color": "#080b14",
+  "theme_color": "#080b14",
   "display": "standalone",
   "orientation": "portrait"
 }
