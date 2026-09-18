@@ -581,10 +581,10 @@ export default function SettingsView({ onBack, defaultSection }) {
   const currentStatusInfo = STATUS_OPTIONS.find(s => s.id === currentStatus) || STATUS_OPTIONS[0];
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#090c15] overflow-hidden select-none">
+    <div className="flex-1 flex flex-col h-full bg-[#080b14] overflow-hidden select-none">
 
       {/* ── Mobile-only top bar with dynamic back navigation ── */}
-      <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-[#1e293b] bg-[#0c101c] shrink-0">
+      <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-[#1d273e] bg-[#101625] shrink-0">
         <button
           onClick={() => {
             if (mobileShowPanel) {
@@ -610,7 +610,7 @@ export default function SettingsView({ onBack, defaultSection }) {
       {/* ── Main settings layout ── */}
       <div className="flex-1 flex flex-col md:flex-row overflow-y-auto">
         {/* Left Settings Navigation Sidebar */}
-        <div className={`w-full md:w-64 border-r border-[#1e293b] p-6 space-y-6 shrink-0 bg-[#0c101c] ${mobileShowPanel ? 'hidden md:block' : 'block md:block'}`}>
+        <div className={`w-full md:w-64 border-r border-[#1d273e] p-6 space-y-6 shrink-0 bg-[#101625] ${mobileShowPanel ? 'hidden md:block' : 'block md:block'}`}>
           <div>
             <h2 className="text-xl font-black text-white font-outfit tracking-tight">Settings</h2>
             <p className="text-xs text-gray-400">Account settings and preferences</p>

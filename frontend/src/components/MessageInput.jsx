@@ -399,7 +399,7 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
       )}
 
       {/* Main Input Bar Container (Panel 3) */}
-      <div className="flex items-center gap-2 bg-[#1e293b] border border-[#2b374e] rounded-full p-2 focus-within:border-indigo-500/60 shadow-lg transition">
+      <div className="flex items-center gap-2 bg-[#101625] border border-[#1d273e] rounded-full p-2 focus-within:border-indigo-500/60 shadow-lg transition">
         {/* Attachment Button (+) */}
         <button
           onClick={() => setIsAttachmentModalOpen(true)}
@@ -471,7 +471,7 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
             <button
               onClick={handleSend}
               disabled={!text.trim() && !selectedFile}
-              className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-40 text-white shadow-lg shadow-indigo-600/30 flex items-center justify-center transition shrink-0"
+              className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#4f46e5] to-[#7c3aed] hover:from-[#4338ca] hover:to-[#6d28d9] disabled:opacity-40 text-white shadow-lg shadow-indigo-600/30 flex items-center justify-center transition shrink-0"
               title="Send Message"
             >
               <Send className="w-4 h-4 ml-0.5" />

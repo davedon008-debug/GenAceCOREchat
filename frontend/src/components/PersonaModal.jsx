@@ -121,7 +121,7 @@ export default function PersonaModal({ onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-      <div className="bg-slate-900 border border-white/15 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
+      <div className="bg-[#101625] border border-[#1d273e] rounded-3xl p-6 w-full max-w-md space-y-4 shadow-2xl">
         <div className="flex items-center justify-between pb-2 border-b border-white/10">
           <h3 className="text-base font-bold text-white">Create New Persona Identity</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-white">

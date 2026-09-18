@@ -361,7 +361,9 @@ export default function MessageItem({
     if (!isMe) return null;
 
     const isPending = message.pending === true || message.sending === true || message.status === 'pending' || (!message._id && !message.id);
-    if (isPending) return null;
+    if (isPending) {
+      return <Clock className="w-3 h-3 text-indigo-300/70 animate-pulse inline ml-1" title="Sending..." />;
+    }
 
     const isRead = message.status === 'read' ||
                    message.read === true ||
@@ -372,10 +374,10 @@ export default function MessageItem({
                    }));
 
     if (isRead) {
-      return <CheckCheck className="w-3.5 h-3.5 text-cyan-300 inline" title="Seen" />;
+      return <CheckCheck className="w-3.5 h-3.5 text-cyan-300 inline font-bold ml-1" title="Read" />;
     }
 
-    return <Check className="w-3.5 h-3.5 text-gray-300/80 inline" title="Sent" />;
+    return <Check className="w-3.5 h-3.5 text-indigo-300/90 inline font-bold ml-1" title="Sent" />;
   };
 
   return (
@@ -391,8 +393,8 @@ export default function MessageItem({
             onContextMenu={handleContextMenu}
             className={`px-3.5 py-2 rounded-2xl text-xs leading-relaxed relative shadow-sm cursor-pointer select-none active:scale-[0.99] transition ${
               isMe
-                ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-br-xs shadow-lg shadow-indigo-950/40 border border-indigo-400/20'
-                : 'bg-[#0f172a] text-gray-100 border border-slate-700/60 rounded-bl-xs shadow-md'
+                ? 'bg-gradient-to-r from-[#4f46e5] to-[#7c3aed] text-white rounded-br-xs shadow-lg shadow-indigo-950/40 border border-indigo-400/20'
+                : 'bg-[#151c2e] text-gray-100 border border-[#1e293b] rounded-bl-xs shadow-md'
             }`}
           >
             {/* Display Sender Handle in Group/Space chats for incoming messages */}

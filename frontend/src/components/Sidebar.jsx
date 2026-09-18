@@ -114,9 +114,9 @@ export default function Sidebar({
     <aside className={`${isMobileView ? 'w-full h-full' : 'w-60 lg:w-64 h-full'} flex flex-col justify-between p-3 sm:p-4 bg-[#090d18] border-r border-[#151c2e] shrink-0 select-none overflow-y-auto z-20 custom-scrollbar`}>
       <div className="flex flex-col space-y-4">
         {/* Top Header Row with Logo & Avatar Status */}
-        <div className="flex items-center justify-between px-1 py-1">
-          <div className="flex items-center gap-2">
-            <Logo variant="full" mode="dark" size={32} />
+        <div className="flex items-center justify-between px-1 py-1 gap-3">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Logo variant="full" mode="dark" size={26} />
             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono font-bold shrink-0">
               v1.0.0
             </span>
@@ -124,13 +124,13 @@ export default function Sidebar({
 
           <div
             onClick={() => setShowPersonaMenu(!showPersonaMenu)}
-            className="relative cursor-pointer group shrink-0"
+            className="relative cursor-pointer group shrink-0 ml-3"
             title="Profile & Identity Persona"
           >
             <img
               src={getMediaUrl(activePersona?.avatar, activePersona?.displayName || activePersona?.username) || DEFAULT_AVATAR}
               alt=""
-              className="w-8 h-8 rounded-full object-cover border border-white/20 group-hover:scale-105 transition"
+              className="w-8 h-8 rounded-full object-cover border border-white/20 group-hover:scale-105 transition shadow-md"
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
             />
             <span className={`w-2.5 h-2.5 rounded-full ${activeStatusColor} absolute bottom-0 right-0 border-2 border-[#090d18]`} />

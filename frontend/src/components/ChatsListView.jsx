@@ -114,16 +114,16 @@ export default function ChatsListView({
   );
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#080b14] p-6 overflow-y-auto select-none space-y-6">
+    <div className="flex-1 flex flex-col h-full bg-[#080b14] p-3 sm:p-6 overflow-y-auto select-none space-y-4 sm:space-y-6">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#141b2d] pb-5">
         <div>
-          <h2 className="text-xl font-black text-white font-outfit tracking-tight flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-indigo-400" /> Recent Chats & Conversations
+          <h2 className="text-lg sm:text-xl font-black text-white font-outfit tracking-tight flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-indigo-400 shrink-0" /> Recent Chats & Conversations
           </h2>
           <p className="text-xs text-gray-400">Select a conversation or space to open the chat stream</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onOpenNewChat}
             className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/25 transition"
@@ -134,8 +134,8 @@ export default function ChatsListView({
       </div>
 
       {/* Search Input & Filter Chips */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="relative flex-1 max-w-md w-full">
           <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
           <input
             type="text"
@@ -146,7 +146,7 @@ export default function ChatsListView({
           />
         </div>
 
-        <div className="flex items-center gap-2 bg-[#0f172a] p-1 rounded-2xl border border-[#1e293b]">
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-[#0f172a] p-1 rounded-2xl border border-[#1e293b] overflow-x-auto no-scrollbar scrollbar-none whitespace-nowrap max-w-full">
           {[
             { id: 'all', label: 'All' },
             { id: 'dms', label: 'Direct Messages' },
@@ -155,7 +155,7 @@ export default function ChatsListView({
             <button
               key={chip.id}
               onClick={() => setActiveFilter(chip.id)}
-              className={`px-4 py-1.5 rounded-xl text-xs font-semibold capitalize transition ${
+              className={`px-3 py-1 sm:px-4 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold capitalize transition shrink-0 ${
                 activeFilter === chip.id
                   ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-md'
                   : 'text-gray-400 hover:text-white'
@@ -180,7 +180,7 @@ export default function ChatsListView({
                 <div
                   key={s._id}
                   onClick={() => onSelectSpace(s._id)}
-                  className="p-4 rounded-3xl bg-[#0f172a] border border-[#1e293b] hover:border-indigo-500/50 flex items-center justify-between cursor-pointer group transition shadow-xl"
+                  className="p-4 rounded-3xl bg-[#101625] border border-[#1d273e] hover:border-indigo-500/50 flex items-center justify-between cursor-pointer group transition shadow-xl"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500/30 to-purple-600/30 border border-indigo-500/40 flex items-center justify-center text-xl shrink-0">
@@ -222,7 +222,7 @@ export default function ChatsListView({
                         onStartDM(item.targetPersonaId);
                       }
                     }}
-                    className="p-4 rounded-3xl bg-[#0f172a] border border-[#1e293b] hover:border-indigo-500/50 flex items-center justify-between cursor-pointer group transition shadow-xl"
+                    className="p-4 rounded-3xl bg-[#101625] border border-[#1d273e] hover:border-indigo-500/50 flex items-center justify-between cursor-pointer group transition shadow-xl"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div

@@ -114,3 +114,39 @@ export function playNotificationSound() {
     console.warn('Could not play notification sound:', err);
   }
 }
+
+export function playSentSound() {
+  if (typeof window === 'undefined') return;
+  if (!getNotifPrefs().soundEffects) return;
+
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(640, now);
+    osc.frequency.exponentialRampToValueAtTime(960, now + 0.05);
+
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.25, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.12);
+  } catch (err) {
+    console.warn('Could not play sent sound:', err);
+  }
+}
+
+

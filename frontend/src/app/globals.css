@@ -8,23 +8,26 @@
    ============================================================ */
 :root,
 html.dark {
-  --color-bg:           #090c15;
+  --color-bg:           #080b14;
   --color-bg-alt:       #090d18;
-  --color-surface:      rgba(15, 23, 42, 0.9);
+  --color-card:         #101625;
+  --color-card-border:  #1d273e;
+  --color-surface:      #0f172a;
   --color-surface-2:    #0c101c;
-  --color-surface-3:    #101524;
+  --color-surface-3:    #101625;
   --color-surface-4:    #0f172a;
   --color-surface-5:    #151c2e;
-  --color-border:       #151c2e;
-  --color-border-2:     #1e293b;
+  --color-border:       #1d273e;
+  --color-border-2:     #151c2e;
   --color-border-3:     rgba(255, 255, 255, 0.08);
-  --color-text:         #f3f4f6;
-  --color-text-muted:   #9ca3af;
-  --color-scrollbar-track: rgba(9, 12, 21, 0.8);
+  --color-text:         #ffffff;
+  --color-text-muted:   #94a3b8;
+  --color-tab-bar:      #0a0e1a;
+  --color-scrollbar-track: rgba(8, 11, 20, 0.8);
   --color-scrollbar-thumb: rgba(255, 255, 255, 0.12);
-  --glass-bg:           rgba(18, 25, 41, 0.85);
-  --glass-border:       rgba(255, 255, 255, 0.08);
-  --glass-shadow:       0 10px 40px 0 rgba(0, 0, 0, 0.45);
+  --glass-bg:           rgba(16, 22, 37, 0.88);
+  --glass-border:       rgba(29, 39, 62, 0.6);
+  --glass-shadow:       0 10px 40px 0 rgba(0, 0, 0, 0.55);
 }
 
 /* ============================================================
@@ -131,8 +134,18 @@ html.light main {
   background-color: #f0f4ff !important;
 }
 
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Smooth theme transition on all elements */
 *, *::before, *::after {
   transition: background-color 0.25s ease, border-color 0.25s ease, color 0.1s ease;
 }
 button, a, input, textarea { transition-duration: 0.15s; }
+

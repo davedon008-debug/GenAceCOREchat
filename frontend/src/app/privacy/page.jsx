@@ -20,7 +20,7 @@ export default function PrivacyPolicyPage() {
                 Official Compliance Document
               </div>
               <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                DonChat Privacy Policy
+                GenAce Privacy Policy
               </h1>
               <p className="text-slate-400 text-sm mt-2">
                 Last updated: <span className="text-cyan-400 font-medium">{lastUpdated}</span>

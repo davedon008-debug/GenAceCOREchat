@@ -39,7 +39,7 @@ export default function MobileBottomNav({
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c101d]/95 backdrop-blur-xl border-t border-white/10 px-2 py-1.5 flex items-center justify-around shadow-2xl select-none">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0e1a]/95 backdrop-blur-xl border-t border-[#1d273e] px-2 py-1.5 flex items-center justify-around shadow-2xl select-none">
       {tabs.map((tab) => {
         const IconComponent = tab.icon;
         const isActive = activeTab === tab.id;
@@ -48,22 +48,22 @@ export default function MobileBottomNav({
           <button
             key={tab.id}
             onClick={() => onSelectTab && onSelectTab(tab.id)}
-            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all duration-200 active:scale-95 ${
+            className={`relative flex flex-col items-center justify-center py-1 px-3.5 rounded-2xl transition-all duration-200 active:scale-95 ${
               isActive
-                ? 'text-cyan-400 font-bold'
-                : 'text-gray-400 hover:text-gray-200 font-medium'
+                ? 'text-indigo-400 font-bold'
+                : 'text-slate-400 hover:text-slate-200 font-medium'
             }`}
           >
             {/* Active Indicator Glow Background */}
             {isActive && (
-              <span className="absolute inset-0 bg-cyan-500/10 rounded-2xl border border-cyan-500/30 animate-in fade-in duration-150" />
+              <span className="absolute inset-0 bg-indigo-500/15 rounded-2xl border border-indigo-500/30 animate-in fade-in duration-150" />
             )}
 
             <div className="relative z-10 flex flex-col items-center">
               <div className="relative">
-                <IconComponent className={`w-5 h-5 transition-transform ${isActive ? 'scale-110 text-cyan-400' : 'text-gray-400'}`} />
+                <IconComponent className={`w-5 h-5 transition-transform ${isActive ? 'scale-110 text-indigo-400' : 'text-slate-400'}`} />
                 {tab.badge && (
-                  <span className={`absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-extrabold text-white flex items-center justify-center shadow-md ${tab.badgeColor || 'bg-cyan-500'}`}>
+                  <span className={`absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-extrabold text-white flex items-center justify-center shadow-md ${tab.badgeColor || 'bg-indigo-600'}`}>
                     {tab.badge}
                   </span>
                 )}

@@ -4,16 +4,21 @@ import { SocketProvider } from '../context/SocketContext';
 import { ThemeProvider } from '../context/ThemeContext';
 
 export const metadata = {
-  title: 'DonChat — Next-Gen Messaging & Fluid Spaces',
+  title: 'GenAce — Next-Gen Messaging & Fluid Spaces',
   description: 'Next-Generation Autonomous Communication Platform with Multi-Persona Identity, Fluid Spaces, and Privacy Vectors.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'DonChat',
+    title: 'GenAce',
   },
   icons: {
-    apple: '/icon.png',
+    icon: '/icon.png',
+    shortcut: '/favicon.png',
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+      { url: '/apple-touch-icon-precomposed.png', sizes: '180x180', type: 'image/png' },
+    ],
   },
 };
 

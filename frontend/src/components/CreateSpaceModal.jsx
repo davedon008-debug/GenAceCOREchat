@@ -81,7 +81,7 @@ export default function CreateSpaceModal({ onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fadeIn">
-      <div className="bg-slate-900 border border-cyan-500/30 rounded-2xl p-6 w-full max-w-lg space-y-5 shadow-2xl relative">
+      <div className="bg-[#101625] border border-[#1d273e] rounded-3xl p-6 w-full max-w-lg space-y-5 shadow-2xl relative">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-white/10">
           <div className="flex items-center gap-2.5">

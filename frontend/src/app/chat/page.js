@@ -29,7 +29,7 @@ import DiscoverView from '../../components/DiscoverView';
 import AdminView from '../../components/AdminView';
 import PasscodeModal from '../../components/PasscodeModal';
 import MobileBottomNav from '../../components/MobileBottomNav';
-import { playNotificationSound, getNotifPrefs } from '../../lib/sound';
+import { playNotificationSound, playSentSound, getNotifPrefs } from '../../lib/sound';
 
 import { Plus, Search, User, X, Bell, UserX } from 'lucide-react';
 
@@ -603,6 +603,8 @@ export default function ChatPage() {
 
   const handleSendMessage = async ({ content, contentType, mediaUrl, voiceDuration, replyTo }) => {
     if (!activeId || (!content && !mediaUrl)) return;
+
+    playSentSound(); // ⚡ Instant audio feedback tone on send
 
     const rawConvId = activeType === 'conversation' ? activeId : activeObject?.conversationId;
     const convId = (typeof rawConvId === 'object' && rawConvId ? (rawConvId._id || rawConvId.id) : rawConvId) || null;

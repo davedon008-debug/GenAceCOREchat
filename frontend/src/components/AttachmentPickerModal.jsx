@@ -15,7 +15,7 @@ export default function AttachmentPickerModal({
   const [mounted, setMounted] = useState(false);
   const [showCameraStream, setShowCameraStream] = useState(false);
   const [cameraError, setCameraError] = useState(null);
-  const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const [capturedPhoto, setCapturedPicture] = useState(null);
   const videoRef = useRef(null);
   const mediaStreamRef = useRef(null);
 
@@ -27,7 +27,7 @@ export default function AttachmentPickerModal({
     if (!isOpen) {
       stopCameraStream();
       setShowCameraStream(false);
-      setCapturedPhoto(null);
+      setCapturedPicture(null);
       setCameraError(null);
     }
   }, [isOpen]);
@@ -65,12 +65,12 @@ export default function AttachmentPickerModal({
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    setCapturedPhoto(dataUrl);
+    setCapturedPicture(dataUrl);
     stopCameraStream();
   };
 
-  const confirmCapturedPhoto = () => {
-    if (!capturedPhoto) return;
+  const confirmCapturedPicture = () => {
+    if (!capturedPicture) return;
     // Convert DataURL to File object
     fetch(capturedPhoto)
       .then((res) => res.blob())
@@ -110,7 +110,7 @@ export default function AttachmentPickerModal({
                 onClick={() => {
                   stopCameraStream();
                   setShowCameraStream(false);
-                  setCapturedPhoto(null);
+                  setCapturedPicture(null);
                 }}
                 className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white transition"
               >

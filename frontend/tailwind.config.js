@@ -1,17 +1,30 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    './src/pages/**/*.{js,jsx}',
-    './src/components/**/*.{js,jsx}',
-    './src/app/**/*.{js,jsx}',
+    './src/**/*.{js,jsx,ts,tsx}',
+    './src/pages/**/*.{js,jsx,ts,tsx}',
+    './src/components/**/*.{js,jsx,ts,tsx}',
+    './src/app/**/*.{js,jsx,ts,tsx}',
   ],
   darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        background: '#090D16',
-        surface: 'rgba(15, 23, 42, 0.75)',
-        surfaceBorder: 'rgba(255, 255, 255, 0.1)',
+        background: '#080b14',
+        bgAlt: '#090d18',
+        card: '#101625',
+        cardAlt: '#0f172a',
+        cardBorder: '#1d273e',
+        cardBorderSubtle: '#151c2e',
+        surface: '#0f172a',
+        surfaceAlt: '#0c101c',
+        inputBg: '#101625',
+        inputBorder: '#1d273e',
+        tabBarBg: '#0a0e1a',
+        bubbleReceivedBg: '#151c2e',
+        bubbleReceivedBorder: '#1e293b',
+        primaryStart: '#4f46e5',
+        primaryEnd: '#7c3aed',
         brandCyan: '#06B6D4',
         brandPurple: '#8B5CF6',
         brandAccent: '#3B82F6',

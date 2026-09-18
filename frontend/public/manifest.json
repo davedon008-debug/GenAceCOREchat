@@ -1,6 +1,6 @@
 {
-  "short_name": "DonChat",
-  "name": "DonChat Messaging & Fluid Spaces",
+  "short_name": "GenAce",
+  "name": "GenAce — Next-Gen Messaging & Fluid Spaces",
   "icons": [
     {
       "src": "/icon.png",
@@ -12,11 +12,16 @@
       "src": "/icon.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
     }
   ],
   "start_url": "/",
-  "background_color": "#0d0f17",
-  "theme_color": "#0d0f17",
+  "background_color": "#090d18",
+  "theme_color": "#090d18",
   "display": "standalone",
   "orientation": "portrait"
 }

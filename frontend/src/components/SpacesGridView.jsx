@@ -43,10 +43,10 @@ export default function SpacesGridView({ spaces = [], onSelectSpace, onOpenCreat
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#090c15] p-6 overflow-y-auto select-none space-y-6">
+    <div className="flex-1 flex flex-col h-full bg-[#080b14] p-3 sm:p-6 overflow-y-auto select-none space-y-4 sm:space-y-6">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1e293b] pb-5">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1d273e] pb-5">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           {onOpenMobileSidebar && (
             <button
               onClick={onOpenMobileSidebar}
@@ -65,9 +65,9 @@ export default function SpacesGridView({ spaces = [], onSelectSpace, onOpenCreat
               <ArrowLeft className="w-5 h-5 text-indigo-400" />
             </button>
           )}
-          <div>
-            <h2 className="text-xl font-black text-white font-outfit tracking-tight">Spaces</h2>
-            <p className="text-xs text-gray-400">Discover and join active community spaces</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg sm:text-xl font-black text-white font-outfit tracking-tight truncate">Spaces</h2>
+            <p className="text-[11px] sm:text-xs text-gray-400 truncate">Discover and join active community spaces</p>
           </div>
         </div>
         <button
@@ -79,26 +79,26 @@ export default function SpacesGridView({ spaces = [], onSelectSpace, onOpenCreat
       </div>
 
       {/* Search Input & Navigation Tabs */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="relative flex-1 max-w-md w-full">
           <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
           <input
             type="text"
             placeholder="Search spaces..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 text-xs rounded-2xl bg-[#0f172a] border border-[#1e293b] text-white placeholder-gray-400 focus:outline-none focus:border-indigo-500 transition"
+            className="w-full pl-10 pr-4 py-2 text-xs rounded-2xl bg-[#101625] border border-[#1d273e] text-white placeholder-gray-400 focus:outline-none focus:border-indigo-500 transition"
           />
         </div>
 
-        <div className="flex items-center gap-2 bg-[#0f172a] p-1 rounded-2xl border border-[#1e293b]">
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-[#101625] p-1 rounded-2xl border border-[#1d273e] overflow-x-auto no-scrollbar scrollbar-none whitespace-nowrap max-w-full">
           {['popular', 'my', 'joined'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 rounded-xl text-xs font-semibold capitalize transition ${
+              className={`px-3 py-1 sm:px-4 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold capitalize transition shrink-0 ${
                 activeTab === tab
-                  ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-md'
+                  ? 'bg-gradient-to-r from-[#4f46e5] to-[#7c3aed] text-white shadow-md'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -110,7 +110,7 @@ export default function SpacesGridView({ spaces = [], onSelectSpace, onOpenCreat
 
       {/* Grid of Spaces Cards */}
       {filteredSpaces.length === 0 ? (
-        <div className="p-12 rounded-3xl bg-[#0f172a] border border-[#1e293b] text-center space-y-3">
+        <div className="p-12 rounded-3xl bg-[#101625] border border-[#1d273e] text-center space-y-3">
           <Globe className="w-10 h-10 text-indigo-400/50 mx-auto" />
           <p className="text-xs text-gray-400">No public spaces found.</p>
           <button
@@ -129,7 +129,7 @@ export default function SpacesGridView({ spaces = [], onSelectSpace, onOpenCreat
               <div
                 key={item.id}
                 onClick={() => item.realSpace && onSelectSpace && onSelectSpace(item.realSpace._id)}
-                className={`p-5 rounded-3xl bg-gradient-to-br ${item.gradient} bg-[#0f172a] border backdrop-blur-md flex flex-col justify-between space-y-4 hover:border-indigo-400/50 cursor-pointer transition group shadow-xl`}
+                className={`p-5 rounded-3xl bg-gradient-to-br ${item.gradient} bg-[#101625] border border-[#1d273e] backdrop-blur-md flex flex-col justify-between space-y-4 hover:border-indigo-400/50 cursor-pointer transition group shadow-xl`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">

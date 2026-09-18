@@ -105,18 +105,15 @@ export const createInitialsAvatar = (name = 'User') => {
   return DEFAULT_AVATAR;
 };
 
-export const getMediaUrl = (url, name = '') => {
+export const getMediaUrl = (url, name = 'User') => {
+  const fallbackName = (typeof name === 'string' && name.trim()) ? name.trim() : 'User';
+
   if (!url || typeof url !== 'string') {
-    return name ? createInitialsAvatar(name) : DEFAULT_AVATAR;
+    return createInitialsAvatar(fallbackName);
   }
   const clean = url.trim();
   if (!clean || clean === 'undefined' || clean === 'null' || clean === '[object Object]' || clean === '{}') {
-    return name ? createInitialsAvatar(name) : DEFAULT_AVATAR;
-  }
-
-  // If unsplash url that fails or is default placeholder, fallback to custom initials avatar
-  if (clean.includes('unsplash.com')) {
-    return name ? createInitialsAvatar(name) : DEFAULT_AVATAR;
+    return createInitialsAvatar(fallbackName);
   }
 
   if (clean.startsWith('data:')) return clean;
@@ -124,7 +121,7 @@ export const getMediaUrl = (url, name = '') => {
   const apiBase = getApiBaseUrl();
   const serverBase = apiBase.replace(/\/api\/?$/, '');
 
-  // Dynamically rewrite /uploads/ URLs to active server base URL regardless of hardcoded host/IP
+  // Dynamically rewrite /uploads/ URLs to active server base URL
   if (clean.includes('/uploads/')) {
     const relativePath = clean.substring(clean.indexOf('/uploads/'));
     return `${serverBase}${relativePath}`;
@@ -137,7 +134,7 @@ export const getMediaUrl = (url, name = '') => {
         const urlObj = new URL(clean);
         return `${serverBase}${urlObj.pathname}${urlObj.search}`;
       } catch {
-        return name ? createInitialsAvatar(name) : DEFAULT_AVATAR;
+        return createInitialsAvatar(fallbackName);
       }
     }
   }

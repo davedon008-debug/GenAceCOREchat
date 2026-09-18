@@ -13,7 +13,8 @@
       "backgroundColor": "#090d18"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bigdon001.genace"
     },
     "android": {
       "package": "com.bigdon001.genace",
