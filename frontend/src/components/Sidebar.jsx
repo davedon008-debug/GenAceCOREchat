@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
-import api, { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
+import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
 import Logo from './Logo';
 import { 
@@ -131,7 +131,7 @@ export default function Sidebar({
               src={getMediaUrl(activePersona?.avatar, activePersona?.displayName || activePersona?.username) || DEFAULT_AVATAR}
               alt=""
               className="w-8 h-8 rounded-full object-cover border border-white/20 group-hover:scale-105 transition shadow-md"
-              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = createInitialsAvatar(activePersona?.displayName || activePersona?.username); }}
             />
             <span className={`w-2.5 h-2.5 rounded-full ${activeStatusColor} absolute bottom-0 right-0 border-2 border-[#090d18]`} />
           </div>
@@ -425,7 +425,7 @@ export default function Sidebar({
                                 src={avatar} 
                                 alt="" 
                                 className="w-9 h-9 rounded-xl object-cover border border-white/10" 
-                                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = createInitialsAvatar(name); }}
                               />
                               <span className={`w-2.5 h-2.5 rounded-full absolute -bottom-0.5 -right-0.5 border border-[#090d18] ${getStatusDotClass(partnerId)}`} />
                             </div>
@@ -483,7 +483,7 @@ export default function Sidebar({
                   src={getMediaUrl(activePersona?.avatar, activePersona?.displayName || activePersona?.username) || DEFAULT_AVATAR}
                   alt=""
                   className="w-9 h-9 rounded-full object-cover border border-white/10 group-hover/avatar:scale-110 transition-transform"
-                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = createInitialsAvatar(activePersona?.displayName || activePersona?.username); }}
                 />
                 <span className={`w-2.5 h-2.5 rounded-full ${activeStatusColor} absolute bottom-0 right-0 border-2 border-[#090d18]`} />
               </div>

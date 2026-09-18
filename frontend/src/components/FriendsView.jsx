@@ -4,10 +4,8 @@ import { useState } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { Search, Share2, ChevronRight, Menu, ArrowLeft } from 'lucide-react';
 
-import api, { getMediaUrl } from '../lib/api';
+import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
-
-const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%231e293b'/%3E%3Cpath d='M18 20a6 6 0 0 0-12 0'/%3E%3Ccircle cx='12' cy='10' r='4'/%3E%3C/svg%3E";
 
 export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileSidebar, onBack, onRefreshContacts }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -150,7 +148,7 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
                     <img
                       src={user.avatar}
                       alt=""
-                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = createInitialsAvatar(user.name || user.handle); }}
                       className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-white/10 group-hover/avatar:scale-110 transition-transform"
                     />
                     {user.online && (
