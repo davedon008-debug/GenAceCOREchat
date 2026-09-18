@@ -34,23 +34,23 @@ html.dark {
    LIGHT MODE
    ============================================================ */
 html.light {
-  --color-bg:           #f0f4ff;
-  --color-bg-alt:       #e8eef8;
-  --color-surface:      rgba(255, 255, 255, 0.92);
+  --color-bg:           #f1f5f9;
+  --color-bg-alt:       #e2e8f0;
+  --color-surface:      #ffffff;
   --color-surface-2:    #ffffff;
-  --color-surface-3:    #f1f5fb;
-  --color-surface-4:    #edf2fc;
-  --color-surface-5:    #e4eaf5;
-  --color-border:       #d1d9ee;
-  --color-border-2:     #c4ceeb;
-  --color-border-3:     rgba(0, 0, 0, 0.08);
+  --color-surface-3:    #f8fafc;
+  --color-surface-4:    #f1f5f9;
+  --color-surface-5:    #e2e8f0;
+  --color-border:       #cbd5e1;
+  --color-border-2:     #94a3b8;
+  --color-border-3:     rgba(0, 0, 0, 0.1);
   --color-text:         #0f172a;
   --color-text-muted:   #475569;
   --color-scrollbar-track: rgba(226, 232, 248, 0.8);
   --color-scrollbar-thumb: rgba(99, 102, 241, 0.25);
-  --glass-bg:           rgba(240, 244, 255, 0.88);
+  --glass-bg:           rgba(255, 255, 255, 0.92);
   --glass-border:       rgba(99, 102, 241, 0.15);
-  --glass-shadow:       0 10px 40px 0 rgba(99, 102, 241, 0.1);
+  --glass-shadow:       0 10px 40px 0 rgba(99, 102, 241, 0.08);
 }
 
 html, body {
@@ -124,14 +124,13 @@ h1, h2, h3, h4, h5, h6 {
   background: rgba(99, 102, 241, 0.6);
 }
 
-/* Light mode overrides */
+/* ============================================================
+   LIGHT MODE OVERRIDES
+   ============================================================ */
 html.light,
-html[data-theme="light"],
 html.light body,
-html[data-theme="light"] body,
-html.light main,
-html[data-theme="light"] main {
-  background-color: #f0f4ff !important;
+html.light main {
+  background-color: #f1f5f9 !important;
   color: #0f172a !important;
 }
 
@@ -139,13 +138,8 @@ html.light [class*="bg-[#080b14]"],
 html.light [class*="bg-[#090d18]"],
 html.light [class*="bg-[#090c15]"],
 html.light [class*="bg-[#0a0e1a]"],
-html.light [class*="bg-[#080a12]"],
-html[data-theme="light"] [class*="bg-[#080b14]"],
-html[data-theme="light"] [class*="bg-[#090d18]"],
-html[data-theme="light"] [class*="bg-[#090c15]"],
-html[data-theme="light"] [class*="bg-[#0a0e1a]"],
-html[data-theme="light"] [class*="bg-[#080a12]"] {
-  background-color: #f0f4ff !important;
+html.light [class*="bg-[#080a12]"] {
+  background-color: #f1f5f9 !important;
 }
 
 html.light [class*="bg-[#101625]"],
@@ -154,25 +148,8 @@ html.light [class*="bg-[#141c2e]"],
 html.light [class*="bg-[#151c2e]"],
 html.light [class*="bg-[#0c101c]"],
 html.light [class*="bg-[#111827]"],
-html.light [class*="bg-[#1e293b]"],
-html[data-theme="light"] [class*="bg-[#101625]"],
-html[data-theme="light"] [class*="bg-[#0f172a]"],
-html[data-theme="light"] [class*="bg-[#141c2e]"],
-html[data-theme="light"] [class*="bg-[#151c2e]"],
-html[data-theme="light"] [class*="bg-[#0c101c]"],
-html[data-theme="light"] [class*="bg-[#111827]"],
-html[data-theme="light"] [class*="bg-[#1e293b]"] {
+html.light [class*="bg-[#1e293b]"] {
   background-color: #ffffff !important;
-}
-
-html.light [class*="bg-white/5"],
-html[data-theme="light"] [class*="bg-white/5"] {
-  background-color: rgba(99, 102, 241, 0.08) !important;
-}
-
-html.light [class*="bg-white/10"],
-html[data-theme="light"] [class*="bg-white/10"] {
-  background-color: rgba(99, 102, 241, 0.15) !important;
 }
 
 html.light [class*="border-[#1d273e]"],
@@ -181,54 +158,39 @@ html.light [class*="border-[#1e293b]"],
 html.light [class*="border-[#151c2e]"],
 html.light [class*="border-[#27344d]"],
 html.light [class*="border-white/10"],
-html.light [class*="border-white/5"],
-html[data-theme="light"] [class*="border-[#1d273e]"],
-html[data-theme="light"] [class*="border-[#141b2d]"],
-html[data-theme="light"] [class*="border-[#1e293b]"],
-html[data-theme="light"] [class*="border-[#151c2e]"],
-html[data-theme="light"] [class*="border-[#27344d]"],
-html[data-theme="light"] [class*="border-white/10"],
-html[data-theme="light"] [class*="border-white/5"] {
+html.light [class*="border-white/5"] {
   border-color: #cbd5e1 !important;
 }
 
-html.light [class*="text-white"],
-html[data-theme="light"] [class*="text-white"] {
+/* Text overrides in Light mode (preserve white text inside buttons) */
+html.light h1,
+html.light h2,
+html.light h3,
+html.light h4,
+html.light h5,
+html.light h6 {
   color: #0f172a !important;
 }
 
-html.light [class*="text-gray-200"],
-html.light [class*="text-gray-300"],
-html[data-theme="light"] [class*="text-gray-200"],
-html[data-theme="light"] [class*="text-gray-300"] {
-  color: #334155 !important;
+html.light .text-gray-300,
+html.light .text-gray-400 {
+  color: #475569 !important;
 }
 
-html.light [class*="text-gray-400"],
-html[data-theme="light"] [class*="text-gray-400"] {
+html.light .text-gray-500 {
   color: #64748b !important;
-}
-
-html.light [class*="text-gray-500"],
-html[data-theme="light"] [class*="text-gray-500"] {
-  color: #94a3b8 !important;
 }
 
 html.light input,
 html.light textarea,
-html.light select,
-html[data-theme="light"] input,
-html[data-theme="light"] textarea,
-html[data-theme="light"] select {
+html.light select {
   background-color: #ffffff !important;
   color: #0f172a !important;
   border-color: #cbd5e1 !important;
 }
 
 html.light input::placeholder,
-html.light textarea::placeholder,
-html[data-theme="light"] input::placeholder,
-html[data-theme="light"] textarea::placeholder {
+html.light textarea::placeholder {
   color: #94a3b8 !important;
 }
 
@@ -246,6 +208,3 @@ html[data-theme="light"] textarea::placeholder {
   transition: background-color 0.25s ease, border-color 0.25s ease, color 0.1s ease;
 }
 button, a, input, textarea { transition-duration: 0.15s; }
-
-
-
