@@ -53,7 +53,7 @@ export const createPersona = async (req, res) => {
       displayName: displayName || cleanUsername,
       type: type || 'personal',
       bio: bio || '',
-      avatar: sanitizeAvatarUrl(avatar) || '',
+      avatar: (avatar && typeof avatar === 'string' && avatar.trim()) ? sanitizeAvatarUrl(avatar) : '',
       isDefault: false
     });
 
@@ -220,7 +220,9 @@ export const updatePersona = async (req, res) => {
 
     if (displayName !== undefined) persona.displayName = displayName.trim();
     if (bio !== undefined) persona.bio = bio;
-    if (avatar !== undefined) persona.avatar = sanitizeAvatarUrl(avatar);
+    if (avatar !== undefined && avatar !== null && typeof avatar === 'string' && avatar.trim() !== '') {
+      persona.avatar = sanitizeAvatarUrl(avatar);
+    }
     if (customStatus !== undefined) persona.customStatus = customStatus;
     if (status !== undefined && ['online', 'away', 'dnd', 'offline'].includes(status)) persona.status = status;
 

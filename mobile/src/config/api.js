@@ -43,10 +43,8 @@ export const getDetectedIps = () => {
   }
 
   // Active detected PC IP adapters (Prioritize LAN / Hotspot IPs for mobile clients)
-  if (!ips.includes('10.4.234.175')) ips.push('10.4.234.175');
+  if (!ips.includes('10.18.24.36')) ips.push('10.18.24.36');
   if (!ips.includes('192.168.137.1')) ips.push('192.168.137.1');
-  if (!ips.includes('10.20.45.168')) ips.push('10.20.45.168');
-  if (!ips.includes('10.21.184.124')) ips.push('10.21.184.124');
   if (Platform.OS === 'android' && !ips.includes('10.0.2.2')) ips.push('10.0.2.2');
   if (!ips.includes('localhost')) ips.push('localhost');
 
