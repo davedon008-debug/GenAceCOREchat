@@ -5,11 +5,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Zap, Lock, Globe, X, Sparkles, Plus } from 'lucide-react-native';
-import api, { getMediaUrl } from '../config/api';
+import api, { getMediaUrl, DEFAULT_AVATAR } from '../config/api';
 import { colors } from '../theme/colors';
 import AvatarViewerModal from './AvatarViewerModal';
-
-const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80';
 
 export default function SpaceDetailsModal({ visible, spaceId, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);

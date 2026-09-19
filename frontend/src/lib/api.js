@@ -4,13 +4,6 @@ const getApiBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return `http://${hostname}:5005/api`;
-    }
-    return 'https://genacecorechat.onrender.com/api';
-  }
   return 'https://genacecorechat.onrender.com/api';
 };
 
