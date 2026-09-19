@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, ChevronRight, Plus, UserPlus, Upload, Zap, MoreHorizontal, Users, X, UserMinus, ShieldCheck } from 'lucide-react';
+import { Search, ChevronRight, Plus, UserPlus, Upload, Zap, MoreHorizontal, Users, X, UserMinus, ShieldCheck, Trash2 } from 'lucide-react';
 import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar } from '../lib/api';
 import { useSocket } from '../context/SocketContext';
 import AvatarViewerModal from './AvatarViewerModal';
@@ -14,6 +14,7 @@ export default function RightMembersPanel({
   onOpenNewChat,
   onOpenInviteModal,
   onRemoveSpaceMember,
+  onDeleteSpace,
   isOpen = false,
   onClose
 }) {
@@ -182,6 +183,21 @@ export default function RightMembersPanel({
             >
               <UserPlus className="w-3.5 h-3.5" />
               <span>+ Add / Invite People</span>
+            </button>
+          )}
+
+          {/* Admin Delete Space Button */}
+          {isSpaceAdmin && onDeleteSpace && (
+            <button
+              onClick={() => {
+                if (confirm(`⚠️ DELETE SPACE "${activeSpace.title}"?\n\nThis will permanently erase all messages, tasks, polls, and data. This action CANNOT be undone.`)) {
+                  onDeleteSpace();
+                }
+              }}
+              className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-md shadow-rose-600/30 transition flex items-center justify-center gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>🗑️ Delete Entire Space</span>
             </button>
           )}
 

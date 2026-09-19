@@ -4,7 +4,7 @@ import {
   Image, ActivityIndicator, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Zap, Lock, Globe, X, Sparkles, Plus, UserPlus, UserMinus, ShieldCheck } from 'lucide-react-native';
+import { Zap, Lock, Globe, X, Sparkles, Plus, UserPlus, UserMinus, ShieldCheck, Trash2 } from 'lucide-react-native';
 import api, { getMediaUrl, DEFAULT_AVATAR } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/colors';
@@ -101,6 +101,32 @@ export default function SpaceDetailsModal({ visible, spaceId, onClose, onSuccess
               }
             } catch (err) {
               Alert.alert('Error', err.response?.data?.message || 'Failed to remove member');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteSpace = () => {
+    Alert.alert(
+      '⚠️ Delete Space',
+      `Are you sure you want to permanently delete "${space?.title}"?\n\nAll messages, tasks, polls, and data will be erased. This CANNOT be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Space',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await api.delete(`/spaces/${spaceId}`);
+              if (res.data?.success) {
+                Alert.alert('Space Deleted', res.data.message || 'Space has been permanently deleted.');
+                onClose();
+                if (onSuccess) onSuccess(null);
+              }
+            } catch (err) {
+              Alert.alert('Error', err.response?.data?.message || 'Failed to delete space');
             }
           }
         }
@@ -221,6 +247,19 @@ export default function SpaceDetailsModal({ visible, spaceId, onClose, onSuccess
                         </Text>
                       </View>
                     </TouchableOpacity>
+
+                    {/* Delete Space Button (Admins Only) */}
+                    {isAdmin && (
+                      <TouchableOpacity
+                        style={[styles.joinBtn, { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.4)' }]}
+                        onPress={handleDeleteSpace}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Trash2 size={16} color="#f87171" />
+                          <Text style={[styles.joinBtnText, { color: '#f87171' }]}>🗑️ Delete Entire Space</Text>
+                        </View>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
 

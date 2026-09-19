@@ -416,6 +416,18 @@ export default function ChatPage() {
       fetchConversations();
     };
 
+    const handleSpaceDeleted = ({ spaceId, spaceTitle }) => {
+      if (activeType === 'space' && String(activeId) === String(spaceId)) {
+        setActiveId(null);
+        setActiveType(null);
+        setActiveObject(null);
+        setMessages([]);
+      }
+      showToast(`Space "${spaceTitle || 'Unknown'}" was deleted.`, 'info');
+      fetchSpaces();
+      fetchConversations();
+    };
+
     socket.on('message:new', handleNewMessage);
     socket.on('typing:start', handleTypingStart);
     socket.on('typing:stop', handleTypingStop);
@@ -427,6 +439,7 @@ export default function ChatPage() {
     socket.on('space:created', handleSpaceCreated);
     socket.on('space:updated', handleSpaceUpdated);
     socket.on('space:kicked', handleSpaceKicked);
+    socket.on('space:deleted', handleSpaceDeleted);
 
     return () => {
       if (activeId) leaveRoom(activeId);
@@ -441,6 +454,7 @@ export default function ChatPage() {
       socket.off('space:created', handleSpaceCreated);
       socket.off('space:updated', handleSpaceUpdated);
       socket.off('space:kicked', handleSpaceKicked);
+      socket.off('space:deleted', handleSpaceDeleted);
     };
   }, [socket, activeId, activeType, activePersona]);
 
@@ -1338,6 +1352,22 @@ export default function ChatPage() {
               }
             } catch (err) {
               showToast(err.response?.data?.message || 'Failed to remove member', 'error');
+            }
+          }}
+          onDeleteSpace={async () => {
+            if (!activeId || activeType !== 'space') return;
+            try {
+              const res = await api.delete(`/spaces/${activeId}`);
+              if (res.data.success) {
+                showToast(res.data.message || 'Space deleted successfully', 'success');
+                setActiveId(null);
+                setActiveType(null);
+                setActiveObject(null);
+                setMessages([]);
+                fetchSpaces();
+              }
+            } catch (err) {
+              showToast(err.response?.data?.message || 'Failed to delete space', 'error');
             }
           }}
           isOpen={showRightPanel}

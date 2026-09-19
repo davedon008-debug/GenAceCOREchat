@@ -283,6 +283,92 @@ export const removeMemberFromSpace = async (req, res) => {
   }
 };
 
+export const deleteSpace = async (req, res) => {
+  try {
+    const { spaceId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(spaceId)) {
+      return res.status(400).json({ success: false, message: 'Invalid space ID' });
+    }
+
+    const space = await Space.findById(spaceId);
+    if (!space) {
+      return res.status(404).json({ success: false, message: 'Space not found' });
+    }
+
+    // Collect all persona IDs and User ID belonging to the current user
+    let myPersonaIdStrs = [];
+    if (req.personaId) myPersonaIdStrs.push(req.personaId.toString());
+    if (req.userId) {
+      myPersonaIdStrs.push(req.userId.toString());
+      const myPersonas = await Persona.find({ userId: req.userId }).select('_id');
+      myPersonas.forEach(p => {
+        const idStr = p._id.toString();
+        if (!myPersonaIdStrs.includes(idStr)) myPersonaIdStrs.push(idStr);
+      });
+    }
+
+    const currentUser = await User.findById(req.userId).select('role');
+    const isSystemAdmin = currentUser?.role === 'admin';
+
+    // Resolve owner persona/user ID string
+    const ownerIdStr = space.ownerPersonaId
+      ? (space.ownerPersonaId._id || space.ownerPersonaId).toString()
+      : (space.members[0]?.personaId ? (space.members[0].personaId._id || space.members[0].personaId).toString() : '');
+
+    const isOwner = myPersonaIdStrs.includes(ownerIdStr);
+
+    const requesterMember = space.members.find(m => {
+      const mId = m.personaId ? (m.personaId._id || m.personaId).toString() : '';
+      return myPersonaIdStrs.includes(mId);
+    });
+
+    const isAdminRole = requesterMember && ['owner', 'admin'].includes(requesterMember.role);
+    const isOwnerOrAdmin = isOwner || isAdminRole || isSystemAdmin;
+
+    if (!isOwnerOrAdmin) {
+      return res.status(403).json({ success: false, message: 'Only Space Owners or Admins can delete this space' });
+    }
+
+    const spaceTitle = space.title;
+    const memberPersonaIds = space.members.map(m => {
+      const pId = m.personaId ? (m.personaId._id || m.personaId).toString() : '';
+      return pId;
+    }).filter(Boolean);
+
+    // 1. Delete all messages associated with spaceId
+    await Message.deleteMany({ spaceId });
+
+    // 2. Delete linked conversation if exists
+    if (space.conversationId) {
+      await Message.deleteMany({ conversationId: space.conversationId });
+      await Conversation.findByIdAndDelete(space.conversationId);
+    }
+
+    // 3. Delete tasks and polls associated with spaceId
+    await Task.deleteMany({ spaceId });
+    await Poll.deleteMany({ spaceId });
+
+    // 4. Delete space document itself
+    await Space.findByIdAndDelete(spaceId);
+
+    console.log(`[Space Delete] User ${req.userId} (Persona ${req.personaId}) deleted Space "${spaceTitle}" (${spaceId})`);
+
+    // Notify all members via socket
+    const io = getIO();
+    if (io) {
+      memberPersonaIds.forEach(pId => {
+        io.to(`persona:${pId}`).emit('space:deleted', { spaceId, spaceTitle });
+      });
+    }
+
+    res.json({ success: true, message: `Space "${spaceTitle}" and all its data have been permanently deleted.` });
+  } catch (error) {
+    console.error('deleteSpace error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete space', error: error.message });
+  }
+};
+
 export const getSpaces = async (req, res) => {
   try {
     const user = await User.findById(req.userId).select('lockedSpaces lockedConversations role');

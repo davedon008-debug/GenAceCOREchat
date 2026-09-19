@@ -3,6 +3,7 @@ import {
   createOrUpgradeSpace,
   inviteMembersToSpace,
   removeMemberFromSpace,
+  deleteSpace,
   getSpaces,
   getPublicSpaces,
   joinPublicSpace,
@@ -24,6 +25,7 @@ router.get('/public', getPublicSpaces);
 router.get('/', getSpaces);
 router.post('/:spaceId/invite', inviteMembersToSpace);
 router.delete('/:spaceId/members/:personaId', removeMemberFromSpace);
+router.delete('/:spaceId', deleteSpace);
 router.post('/:spaceId/join', joinPublicSpace);
 router.get('/:spaceId', getSpaceDetails);
 router.patch('/:spaceId/privacy', updateSpacePrivacyMode);
