@@ -200,12 +200,15 @@ export const sendMessage = async (req, res) => {
         return res.status(404).json({ success: false, message: 'Conversation not found' });
       }
 
-      recipientPersonaIds = (conversation.participants || []).map(String);
+      recipientPersonaIds = (conversation.participants || []).map(p => {
+        if (!p) return null;
+        return typeof p === 'object' ? String(p._id || p.id || p) : String(p);
+      }).filter(Boolean);
       const isParticipant = recipientPersonaIds.includes(req.personaId.toString());
       if (!isParticipant) {
         if (conversation.spaceId) {
           const spaceObj = await Space.findById(conversation.spaceId).lean();
-          if (spaceObj && (spaceObj.visibility === 'public' || !spaceObj.visibility || spaceObj.members?.some(m => m.personaId?.toString() === req.personaId.toString()))) {
+          if (spaceObj && (spaceObj.visibility === 'public' || !spaceObj.visibility || spaceObj.members?.some(m => (m.personaId?._id || m.personaId)?.toString() === req.personaId.toString()))) {
             await Conversation.findByIdAndUpdate(conversationId, {
               $addToSet: { participants: req.personaId }
             });
@@ -232,7 +235,11 @@ export const sendMessage = async (req, res) => {
       if (!isMember) {
         return res.status(403).json({ success: false, message: 'You have been removed from this space and cannot send messages.' });
       }
-      recipientPersonaIds = (targetSpace.members || []).map(m => String(m.personaId));
+      recipientPersonaIds = (targetSpace.members || []).map(m => {
+        if (!m || !m.personaId) return null;
+        const p = m.personaId;
+        return typeof p === 'object' ? String(p._id || p.id || p) : String(p);
+      }).filter(Boolean);
     } else {
       return res.status(400).json({ success: false, message: 'conversationId or spaceId required' });
     }

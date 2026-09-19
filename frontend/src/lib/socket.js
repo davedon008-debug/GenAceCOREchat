@@ -28,10 +28,19 @@ export const getSocket = () => {
   if (!socket) {
     socket = io(getSocketUrl(), {
       auth: { token },
+      transports: ['websocket', 'polling'],
       autoConnect: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 20,
       reconnectionDelay: 1000
     });
+  } else {
+    if (socket.auth?.token !== token) {
+      socket.auth = { token };
+      socket.disconnect();
+      socket.connect();
+    } else if (socket.disconnected) {
+      socket.connect();
+    }
   }
 
   return socket;

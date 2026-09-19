@@ -79,12 +79,12 @@ export const createInitialsAvatar = (name = 'User') => {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=${color}&color=fff&size=128&bold=true`;
 };
 
-export const DEFAULT_AVATAR = 'https://ui-avatars.com/api/?name=User&background=6366f1&color=fff&size=128&bold=true';
+export const DEFAULT_AVATAR = '';
 
 export const getMediaUrl = (url, name = 'User') => {
   const fallbackName = (typeof name === 'string' && name.trim()) ? name.trim() : 'User';
 
-  if (!url || typeof url !== 'string') {
+  if (!url || typeof url !== 'string' || url.includes('unsplash.com')) {
     return createInitialsAvatar(fallbackName);
   }
   const clean = url.trim().replace(/\\/g, '/');

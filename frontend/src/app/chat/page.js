@@ -278,11 +278,14 @@ export default function ChatPage() {
     }
 
     const handleNewMessage = (newMsg) => {
-      const msgSpaceId = newMsg.spaceId?._id || newMsg.spaceId;
-      const msgConvId = newMsg.conversationId?._id || newMsg.conversationId;
+      const rawSpaceId = newMsg.spaceId?._id || newMsg.spaceId;
+      const rawConvId = newMsg.conversationId?._id || newMsg.conversationId;
+      const msgSpaceId = rawSpaceId ? String(rawSpaceId) : null;
+      const msgConvId = rawConvId ? String(rawConvId) : null;
+      const currentActiveId = activeId ? String(activeId) : null;
 
-      const isForCurrentSpace = activeType === 'space' && msgSpaceId && String(msgSpaceId) === String(activeId);
-      const isForCurrentConv = activeType === 'conversation' && !msgSpaceId && msgConvId && String(msgConvId) === String(activeId);
+      const isForCurrentSpace = activeType === 'space' && msgSpaceId && currentActiveId && msgSpaceId === currentActiveId;
+      const isForCurrentConv = activeType === 'conversation' && msgConvId && currentActiveId && msgConvId === currentActiveId;
 
       const senderId = newMsg.senderPersonaId?._id || newMsg.senderPersonaId;
       const isFromMe = activePersona && String(senderId) === String(activePersona._id);

@@ -444,8 +444,13 @@ export default function ConversationScreen({ route, navigation }) {
     if (!socket || !passcodeUnlocked) return;
 
     const handleNewMessage = (msg) => {
-      const msgConvId = String(msg.conversationId?._id || msg.conversationId);
-      const msgSpaceId = String(msg.spaceId?._id || msg.spaceId);
+      const rawConvId = msg.conversationId?._id || msg.conversationId;
+      const rawSpaceId = msg.spaceId?._id || msg.spaceId;
+      const msgConvId = rawConvId ? String(rawConvId) : null;
+      const msgSpaceId = rawSpaceId ? String(rawSpaceId) : null;
+
+      const targetConvId = conversationId ? String(conversationId) : null;
+      const targetSpaceId = spaceId ? String(spaceId) : null;
 
       const senderPersonaObj = msg.senderPersonaId || msg.sender;
       const senderId = typeof senderPersonaObj === 'object'
@@ -453,12 +458,14 @@ export default function ConversationScreen({ route, navigation }) {
         : String(senderPersonaObj || '');
       const isFromMe = activePersona && senderId === String(activePersona._id);
 
-      // Do not append incoming real-time messages or send read receipts if user is on DND status
       if (!isFromMe && activePersona?.status === 'dnd') {
         return;
       }
 
-      if (msgConvId === String(conversationId) || (spaceId && msgSpaceId === String(spaceId))) {
+      const isForThisChat = (targetSpaceId && msgSpaceId && msgSpaceId === targetSpaceId) ||
+                            (!targetSpaceId && targetConvId && msgConvId && msgConvId === targetConvId);
+
+      if (isForThisChat) {
         setMessages(prev => {
           const msgIdStr = String(msg._id || msg.id || '');
           if (prev.some(m => String(m._id || m.id || '') === msgIdStr)) return prev;
@@ -474,7 +481,6 @@ export default function ConversationScreen({ route, navigation }) {
           return [...prev, msg];
         });
 
-        // Trigger read confirmation back to sender since receiver has chat active
         socket.emit('message:read', { roomId: targetRoomId, conversationId, spaceId });
         api.post('/messages/read', { conversationId, spaceId }).catch(() => {});
       }
@@ -903,6 +909,18 @@ export default function ConversationScreen({ route, navigation }) {
 
     return (
       <View style={[styles.msgWrapper, isMe ? styles.msgMeWrapper : styles.msgOtherWrapper]}>
+        {!isMe && (
+          <TouchableOpacity
+            onPress={() => !isAnonymous && handleOpenProfile(item.senderPersonaId)}
+            activeOpacity={0.8}
+            style={{ marginRight: 6, alignSelf: 'flex-end', marginBottom: 4 }}
+          >
+            <Image
+              source={{ uri: getMediaUrl(isAnonymous ? null : (item.senderPersonaId?.avatar || item.senderPersonaId), senderName) }}
+              style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.1)' }}
+            />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           activeOpacity={0.9}
           onLongPress={() => setActionModalMessage(item)}

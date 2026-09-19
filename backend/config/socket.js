@@ -191,12 +191,19 @@ export const initSocketServer = (httpServer) => {
         if (conversationId && mongoose.Types.ObjectId.isValid(conversationId)) {
           const conv = await Conversation.findById(conversationId).select('participants').lean();
           if (conv && Array.isArray(conv.participants)) {
-            recipientPersonaIds = conv.participants.map(String);
+            recipientPersonaIds = conv.participants.map(p => {
+              if (!p) return null;
+              return typeof p === 'object' ? String(p._id || p.id || p) : String(p);
+            }).filter(Boolean);
           }
         } else if (spaceId && mongoose.Types.ObjectId.isValid(spaceId)) {
           const space = await Space.findById(spaceId).select('members').lean();
           if (space && Array.isArray(space.members)) {
-            recipientPersonaIds = space.members.map(m => String(m.personaId));
+            recipientPersonaIds = space.members.map(m => {
+              if (!m || !m.personaId) return null;
+              const p = m.personaId;
+              return typeof p === 'object' ? String(p._id || p.id || p) : String(p);
+            }).filter(Boolean);
           }
         }
 
