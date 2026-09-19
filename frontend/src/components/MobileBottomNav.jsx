@@ -27,8 +27,7 @@ export default function MobileBottomNav({
       id: 'friends',
       label: 'Friends',
       icon: Users,
-      badge: onlineFriendsCount > 0 ? onlineFriendsCount : null,
-      badgeColor: 'bg-emerald-500'
+      badge: null
     },
     {
       id: 'settings',
