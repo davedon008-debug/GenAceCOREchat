@@ -105,18 +105,20 @@ export default function MainTabScreen({ navigation }) {
   const fetchData = async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true);
-      const [convRes, spaceRes, pubSpaceRes, contactRes, passRes] = await Promise.all([
+      const [convRes, spaceRes, pubSpaceRes, contactRes, passRes, searchRes] = await Promise.all([
         api.get('/conversations').catch(() => ({ data: { conversations: [] } })),
         api.get('/spaces').catch(() => ({ data: { spaces: [] } })),
         api.get('/spaces/public').catch(() => ({ data: { spaces: [] } })),
         api.get('/personas/all').catch(() => ({ data: { contacts: [] } })),
-        api.get('/auth/passcode-status').catch(() => ({ data: { hasPasscode: false, chatLockEnabled: false } }))
+        api.get('/auth/passcode-status').catch(() => ({ data: { hasPasscode: false, chatLockEnabled: false } })),
+        api.get('/personas/search?query=').catch(() => ({ data: { personas: [] } }))
       ]);
 
       if (convRes.data?.success) setConversations(convRes.data.conversations || []);
       if (spaceRes.data?.success) setSpaces(spaceRes.data.spaces || []);
       if (pubSpaceRes.data?.success) setPublicSpaces(pubSpaceRes.data.spaces || []);
       if (contactRes.data?.success) setContacts(contactRes.data.contacts || []);
+      if (searchRes.data?.success) setFoundUsers(searchRes.data.personas || []);
       if (passRes.data?.success) {
         setPasscodeStatus({
           hasPasscode: passRes.data.hasPasscode,
@@ -185,13 +187,9 @@ export default function MainTabScreen({ navigation }) {
     };
   }, [socket, activePersona]);
 
-  const handleSearchUsers = async (text) => {
+  const handleSearchUsers = async (text = '') => {
     setSearchQuery(text);
     const clean = text.trim().replace(/^@/, '');
-    if (!clean) {
-      setFoundUsers([]);
-      return;
-    }
     setSearching(true);
     try {
       const res = await api.get(`/personas/search?query=${encodeURIComponent(clean)}`);
@@ -1081,7 +1079,7 @@ export default function MainTabScreen({ navigation }) {
               <ActivityIndicator color={dynamicColors.primary} style={{ marginTop: 20 }} />
             ) : (
               <FlatList
-                data={searchQuery.trim() ? foundUsers : contacts}
+                data={foundUsers.length > 0 ? foundUsers : contacts}
                 keyExtractor={item => item._id}
                 renderItem={({ item }) => {
                   const contactStatusColor = getStatusColor(item._id);
@@ -1092,7 +1090,7 @@ export default function MainTabScreen({ navigation }) {
                         onPress={() => setAvatarViewerTarget({ visible: true, avatarUrl: item.avatar, name: item.displayName || item.username, handle: item.username, bio: item.bio, customStatus: item.customStatus })}
                         activeOpacity={0.8}
                       >
-                        <Image source={{ uri: getMediaUrl(item.avatar) || DEFAULT_AVATAR }} style={styles.contactAvatar} />
+                        <Image source={{ uri: getMediaUrl(item.avatar, item.displayName || item.username) }} style={styles.contactAvatar} />
                         {contactStatusColor ? <View style={[styles.onlineDot, { backgroundColor: contactStatusColor }]} /> : null}
                       </TouchableOpacity>
                       <View style={{ flex: 1 }}>

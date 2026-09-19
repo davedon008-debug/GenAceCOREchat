@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { Search, Globe, Users, Zap, Menu, ArrowLeft, LogIn, Check } from 'lucide-react';
-import api, { getMediaUrl } from '../lib/api';
+import api, { getMediaUrl, createInitialsAvatar } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
 
 const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%231e293b'/%3E%3Cpath d='M18 20a6 6 0 0 0-12 0'/%3E%3Ccircle cx='12' cy='10' r='4'/%3E%3C/svg%3E";
@@ -72,14 +72,31 @@ export default function DiscoverView({ allContacts = [], onSelectSpace, onStartD
     }
   };
 
+  const [discoverUsers, setDiscoverUsers] = useState([]);
+
+  const fetchDiscoverUsers = useCallback(async (q = '') => {
+    try {
+      const res = await api.get(`/personas/search?query=${encodeURIComponent(q.trim())}`);
+      if (res.data.success) {
+        setDiscoverUsers(res.data.personas || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch discover users:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDiscoverUsers(searchQuery);
+  }, [searchQuery, fetchDiscoverUsers]);
+
   const filteredSpaces = publicSpaces.filter(s =>
     s.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredUsers = allContacts.filter(c =>
-    (c.displayName || c.username)?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = discoverUsers.length > 0
+    ? discoverUsers
+    : allContacts.filter(c => (c.displayName || c.username)?.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#090c15] p-6 overflow-y-auto select-none space-y-8">
@@ -234,7 +251,12 @@ export default function DiscoverView({ allContacts = [], onSelectSpace, onStartD
                       }}
                       title="Click to view profile picture"
                     >
-                      <img src={getMediaUrl(user.avatar) || DEFAULT_AVATAR} alt={user.displayName || user.username} className="w-9 h-9 rounded-full object-cover border border-white/10 group-hover/avatar:scale-110 transition-transform" />
+                      <img
+                        src={getMediaUrl(user.avatar, user.displayName || user.username)}
+                        alt={user.displayName || user.username}
+                        className="w-9 h-9 rounded-full object-cover border border-white/10 group-hover/avatar:scale-110 transition-transform"
+                        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = createInitialsAvatar(user.displayName || user.username); }}
+                      />
                       <span className={`w-2.5 h-2.5 rounded-full absolute bottom-0 right-0 border-2 border-[#0f172a] ${getStatusDotClass(uId)}`} />
                     </div>
                     <div>

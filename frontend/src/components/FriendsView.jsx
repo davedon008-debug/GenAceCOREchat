@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { Search, Share2, ChevronRight, Menu, ArrowLeft } from 'lucide-react';
 
@@ -17,6 +17,24 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
   const onlineUserIds = socketCtx?.onlineUserIds || [];
   const personaStatuses = socketCtx?.personaStatuses || {};
   const safeOnlineIds = Array.isArray(onlineUserIds) ? onlineUserIds.map(String) : [];
+
+  const [globalUsers, setGlobalUsers] = useState([]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await api.get(`/personas/search?query=${encodeURIComponent(searchQuery.trim())}`);
+        if (res.data.success) {
+          setGlobalUsers(res.data.personas || []);
+        }
+      } catch (err) {
+        console.error('Failed to search personas:', err);
+      }
+    };
+    fetchUsers();
+  }, [searchQuery]);
+
+  const contactIds = new Set((allContacts || []).map(c => String(c._id || c.id)));
 
   const friendsList = allContacts.map(c => {
     const contactId = String(c._id || c.id || '');
@@ -36,17 +54,37 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
       avatar: getMediaUrl(c.avatar, c.displayName || c.username) || DEFAULT_AVATAR,
       online: isOnline,
       bio: c.bio,
-      customStatus: c.customStatus
+      customStatus: c.customStatus,
+      isContact: true
     };
   });
 
-  const filteredFriends = friendsList.filter(f =>
-    f.handle.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const formattedGlobalUsers = globalUsers.map(u => {
+    const uId = String(u._id || u.id || '');
+    const isOnline = safeOnlineIds.includes(uId);
+    const isContact = contactIds.has(uId) || addedHandles.includes(u._id);
+
+    return {
+      id: u._id,
+      name: u.displayName || u.username,
+      handle: u.username,
+      status: isOnline ? 'Online' : 'Offline',
+      statusDotColor: isOnline ? 'bg-emerald-500' : 'bg-gray-500',
+      avatar: getMediaUrl(u.avatar, u.displayName || u.username) || DEFAULT_AVATAR,
+      online: isOnline,
+      bio: u.bio,
+      customStatus: u.customStatus,
+      isContact
+    };
+  });
+
+  const filteredFriends = activeTab === 'contacts'
+    ? friendsList.filter(f => (f.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || (f.handle || '').toLowerCase().includes(searchQuery.toLowerCase()))
+    : (formattedGlobalUsers.length > 0 ? formattedGlobalUsers : friendsList);
 
   const toggleAdd = async (id) => {
     try {
-      if (addedHandles.includes(id)) {
+      if (addedHandles.includes(id) || contactIds.has(String(id))) {
         await api.delete(`/personas/contacts/remove/${id}`);
         setAddedHandles(addedHandles.filter(h => h !== id));
       } else {
@@ -177,10 +215,14 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
 
                   <button
                     onClick={() => toggleAdd(user.id)}
-                    className="px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-[11px] sm:text-xs font-semibold transition shrink-0"
-                    title="Remove from contacts"
+                    className={`px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl border text-[11px] sm:text-xs font-semibold transition shrink-0 ${
+                      user.isContact
+                        ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/20'
+                        : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    }`}
+                    title={user.isContact ? 'Remove from contacts' : 'Add to contacts'}
                   >
-                    Remove
+                    {user.isContact ? 'Remove' : '+ Add Friend'}
                   </button>
                 </div>
               </div>

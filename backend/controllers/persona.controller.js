@@ -45,7 +45,7 @@ export const createPersona = async (req, res) => {
       displayName: displayName || cleanUsername,
       type: type || 'personal',
       bio: bio || '',
-      avatar: avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+      avatar: avatar || '',
       isDefault: false
     });
 
@@ -87,18 +87,25 @@ export const searchPersonas = async (req, res) => {
     const { query } = req.query;
     const cleanQuery = query ? query.trim().replace(/^@/, '') : '';
 
-    if (!cleanQuery) {
-      return res.json({ success: true, personas: [] });
+    const reqPersonaId = req.personaId ? req.personaId.toString() : null;
+
+    let filter = {};
+    if (reqPersonaId) {
+      filter._id = { $ne: req.personaId };
     }
 
-    const escapedQuery = cleanQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (cleanQuery) {
+      const escapedQuery = cleanQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.$or = [
+        { username: { $regex: escapedQuery, $options: 'i' } },
+        { displayName: { $regex: escapedQuery, $options: 'i' } }
+      ];
+    }
 
-    const personas = await Persona.find({
-      username: { $regex: escapedQuery, $options: 'i' },
-      _id: { $ne: req.personaId }
-    })
-      .populate('userId', 'role email')
-      .limit(10);
+    const personas = await Persona.find(filter)
+      .populate('userId', 'role email masterName')
+      .sort({ updatedAt: -1 })
+      .limit(30);
 
     res.json({ success: true, personas });
   } catch (error) {

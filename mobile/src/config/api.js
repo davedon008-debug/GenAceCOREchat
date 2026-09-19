@@ -75,24 +75,49 @@ export const getApiBaseUrl = () => {
   return 'https://genacecorechat.onrender.com/api';
 };
 
-export const getMediaUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('data:')) return url;
+export const createInitialsAvatar = (name = 'User') => {
+  const cleanName = (typeof name === 'string' && name.trim()) ? name.trim().replace(/^@/, '') : 'User';
+  let hash = 0;
+  for (let i = 0; i < cleanName.length; i++) {
+    hash = cleanName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const bgColors = ['6366f1', '3b82f6', '10b981', 'f43f5e', '8b5cf6', 'f59e0b', '0ea5e9', '14b8a6'];
+  const color = bgColors[Math.abs(hash) % bgColors.length];
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=${color}&color=fff&size=128&bold=true`;
+};
+
+export const DEFAULT_AVATAR = 'https://ui-avatars.com/api/?name=User&background=6366f1&color=fff&size=128&bold=true';
+
+export const getMediaUrl = (url, name = 'User') => {
+  if (!url || typeof url !== 'string') {
+    return createInitialsAvatar(name);
+  }
+  const clean = url.trim();
+  if (!clean || clean === 'undefined' || clean === 'null' || clean === '[object Object]' || clean === '{}') {
+    return createInitialsAvatar(name);
+  }
+
+  if (clean.startsWith('data:')) {
+    if (Platform.OS !== 'web') {
+      return createInitialsAvatar(name);
+    }
+    return clean;
+  }
 
   // Dynamically rewrite /uploads/ URLs to active server base URL regardless of hardcoded host/IP
-  if (url.includes('/uploads/')) {
-    const relativePath = url.substring(url.indexOf('/uploads/'));
+  if (clean.includes('/uploads/')) {
+    const relativePath = clean.substring(clean.indexOf('/uploads/'));
     const apiBase = getApiBaseUrl();
     const serverBase = apiBase.replace(/\/api\/?$/, '');
     return `${serverBase}${relativePath}`;
   }
 
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    return clean;
   }
   const apiBase = getApiBaseUrl();
   const serverBase = apiBase.replace(/\/api\/?$/, '');
-  return `${serverBase}${url.startsWith('/') ? '' : '/'}${url}`;
+  return `${serverBase}${clean.startsWith('/') ? '' : '/'}${clean}`;
 };
 
 export const testIpConnection = async (ip) => {

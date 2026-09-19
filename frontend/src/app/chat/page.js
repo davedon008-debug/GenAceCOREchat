@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
-import api, { getMediaUrl } from '../../lib/api';
+import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar } from '../../lib/api';
 
 import Sidebar from '../../components/Sidebar';
 import ChatHeader from '../../components/ChatHeader';
@@ -794,21 +794,16 @@ export default function ChatPage() {
   useEffect(() => {
     if (showNewChatModal) {
       setSearchUsersQuery('');
-      setFoundUsers([]);
+      handleSearchUsers('');
     }
   }, [showNewChatModal]);
 
   const handleSearchUsers = async (query = '') => {
     setSearchUsersQuery(query);
-    if (!query.trim()) {
-      setFoundUsers([]);
-      return;
-    }
-
     try {
       const res = await api.get(`/personas/search?query=${encodeURIComponent(query.trim())}`);
       if (res.data.success) {
-        setFoundUsers(res.data.personas);
+        setFoundUsers(res.data.personas || []);
       }
     } catch (err) {
       console.error('Search failed:', err);
@@ -1424,7 +1419,12 @@ export default function ChatPage() {
                   className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 text-left text-xs transition"
                 >
                   <div className="flex items-center gap-3">
-                    <img src={u.avatar} alt={u.displayName} className="w-8 h-8 rounded-full object-cover" />
+                    <img
+                      src={getMediaUrl(u.avatar, u.displayName || u.username)}
+                      alt={u.displayName || u.username}
+                      className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10"
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = createInitialsAvatar(u.displayName || u.username); }}
+                    />
                     <div>
                       <p className="font-semibold text-white">{u.displayName}</p>
                       <p className="text-[10px] text-gray-400">@{u.username}</p>

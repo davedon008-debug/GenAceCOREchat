@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Search, ChevronRight, Plus, UserPlus, Upload, Zap, MoreHorizontal } from 'lucide-react';
-import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
+import { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar } from '../lib/api';
 import { useSocket } from '../context/SocketContext';
 import AvatarViewerModal from './AvatarViewerModal';
 
@@ -45,7 +45,7 @@ export default function RightMembersPanel({
         name: c.displayName || (c.username ? `@${c.username}` : 'Member'),
         handle: c.username || 'user',
         role: roleLabel,
-        avatar: getMediaUrl(c.avatar) || DEFAULT_AVATAR,
+        avatar: getMediaUrl(c.avatar, c.displayName || c.username) || DEFAULT_AVATAR,
         online: isOnline,
         statusDotColor,
         statusText,
@@ -188,7 +188,7 @@ export default function RightMembersPanel({
                           src={member.avatar}
                           alt={member.name}
                           className="w-8 h-8 rounded-full object-cover border border-white/10 group-hover/avatar:scale-110 transition-transform"
-                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = createInitialsAvatar(member.name); }}
                         />
                         <span className={`w-2.5 h-2.5 rounded-full border-2 border-[#090d18] absolute bottom-0 right-0 ${member.statusDotColor}`} />
                       </div>
@@ -243,7 +243,7 @@ export default function RightMembersPanel({
                             src={member.avatar}
                             alt={member.name}
                             className="w-8 h-8 rounded-full object-cover border border-white/10 grayscale group-hover:grayscale-0 group-hover/avatar:scale-110 transition"
-                            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = createInitialsAvatar(member.name); }}
                           />
                           <span className="w-2.5 h-2.5 rounded-full bg-gray-500 border-2 border-[#090d18] absolute bottom-0 right-0" />
                         </div>
