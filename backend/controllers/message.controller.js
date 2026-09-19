@@ -26,25 +26,10 @@ export const getMessages = async (req, res) => {
 
       const spaceObj = await Space.findById(spaceId);
       if (spaceObj) {
-        const isMember = spaceObj.members?.some(m => m.personaId?.toString() === currentPersonaIdStr) ||
-                         spaceObj.ownerPersonaId?.toString() === currentPersonaIdStr;
+        const isMember = spaceObj.members?.some(m => (m.personaId?._id || m.personaId)?.toString() === currentPersonaIdStr) ||
+                         (spaceObj.ownerPersonaId?._id || spaceObj.ownerPersonaId)?.toString() === currentPersonaIdStr;
         if (!isMember) {
-          if (spaceObj.visibility === 'public' || !spaceObj.visibility) {
-            // Auto-join public space
-            spaceObj.members.push({ personaId: req.personaId, role: 'member' });
-            await spaceObj.save();
-            if (spaceObj.conversationId) {
-              await Conversation.findByIdAndUpdate(spaceObj.conversationId, {
-                $addToSet: { participants: req.personaId }
-              });
-            }
-          } else {
-            // Check if user is participant in linked conversation
-            const isConvParticipant = spaceObj.conversationId && await Conversation.exists({ _id: spaceObj.conversationId, participants: req.personaId });
-            if (!isConvParticipant) {
-              return res.status(403).json({ success: false, message: 'Not authorized to view messages in this space' });
-            }
-          }
+          return res.status(403).json({ success: false, message: 'You have been removed from this space and cannot view messages.' });
         }
       } else {
         // Fallback authorization check if space document isn't directly found by ID
@@ -241,22 +226,11 @@ export const sendMessage = async (req, res) => {
         return res.status(404).json({ success: false, message: 'Space not found' });
       }
 
-      const isMember = targetSpace.members?.some(m => m.personaId?.toString() === req.personaId.toString()) ||
-                       targetSpace.ownerPersonaId?.toString() === req.personaId.toString();
+      const isMember = targetSpace.members?.some(m => (m.personaId?._id || m.personaId)?.toString() === req.personaId.toString()) ||
+                       (targetSpace.ownerPersonaId?._id || targetSpace.ownerPersonaId)?.toString() === req.personaId.toString();
 
       if (!isMember) {
-        if (targetSpace.visibility === 'public' || !targetSpace.visibility) {
-          await Space.findByIdAndUpdate(spaceId, {
-            $push: { members: { personaId: req.personaId, role: 'member' } }
-          });
-          if (targetSpace.conversationId) {
-            await Conversation.findByIdAndUpdate(targetSpace.conversationId, {
-              $addToSet: { participants: req.personaId }
-            });
-          }
-        } else {
-          return res.status(403).json({ success: false, message: 'Not authorized to send messages in this space' });
-        }
+        return res.status(403).json({ success: false, message: 'You have been removed from this space and cannot send messages.' });
       }
       recipientPersonaIds = (targetSpace.members || []).map(m => String(m.personaId));
     } else {

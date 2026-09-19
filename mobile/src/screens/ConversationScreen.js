@@ -522,12 +522,20 @@ export default function ConversationScreen({ route, navigation }) {
       setMessages(prev => prev.map(m => String(m._id || m.id) === String(messageId) ? { ...m, content, isBurned: true, mediaUrl: '' } : m));
     };
 
+    const handleSpaceKicked = ({ spaceId: kickedSpaceId, spaceTitle }) => {
+      if (spaceId && String(spaceId) === String(kickedSpaceId)) {
+        Alert.alert('Removed from Space', `You were removed from ${spaceTitle || 'this space'} by an admin.`);
+        navigation.goBack();
+      }
+    };
+
     socket.on('message:new', handleNewMessage);
     socket.on('messages:read', handleMessagesRead);
     socket.on('typing:start', handleTypingStart);
     socket.on('typing:stop', handleTypingStop);
     socket.on('conversation:privacy:updated', handlePrivacyUpdated);
     socket.on('message:burned', handleMessageBurned);
+    socket.on('space:kicked', handleSpaceKicked);
 
     return () => {
       socket.off('message:new', handleNewMessage);
@@ -536,6 +544,7 @@ export default function ConversationScreen({ route, navigation }) {
       socket.off('typing:stop', handleTypingStop);
       socket.off('conversation:privacy:updated', handlePrivacyUpdated);
       socket.off('message:burned', handleMessageBurned);
+      socket.off('space:kicked', handleSpaceKicked);
     };
   }, [socket, conversationId, spaceId, activePersona?._id, passcodeUnlocked, targetRoomId]);
 

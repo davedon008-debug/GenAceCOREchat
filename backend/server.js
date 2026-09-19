@@ -62,7 +62,7 @@ app.use(cors({
 // Rate Limiting Definitions
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'production' ? 15 : 200,
+  max: process.env.NODE_ENV === 'production' ? 100 : 300,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication or passcode attempts. Please try again in 15 minutes.' }
@@ -70,7 +70,7 @@ const authLimiter = rateLimit({
 
 const uploadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Upload limit exceeded. Please wait before uploading more files.' }

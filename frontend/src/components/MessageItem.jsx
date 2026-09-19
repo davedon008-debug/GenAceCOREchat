@@ -381,7 +381,7 @@ export default function MessageItem({
   };
 
   return (
-    <div className={`flex w-full my-1.5 px-2 group ${isMe ? 'justify-end' : 'justify-start'}`}>
+    <div id={`msg-${message._id || message.id}`} className={`flex w-full my-1.5 px-2 group ${isMe ? 'justify-end' : 'justify-start'}`}>
       <div className={`relative max-w-[85%] sm:max-w-[75%] md:max-w-[65%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
         
         {/* WhatsApp-Style Message Content Bubble */}
@@ -397,6 +397,47 @@ export default function MessageItem({
                 : 'bg-[#151c2e] text-gray-100 border border-[#1e293b] rounded-bl-xs shadow-md'
             }`}
           >
+            {/* WhatsApp-Style Quoted Reply Box */}
+            {message.replyTo && (
+              <div 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const replyId = typeof message.replyTo === 'object' ? (message.replyTo._id || message.replyTo.id) : message.replyTo;
+                  if (replyId) {
+                    const el = document.getElementById(`msg-${replyId}`);
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      el.classList.add('ring-2', 'ring-cyan-400', 'transition-all');
+                      setTimeout(() => el.classList.remove('ring-2', 'ring-cyan-400'), 2000);
+                    }
+                  }
+                }}
+                className={`w-full p-2 mb-1.5 rounded-xl border-l-4 text-xs select-none cursor-pointer transition ${
+                  isMe
+                    ? 'bg-black/30 border-l-cyan-300 text-white hover:bg-black/40'
+                    : 'bg-[#0f172a]/80 border-l-indigo-400 text-gray-200 hover:bg-[#0f172a]'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1 mb-0.5">
+                  <span className={`text-[11px] font-bold truncate ${isMe ? 'text-cyan-300' : 'text-indigo-400'}`}>
+                    {typeof message.replyTo === 'object' && message.replyTo.senderPersonaId
+                      ? message.replyTo.senderPersonaId.displayName || `@${message.replyTo.senderPersonaId.username}`
+                      : 'Replied Message'}
+                  </span>
+                  <Reply className="w-3 h-3 opacity-60 shrink-0" />
+                </div>
+                <p className="text-[11px] text-gray-200/90 truncate font-sans">
+                  {typeof message.replyTo === 'object'
+                    ? (message.replyTo.contentType === 'voice' ? '🎙️ Voice Note' :
+                       message.replyTo.contentType === 'image' ? '📷 Image' :
+                       message.replyTo.contentType === 'video' ? '🎥 Video' :
+                       message.replyTo.contentType === 'file' ? '📁 Attachment' :
+                       message.replyTo.content || 'Message')
+                    : 'Quoted message'}
+                </p>
+              </div>
+            )}
+
             {/* Display Sender Handle in Group/Space chats for incoming messages */}
             {!isMe && message.spaceId && (
               <span

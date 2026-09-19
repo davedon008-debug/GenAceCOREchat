@@ -17,9 +17,9 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 const ALLOWED_MIME_TYPES = [
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-  'video/mp4', 'video/webm', 'video/quicktime',
-  'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/m4a', 'audio/x-m4a', 'audio/mp4',
+  'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/heic', 'image/heif',
+  'video/mp4', 'video/webm', 'video/quicktime', 'video/3gpp', 'video/x-m4v',
+  'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/m4a', 'audio/x-m4a', 'audio/mp4', 'audio/aac', 'audio/3gpp', 'audio/amr',
   'application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'text/html', 'application/json',
   'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -28,7 +28,15 @@ const ALLOWED_MIME_TYPES = [
 ];
 
 const fileFilter = (req, file, cb) => {
-  if (ALLOWED_MIME_TYPES.includes(file.mimetype) || file.mimetype.startsWith('application/') || file.mimetype.startsWith('text/')) {
+  const mime = (file.mimetype || '').toLowerCase();
+  if (
+    ALLOWED_MIME_TYPES.includes(mime) ||
+    mime.startsWith('image/') ||
+    mime.startsWith('audio/') ||
+    mime.startsWith('video/') ||
+    mime.startsWith('application/') ||
+    mime.startsWith('text/')
+  ) {
     cb(null, true);
   } else {
     cb(new Error(`File type ${file.mimetype} is not allowed`));

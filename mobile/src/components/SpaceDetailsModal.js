@@ -4,18 +4,45 @@ import {
   Image, ActivityIndicator, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Zap, Lock, Globe, X, Sparkles, Plus } from 'lucide-react-native';
+import { Zap, Lock, Globe, X, Sparkles, Plus, UserPlus, UserMinus, ShieldCheck } from 'lucide-react-native';
 import api, { getMediaUrl, DEFAULT_AVATAR } from '../config/api';
+import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/colors';
 import AvatarViewerModal from './AvatarViewerModal';
+import InviteMemberModal from './InviteMemberModal';
 
 export default function SpaceDetailsModal({ visible, spaceId, onClose, onSuccess }) {
+  const { activePersona } = useAuth();
   const [loading, setLoading] = useState(false);
   const [space, setSpace] = useState(null);
   const [members, setMembers] = useState([]);
   const [isMember, setIsMember] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [avatarViewerTarget, setAvatarViewerTarget] = useState({ visible: false, avatarUrl: '', name: '', handle: '', bio: '', customStatus: '' });
+
+  const currentPersonaId = activePersona?._id ? String(activePersona._id) : null;
+  const currentUserId = activePersona?.userId ? String(activePersona.userId._id || activePersona.userId) : null;
+
+  const ownerPersonaIdStr = space?.ownerPersonaId?._id 
+    ? String(space.ownerPersonaId._id) 
+    : (space?.ownerPersonaId ? String(space.ownerPersonaId) : null);
+  const ownerUserIdStr = space?.ownerPersonaId?.userId 
+    ? String(space.ownerPersonaId.userId._id || space.ownerPersonaId.userId) 
+    : null;
+
+  const isOwner = !!(
+    (currentPersonaId && ownerPersonaIdStr && currentPersonaId === ownerPersonaIdStr) ||
+    (currentUserId && ownerUserIdStr && currentUserId === ownerUserIdStr)
+  );
+
+  const myMember = members.find(m => {
+    const mPId = String(m.personaId?._id || m.personaId || '');
+    const mUId = m.personaId?.userId ? String(m.personaId.userId._id || m.personaId.userId) : null;
+    return (currentPersonaId && mPId === currentPersonaId) || (currentUserId && mUId && mUId === currentUserId);
+  });
+
+  const isAdmin = isOwner || (myMember && ['owner', 'admin'].includes(myMember.role)) || (activePersona?.role === 'admin');
 
   const fetchSpace = async () => {
     if (!spaceId) return;
@@ -54,6 +81,33 @@ export default function SpaceDetailsModal({ visible, spaceId, onClose, onSuccess
     }
   };
 
+  const handleRemoveMember = (targetPersonaId, memberName) => {
+    if (!targetPersonaId) return;
+    Alert.alert(
+      'Remove Member',
+      `Are you sure you want to remove ${memberName} from this space?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove Member',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await api.delete(`/spaces/${spaceId}/members/${targetPersonaId}`);
+              if (res.data?.success) {
+                Alert.alert('Member Removed', `${memberName} removed from this space.`);
+                setMembers(prev => prev.filter(m => String(m.personaId?._id || m.personaId) !== String(targetPersonaId)));
+                if (onSuccess) onSuccess(res.data.space);
+              }
+            } catch (err) {
+              Alert.alert('Error', err.response?.data?.message || 'Failed to remove member');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   useEffect(() => {
     if (visible) {
       fetchSpace();
@@ -83,6 +137,11 @@ export default function SpaceDetailsModal({ visible, spaceId, onClose, onSuccess
                       <Globe size={11} color={colors.textMuted} />
                       <Text style={styles.subtitleText}>Public Space</Text>
                     </>
+                  )}
+                  {isAdmin && (
+                    <View style={{ backgroundColor: 'rgba(168, 85, 247, 0.2)', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, marginLeft: 4 }}>
+                      <Text style={{ color: '#c084fc', fontSize: 9, fontWeight: 'bold' }}>👑 YOU ARE ADMIN</Text>
+                    </View>
                   )}
                 </View>
               </View>
@@ -122,33 +181,47 @@ export default function SpaceDetailsModal({ visible, spaceId, onClose, onSuccess
 
                 {/* Member Action Buttons */}
                 {isMember && (
-                  <TouchableOpacity
-                    style={[styles.joinBtn, { backgroundColor: space?.isLocked ? 'rgba(245, 158, 11, 0.2)' : 'rgba(99, 102, 241, 0.15)', borderWidth: 1, borderColor: space?.isLocked ? 'rgba(245, 158, 11, 0.4)' : 'rgba(99, 102, 241, 0.3)' }]}
-                    onPress={async () => {
-                      if (!spaceId) return;
-                      try {
-                        const res = await api.post('/auth/toggle-lock-chat', { spaceId });
-                        if (res.data?.success) {
-                          const nextState = !!res.data.isLocked;
-                          setSpace(prev => prev ? { ...prev, isLocked: nextState } : prev);
-                          Alert.alert(
-                            nextState ? 'Space Locked 🔒' : 'Space Unlocked 🔓',
-                            nextState ? 'This space is now locked with your 4-digit PIN.' : 'Passcode lock removed from this space.'
-                          );
-                          if (onSuccess) onSuccess(res.data.space);
+                  <View style={{ gap: 8 }}>
+                    {isAdmin && (
+                      <TouchableOpacity
+                        style={[styles.joinBtn, { backgroundColor: colors.primary }]}
+                        onPress={() => setInviteModalVisible(true)}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <UserPlus size={16} color="#ffffff" />
+                          <Text style={styles.joinBtnText}>+ Add / Invite People to Space</Text>
+                        </View>
+                      </TouchableOpacity>
+                    )}
+
+                    <TouchableOpacity
+                      style={[styles.joinBtn, { backgroundColor: space?.isLocked ? 'rgba(245, 158, 11, 0.2)' : 'rgba(99, 102, 241, 0.15)', borderWidth: 1, borderColor: space?.isLocked ? 'rgba(245, 158, 11, 0.4)' : 'rgba(99, 102, 241, 0.3)' }]}
+                      onPress={async () => {
+                        if (!spaceId) return;
+                        try {
+                          const res = await api.post('/auth/toggle-lock-chat', { spaceId });
+                          if (res.data?.success) {
+                            const nextState = !!res.data.isLocked;
+                            setSpace(prev => prev ? { ...prev, isLocked: nextState } : prev);
+                            Alert.alert(
+                              nextState ? 'Space Locked 🔒' : 'Space Unlocked 🔓',
+                              nextState ? 'This space is now locked with your 4-digit PIN.' : 'Passcode lock removed from this space.'
+                            );
+                            if (onSuccess) onSuccess(res.data.space);
+                          }
+                        } catch (err) {
+                          Alert.alert('Error', err.response?.data?.message || 'Failed to toggle lock status');
                         }
-                      } catch (err) {
-                        Alert.alert('Error', err.response?.data?.message || 'Failed to toggle lock status');
-                      }
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Lock size={16} color={space?.isLocked ? '#f59e0b' : '#818cf8'} />
-                      <Text style={[styles.joinBtnText, { color: space?.isLocked ? '#f59e0b' : '#818cf8' }]}>
-                        {space?.isLocked ? 'Unlock Space (Passcode Set)' : 'Lock Space with PIN 🔒'}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Lock size={16} color={space?.isLocked ? '#f59e0b' : '#818cf8'} />
+                        <Text style={[styles.joinBtnText, { color: space?.isLocked ? '#f59e0b' : '#818cf8' }]}>
+                          {space?.isLocked ? 'Unlock Space (Passcode Set)' : 'Lock Space with PIN 🔒'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
                 )}
 
                 {/* Join Button for non-members viewing public space */}
@@ -173,37 +246,56 @@ export default function SpaceDetailsModal({ visible, spaceId, onClose, onSuccess
                 <View style={{ gap: 10 }}>
                   <Text style={styles.sectionLabel}>MEMBER ROSTER ({members.length})</Text>
 
-                  {members.map(m => {
-                    const p = m.personaId || {};
-                    const role = m.role || 'member';
-                    const bio = p.bio || '';
+                  {members
+                    .filter(m => m && m.personaId)
+                    .map(m => {
+                      const p = (m.personaId && typeof m.personaId === 'object') ? m.personaId : {};
+                      const targetPId = String(p._id || p.id || m.personaId || m._id || '');
+                      if (!targetPId || targetPId === 'null' || targetPId === 'undefined') return null;
+
+                      const targetUId = p.userId ? String(p.userId._id || p.userId) : null;
+                      const isMemberOwner = targetPId === ownerPersonaIdStr || (targetUId && ownerUserIdStr && targetUId === ownerUserIdStr);
+                      const role = isMemberOwner ? 'owner' : (m.role || 'member');
+                      const bio = p.bio || '';
+                      const isMe = targetPId === currentPersonaId || (targetUId && currentUserId && targetUId === currentUserId);
+                      const canKickThisUser = isAdmin && !isMe && !isMemberOwner;
 
                     return (
-                      <TouchableOpacity
-                        key={p._id || m._id}
-                        style={styles.memberRow}
-                        onPress={() => setAvatarViewerTarget({
-                          visible: true,
-                          avatarUrl: p.avatar,
-                          name: p.displayName || p.username || 'Member',
-                          handle: p.username,
-                          bio: p.bio,
-                          customStatus: p.customStatus
-                        })}
-                        activeOpacity={0.8}
-                      >
-                        <Image source={{ uri: getMediaUrl(p.avatar || DEFAULT_AVATAR) }} style={styles.avatar} />
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={styles.memberName}>{p.displayName || p.username || 'Member'}</Text>
-                            <View style={[styles.roleBadge, role === 'owner' ? styles.roleOwner : role === 'admin' ? styles.roleAdmin : styles.roleMember]}>
-                              <Text style={styles.roleText}>{role.toUpperCase()}</Text>
+                      <View key={targetPId} style={styles.memberRow}>
+                        <TouchableOpacity
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}
+                          onPress={() => setAvatarViewerTarget({
+                            visible: true,
+                            avatarUrl: p.avatar,
+                            name: p.displayName || p.username || 'Member',
+                            handle: p.username,
+                            bio: p.bio,
+                            customStatus: p.customStatus
+                          })}
+                          activeOpacity={0.8}
+                        >
+                          <Image source={{ uri: getMediaUrl(p.avatar || DEFAULT_AVATAR) }} style={styles.avatar} />
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={styles.memberName}>{p.displayName || p.username || 'Member'}</Text>
+                              <View style={[styles.roleBadge, role === 'owner' ? styles.roleOwner : role === 'admin' ? styles.roleAdmin : styles.roleMember]}>
+                                <Text style={styles.roleText}>{role === 'owner' ? '👑 OWNER / ADMIN' : role.toUpperCase()}</Text>
+                              </View>
                             </View>
+                            <Text style={styles.memberHandle}>@{p.username || 'member'}</Text>
+                            {bio ? <Text style={styles.memberBioText} numberOfLines={1}>"{bio}"</Text> : null}
                           </View>
-                          <Text style={styles.memberHandle}>@{p.username || 'member'}</Text>
-                          {bio ? <Text style={styles.memberBioText} numberOfLines={1}>"{bio}"</Text> : null}
-                        </View>
-                      </TouchableOpacity>
+                        </TouchableOpacity>
+
+                        {canKickThisUser && (
+                          <TouchableOpacity
+                            style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.4)', borderWidth: 1, borderRadius: 8 }}
+                            onPress={() => handleRemoveMember(targetPId, p.displayName || p.username || 'Member')}
+                          >
+                            <Text style={{ color: '#f87171', fontSize: 11, fontWeight: 'bold' }}>Remove</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
                     );
                   })}
                 </View>
@@ -219,6 +311,20 @@ export default function SpaceDetailsModal({ visible, spaceId, onClose, onSuccess
             handle={avatarViewerTarget.handle}
             bio={avatarViewerTarget.bio}
             customStatus={avatarViewerTarget.customStatus}
+          />
+
+          <InviteMemberModal
+            visible={inviteModalVisible}
+            space={space}
+            onClose={() => setInviteModalVisible(false)}
+            onSuccess={(updatedSpace) => {
+              if (updatedSpace) {
+                setSpace(updatedSpace);
+                setMembers(updatedSpace.members || []);
+              }
+              fetchSpace();
+              if (onSuccess) onSuccess(updatedSpace);
+            }}
           />
         </SafeAreaView>
       </View>

@@ -5,6 +5,7 @@ import Message from '../models/Message.js';
 import Task from '../models/Task.js';
 import Poll from '../models/Poll.js';
 import User from '../models/User.js';
+import Persona from '../models/Persona.js';
 import { getIO } from '../config/socket.js';
 
 export const createOrUpgradeSpace = async (req, res) => {
@@ -160,6 +161,125 @@ export const inviteMembersToSpace = async (req, res) => {
     res.json({ success: true, space: updatedSpace, addedCount: newPersonaIds.length });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to invite members to Space', error: error.message });
+  }
+};
+
+export const removeMemberFromSpace = async (req, res) => {
+  try {
+    const { spaceId, personaId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(spaceId)) {
+      return res.status(400).json({ success: false, message: 'Invalid space ID' });
+    }
+
+    const space = await Space.findById(spaceId);
+    if (!space) {
+      return res.status(404).json({ success: false, message: 'Space not found' });
+    }
+
+    // Resolve target persona ID or handle
+    let targetPersona = null;
+    let targetIdStr = '';
+
+    if (personaId && personaId !== 'null' && personaId !== 'undefined') {
+      if (mongoose.Types.ObjectId.isValid(personaId)) {
+        targetIdStr = personaId.toString();
+        targetPersona = await Persona.findById(personaId);
+      } else {
+        const cleanHandle = personaId.replace(/^@/, '').trim();
+        targetPersona = await Persona.findOne({ username: cleanHandle });
+        if (targetPersona) {
+          targetIdStr = targetPersona._id.toString();
+        }
+      }
+    }
+
+    // Collect all persona IDs and User ID belonging to the current user
+    let myPersonaIdStrs = [];
+    if (req.personaId) myPersonaIdStrs.push(req.personaId.toString());
+    if (req.userId) {
+      myPersonaIdStrs.push(req.userId.toString());
+      const myPersonas = await Persona.find({ userId: req.userId }).select('_id');
+      myPersonas.forEach(p => {
+        const idStr = p._id.toString();
+        if (!myPersonaIdStrs.includes(idStr)) myPersonaIdStrs.push(idStr);
+      });
+    }
+
+    const currentUser = await User.findById(req.userId).select('role');
+    const isSystemAdmin = currentUser?.role === 'admin';
+
+    // Resolve owner persona/user ID string
+    const ownerIdStr = space.ownerPersonaId
+      ? (space.ownerPersonaId._id || space.ownerPersonaId).toString()
+      : (space.members[0]?.personaId ? (space.members[0].personaId._id || space.members[0].personaId).toString() : '');
+
+    const isOwner = myPersonaIdStrs.includes(ownerIdStr);
+
+    const requesterMember = space.members.find(m => {
+      const mId = m.personaId ? (m.personaId._id || m.personaId).toString() : '';
+      return myPersonaIdStrs.includes(mId);
+    });
+
+    const isAdminRole = requesterMember && ['owner', 'admin'].includes(requesterMember.role);
+    const isOwnerOrAdmin = isOwner || isAdminRole || isSystemAdmin;
+
+    if (!isOwnerOrAdmin) {
+      return res.status(403).json({ success: false, message: 'Only Space Admins can remove members' });
+    }
+
+    // Prevent removing owner persona
+    if (targetIdStr && targetIdStr === ownerIdStr) {
+      return res.status(400).json({ success: false, message: 'Space owner cannot be removed' });
+    }
+
+    // Filter out target persona as well as any null/broken member references
+    space.members = space.members.filter(m => {
+      if (!m || !m.personaId) return false;
+      const mId = (m.personaId._id || m.personaId).toString();
+      if (!mId || mId === 'null' || mId === 'undefined') return false;
+      if (targetIdStr && mId === targetIdStr) return false;
+      return true;
+    });
+
+    space.markModified('members');
+    await space.save();
+
+    // Also update linked conversation participants
+    if (space.conversationId) {
+      const conversation = await Conversation.findById(space.conversationId);
+      if (conversation) {
+        conversation.participants = conversation.participants.filter(pId => {
+          if (!pId) return false;
+          const pIdStr = (pId._id || pId).toString();
+          if (!pIdStr || pIdStr === 'null' || pIdStr === 'undefined') return false;
+          if (targetIdStr && pIdStr === targetIdStr) return false;
+          return true;
+        });
+        conversation.markModified('participants');
+        await conversation.save();
+      }
+    }
+
+    const updatedSpace = await Space.findById(spaceId)
+      .populate('members.personaId', 'username displayName avatar bio status customStatus type userId')
+      .populate('ownerPersonaId', 'username displayName avatar bio status customStatus type userId');
+
+    console.log(`[Space Admin] User ${req.userId} (Persona ${req.personaId}) successfully removed target ${targetIdStr || personaId} from Space ${spaceId}`);
+
+    const io = getIO();
+    if (io) {
+      io.to(String(space._id)).emit('space:updated', updatedSpace);
+      if (targetIdStr) {
+        io.to(String(space._id)).emit('space:member_removed', { spaceId, personaId: targetIdStr });
+        io.to(`persona:${targetIdStr}`).emit('space:kicked', { spaceId, spaceTitle: space.title });
+      }
+    }
+
+    res.json({ success: true, space: updatedSpace, removedPersonaId: targetIdStr || personaId });
+  } catch (error) {
+    console.error('removeMemberFromSpace error:', error);
+    res.status(500).json({ success: false, message: 'Failed to remove member from Space', error: error.message });
   }
 };
 

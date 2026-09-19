@@ -2,6 +2,7 @@ import express from 'express';
 import {
   createOrUpgradeSpace,
   inviteMembersToSpace,
+  removeMemberFromSpace,
   getSpaces,
   getPublicSpaces,
   joinPublicSpace,
@@ -22,6 +23,7 @@ router.post('/', createOrUpgradeSpace);
 router.get('/public', getPublicSpaces);
 router.get('/', getSpaces);
 router.post('/:spaceId/invite', inviteMembersToSpace);
+router.delete('/:spaceId/members/:personaId', removeMemberFromSpace);
 router.post('/:spaceId/join', joinPublicSpace);
 router.get('/:spaceId', getSpaceDetails);
 router.patch('/:spaceId/privacy', updateSpacePrivacyMode);

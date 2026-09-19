@@ -4,6 +4,13 @@ const getApiBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    const isRemoteProd = host.includes('onrender.com') || host.includes('vercel.app') || host.includes('genace.app');
+    if (!isRemoteProd) {
+      return `${window.location.protocol}//${host}:5005/api`;
+    }
+  }
   return 'https://genacecorechat.onrender.com/api';
 };
 

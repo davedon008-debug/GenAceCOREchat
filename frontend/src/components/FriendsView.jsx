@@ -80,6 +80,8 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
 
   const filteredFriends = activeTab === 'contacts'
     ? friendsList.filter(f => (f.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || (f.handle || '').toLowerCase().includes(searchQuery.toLowerCase()))
+    : activeTab === 'requests'
+    ? formattedGlobalUsers.filter(u => u.isContact)
     : (formattedGlobalUsers.length > 0 ? formattedGlobalUsers : friendsList);
 
   const toggleAdd = async (id) => {

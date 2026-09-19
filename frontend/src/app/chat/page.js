@@ -93,7 +93,7 @@ export default function ChatPage() {
   const fetchPasscodeStatus = async () => {
     try {
       const res = await api.get('/auth/passcode-status');
-      if (res.data.success) {
+      if (res?.data?.success) {
         setPasscodeStatus({
           hasPasscode: res.data.hasPasscode,
           chatLockEnabled: res.data.chatLockEnabled,
@@ -109,7 +109,7 @@ export default function ChatPage() {
   const fetchConversations = async () => {
     try {
       const res = await api.get('/conversations');
-      if (res.data.success) {
+      if (res?.data?.success) {
         setConversations(res.data.conversations);
       }
     } catch (err) {
@@ -120,7 +120,7 @@ export default function ChatPage() {
   const fetchSpaces = async () => {
     try {
       const res = await api.get('/spaces');
-      if (res.data.success) {
+      if (res?.data?.success) {
         setSpaces(res.data.spaces);
       }
     } catch (err) {
@@ -131,7 +131,7 @@ export default function ChatPage() {
   const fetchContacts = async () => {
     try {
       const res = await api.get('/personas/all');
-      if (res.data.success) {
+      if (res?.data?.success) {
         setAllContacts(res.data.contacts);
       }
     } catch (err) {
@@ -142,7 +142,7 @@ export default function ChatPage() {
   const fetchBlockedUsers = async () => {
     try {
       const res = await api.get('/personas/blocked');
-      if (res.data.success) {
+      if (res?.data?.success) {
         const ids = (res.data.blockedPersonas || []).map(p => String(p._id));
         setBlockedUserIds(ids);
       }
@@ -407,6 +407,15 @@ export default function ChatPage() {
       }
     };
 
+    const handleSpaceKicked = ({ spaceId, spaceTitle }) => {
+      if (activeType === 'space' && String(activeId) === String(spaceId)) {
+        setActiveId(null);
+        showToast(`You were removed from ${spaceTitle || 'this space'} by an admin.`, 'error');
+      }
+      fetchSpaces();
+      fetchConversations();
+    };
+
     socket.on('message:new', handleNewMessage);
     socket.on('typing:start', handleTypingStart);
     socket.on('typing:stop', handleTypingStop);
@@ -417,6 +426,7 @@ export default function ChatPage() {
     socket.on('message:burned', handleMessageBurned);
     socket.on('space:created', handleSpaceCreated);
     socket.on('space:updated', handleSpaceUpdated);
+    socket.on('space:kicked', handleSpaceKicked);
 
     return () => {
       if (activeId) leaveRoom(activeId);
@@ -430,6 +440,7 @@ export default function ChatPage() {
       socket.off('message:burned', handleMessageBurned);
       socket.off('space:created', handleSpaceCreated);
       socket.off('space:updated', handleSpaceUpdated);
+      socket.off('space:kicked', handleSpaceKicked);
     };
   }, [socket, activeId, activeType, activePersona]);
 
@@ -1311,9 +1322,24 @@ export default function ChatPage() {
           allContacts={allContacts}
           onlineUserIds={onlineUserIds}
           activePersona={activePersona}
+          activeSpace={activeType === 'space' ? activeObject : null}
           onStartDM={(id) => { startNewDirectMessage(id); setShowRightPanel(false); }}
           onOpenCreateSpace={() => { setShowCreateSpaceModal(true); setShowRightPanel(false); }}
           onOpenNewChat={() => { setShowNewChatModal(true); setShowRightPanel(false); }}
+          onOpenInviteModal={() => setShowInviteModal(true)}
+          onRemoveSpaceMember={async (personaId) => {
+            if (!activeId || activeType !== 'space') return;
+            try {
+              const res = await api.delete(`/spaces/${activeId}/members/${personaId}`);
+              if (res.data.success) {
+                showToast('Member removed from Space', 'success');
+                fetchSpaces();
+                selectSpace(activeId);
+              }
+            } catch (err) {
+              showToast(err.response?.data?.message || 'Failed to remove member', 'error');
+            }
+          }}
           isOpen={showRightPanel}
           onClose={() => setShowRightPanel(false)}
         />

@@ -95,9 +95,6 @@ export const getMediaUrl = (url, name = 'User') => {
   }
 
   if (clean.startsWith('data:')) {
-    if (Platform.OS !== 'web') {
-      return createInitialsAvatar(fallbackName);
-    }
     return clean;
   }
 

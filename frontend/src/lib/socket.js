@@ -9,6 +9,13 @@ const getSocketUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/?$/, '');
   }
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    const isRemoteProd = host.includes('onrender.com') || host.includes('vercel.app') || host.includes('genace.app');
+    if (!isRemoteProd) {
+      return `${window.location.protocol}//${host}:5005`;
+    }
+  }
   return 'https://genacecorechat.onrender.com';
 };
 
