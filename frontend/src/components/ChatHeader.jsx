@@ -58,12 +58,13 @@ export default function ChatHeader({
           </button>
         )}
 
-        {/* Tablet Hamburger Menu Button */}
+        {/* Hamburger Menu Button (Opens Members Directory) */}
         <button
-          onClick={onOpenMobileSidebar}
-          className="hidden sm:inline-flex lg:hidden p-2 text-gray-300 hover:text-white rounded-xl hover:bg-white/10 shrink-0"
+          onClick={onToggleRightPanel || onOpenMobileSidebar}
+          className="p-2 text-gray-300 hover:text-white rounded-xl hover:bg-white/10 shrink-0 transition flex items-center gap-1.5"
+          title="Open Members Directory"
         >
-          <Menu className="w-5 h-5" />
+          <Menu className="w-5 h-5 text-indigo-400" />
         </button>
 
         {isSpace ? (

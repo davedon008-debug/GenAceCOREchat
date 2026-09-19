@@ -21,7 +21,8 @@ export default function WelcomeScreen({
   spaces = [],
   onSelectConversation,
   onSelectSpace,
-  onStartDM
+  onStartDM,
+  onToggleRightPanel
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
@@ -107,6 +108,17 @@ export default function WelcomeScreen({
 
           {/* Right Header Action Icons */}
           <div className="flex items-center gap-2 shrink-0 ml-auto sm:ml-0">
+            {/* Members Directory Hamburger Button */}
+            {onToggleRightPanel && (
+              <button
+                onClick={onToggleRightPanel}
+                className="p-2.5 rounded-xl bg-[#101625] border border-[#1a2338] text-gray-300 hover:text-white hover:bg-indigo-600/20 hover:border-indigo-500/40 transition flex items-center gap-1.5"
+                title="Open Members Directory"
+              >
+                <Users className="w-4 h-4 text-indigo-400" />
+                <span className="text-xs font-bold text-white font-outfit hidden sm:inline">Members</span>
+              </button>
+            )}
             <button
               onClick={() => onSelectNav && onSelectNav('settings')}
               className="p-2 rounded-xl bg-[#101625] border border-[#1a2338] text-gray-300 hover:text-white hover:bg-white/5 transition"

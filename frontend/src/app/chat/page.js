@@ -1054,6 +1054,7 @@ export default function ChatPage() {
           onCloseMobile={() => setMobileSidebarOpen(false)}
           onOpenCameraModal={() => setShowCameraModal(true)}
           onTestNotification={handleTestNotification}
+          onToggleRightPanel={() => setShowRightPanel(prev => !prev)}
         />
       </div>
 
@@ -1234,6 +1235,7 @@ export default function ChatPage() {
                   onSelectConversation={(id) => handleSelectConversationWithLock(id)}
                   onSelectSpace={(id) => selectSpace(id)}
                   onStartDM={(id) => startNewDirectMessage(id)}
+                  onToggleRightPanel={() => setShowRightPanel(prev => !prev)}
                 />
               </div>
 
@@ -1257,6 +1259,7 @@ export default function ChatPage() {
                   onOpenNewPersona={() => setShowPersonaModal(true)}
                   onResetActive={() => setActiveId(null)}
                   isMobileView={true}
+                  onToggleRightPanel={() => setShowRightPanel(prev => !prev)}
                 />
               </div>
             </div>
@@ -1274,6 +1277,7 @@ export default function ChatPage() {
               onSelectConversation={(id) => handleSelectConversationWithLock(id)}
               onSelectSpace={(id) => selectSpace(id)}
               onStartDM={(id) => startNewDirectMessage(id)}
+              onToggleRightPanel={() => setShowRightPanel(prev => !prev)}
             />
           )}
         </div>

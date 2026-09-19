@@ -8,7 +8,7 @@ import AvatarViewerModal from './AvatarViewerModal';
 import Logo from './Logo';
 import { 
   MessageSquare, Zap, Users, Compass, Bell, Settings, Crown, 
-  ChevronRight, X, Check, Plus, LogOut, Shield, Lock, Search
+  ChevronRight, X, Check, Plus, LogOut, Shield, Lock, Search, Menu
 } from 'lucide-react';
 
 export default function Sidebar({ 
@@ -32,7 +32,8 @@ export default function Sidebar({
   onTestNotification,
   activeNav = 'chats',
   onSelectNav,
-  isMobileView = false
+  isMobileView = false,
+  onToggleRightPanel
 }) {
   const { activePersona, user, personas, switchPersona, logout } = useAuth();
   const socketCtx = useSocket();
@@ -113,10 +114,21 @@ export default function Sidebar({
   return (
     <aside className={`${isMobileView ? 'w-full h-full' : 'w-60 lg:w-64 h-full'} flex flex-col justify-between p-3 sm:p-4 bg-[#090d18] border-r border-[#151c2e] shrink-0 select-none overflow-y-auto z-20 custom-scrollbar`}>
       <div className="flex flex-col space-y-4">
-        {/* Top Header Row with Logo & Avatar Status */}
-        <div className="flex items-center justify-between px-1 py-1 gap-3">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Logo variant="full" mode="dark" size={26} />
+        {/* Top Header Row with Logo, Hamburger Menu & Avatar Status */}
+        <div className="flex items-center justify-between px-1 py-1 gap-2">
+          {/* Hamburger Menu Toggle Button for Members Directory */}
+          {onToggleRightPanel && (
+            <button
+              onClick={onToggleRightPanel}
+              className="p-1.5 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:text-white hover:bg-indigo-600/20 hover:border-indigo-500/40 transition shrink-0 flex items-center justify-center"
+              title="Open Members Directory"
+            >
+              <Menu className="w-4 h-4 text-indigo-400" />
+            </button>
+          )}
+
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <Logo variant="full" mode="dark" size={24} />
             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono font-bold shrink-0">
               v1.0.0
             </span>
@@ -124,7 +136,7 @@ export default function Sidebar({
 
           <div
             onClick={() => setShowPersonaMenu(!showPersonaMenu)}
-            className="relative cursor-pointer group shrink-0 ml-3"
+            className="relative cursor-pointer group shrink-0"
             title="Profile & Identity Persona"
           >
             <img

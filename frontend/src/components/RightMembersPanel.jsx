@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, ChevronRight, Plus, UserPlus, Upload, Zap, MoreHorizontal } from 'lucide-react';
+import { Search, ChevronRight, Plus, UserPlus, Upload, Zap, MoreHorizontal, Users, X } from 'lucide-react';
 import { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar } from '../lib/api';
 import { useSocket } from '../context/SocketContext';
 import AvatarViewerModal from './AvatarViewerModal';
@@ -78,14 +78,30 @@ export default function RightMembersPanel({
       )}
 
       {/* ── PANEL ITSELF ── */}
-      {/* On xl+: always-visible permanent sidebar column */}
-      {/* Below xl: fixed right-side drawer, shown when isOpen=true */}
       <aside className={`
         bg-[#090d18] border-l border-[#151c2e] flex flex-col h-full shrink-0 select-none
         xl:relative xl:translate-x-0 xl:w-72 xl:flex xl:z-auto
         fixed inset-y-0 right-0 w-80 z-50 transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : 'translate-x-full xl:translate-x-0'}
       `}>
+      {/* ── PANEL HEADER (Title & Close Button matching Mobile) ── */}
+      <div className="flex items-center justify-between p-4 pb-3 border-b border-[#151c2e] shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+            <Users className="w-4 h-4" />
+          </div>
+          <h2 className="text-sm font-extrabold text-white font-outfit tracking-tight">Members Directory</h2>
+        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1.5 text-gray-400 hover:text-white rounded-xl hover:bg-white/10 transition"
+            title="Close Members Directory"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
       {/* ── STICKY TOP STATUS WIDGET — never scrolls away ── */}
       <div className="shrink-0 p-4 pb-0">
         <div className="p-4 rounded-3xl bg-gradient-to-br from-[#1a2540] via-[#1b1e3d] to-[#1c1836] border border-indigo-500/30 relative overflow-hidden shadow-2xl shadow-indigo-900/30 ring-1 ring-inset ring-white/5">
