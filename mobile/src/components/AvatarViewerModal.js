@@ -29,7 +29,7 @@ export default function AvatarViewerModal({
 
   if (!visible) return null;
 
-  const resolvedUrl = getMediaUrl(avatarUrl) || DEFAULT_AVATAR;
+  const resolvedUrl = getMediaUrl(avatarUrl, name) || DEFAULT_AVATAR;
   const cleanHandle = handle ? handle.replace(/^@/, '') : null;
 
   const handleBlock = () => {

@@ -111,7 +111,7 @@ export const getMediaUrl = (url, name = 'User') => {
   if (!url || typeof url !== 'string') {
     return createInitialsAvatar(fallbackName);
   }
-  const clean = url.trim();
+  const clean = url.trim().replace(/\\/g, '/');
   if (!clean || clean === 'undefined' || clean === 'null' || clean === '[object Object]' || clean === '{}') {
     return createInitialsAvatar(fallbackName);
   }
@@ -121,21 +121,20 @@ export const getMediaUrl = (url, name = 'User') => {
   const apiBase = getApiBaseUrl();
   const serverBase = apiBase.replace(/\/api\/?$/, '');
 
-  // Dynamically rewrite /uploads/ URLs to active server base URL
-  if (clean.includes('/uploads/')) {
-    const relativePath = clean.substring(clean.indexOf('/uploads/'));
-    return `${serverBase}${relativePath}`;
+  // 1. Dynamically rewrite uploads URLs to active server base URL
+  if (clean.includes('uploads/')) {
+    const relativePath = clean.substring(clean.indexOf('uploads/'));
+    return `${serverBase}/${relativePath}`;
   }
 
-  // Rewrite hardcoded local IP/localhost URLs on remote deployments to active serverBase
-  if (clean.includes('localhost:') || clean.includes('127.0.0.1:') || clean.includes('192.168.') || clean.includes('10.0.') || clean.includes('172.16.')) {
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      try {
-        const urlObj = new URL(clean);
-        return `${serverBase}${urlObj.pathname}${urlObj.search}`;
-      } catch {
-        return createInitialsAvatar(fallbackName);
-      }
+  // 2. Rewrite hardcoded local IP/localhost URLs to active server base
+  if (/^(http:\/\/|https:\/\/)?(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?/i.test(clean)) {
+    try {
+      const match = clean.match(/(?:http:\/\/|https:\/\/)?[^\/]+(\/.*)?$/);
+      const pathAndQuery = match && match[1] ? match[1] : '';
+      return `${serverBase}${pathAndQuery.startsWith('/') ? '' : '/'}${pathAndQuery}`;
+    } catch {
+      return createInitialsAvatar(fallbackName);
     }
   }
 

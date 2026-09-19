@@ -89,34 +89,46 @@ export const createInitialsAvatar = (name = 'User') => {
 export const DEFAULT_AVATAR = 'https://ui-avatars.com/api/?name=User&background=6366f1&color=fff&size=128&bold=true';
 
 export const getMediaUrl = (url, name = 'User') => {
+  const fallbackName = (typeof name === 'string' && name.trim()) ? name.trim() : 'User';
+
   if (!url || typeof url !== 'string') {
-    return createInitialsAvatar(name);
+    return createInitialsAvatar(fallbackName);
   }
-  const clean = url.trim();
+  const clean = url.trim().replace(/\\/g, '/');
   if (!clean || clean === 'undefined' || clean === 'null' || clean === '[object Object]' || clean === '{}') {
-    return createInitialsAvatar(name);
+    return createInitialsAvatar(fallbackName);
   }
 
   if (clean.startsWith('data:')) {
     if (Platform.OS !== 'web') {
-      return createInitialsAvatar(name);
+      return createInitialsAvatar(fallbackName);
     }
     return clean;
   }
 
-  // Dynamically rewrite /uploads/ URLs to active server base URL regardless of hardcoded host/IP
-  if (clean.includes('/uploads/')) {
-    const relativePath = clean.substring(clean.indexOf('/uploads/'));
-    const apiBase = getApiBaseUrl();
-    const serverBase = apiBase.replace(/\/api\/?$/, '');
-    return `${serverBase}${relativePath}`;
+  const apiBase = getApiBaseUrl();
+  const serverBase = apiBase.replace(/\/api\/?$/, '');
+
+  // 1. Dynamically rewrite uploads URLs to active server base URL regardless of hardcoded host/IP
+  if (clean.includes('uploads/')) {
+    const relativePath = clean.substring(clean.indexOf('uploads/'));
+    return `${serverBase}/${relativePath}`;
+  }
+
+  // 2. Rewrite hardcoded local IP/localhost URLs to active server base
+  if (/^(http:\/\/|https:\/\/)?(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?/i.test(clean)) {
+    try {
+      const match = clean.match(/(?:http:\/\/|https:\/\/)?[^\/]+(\/.*)?$/);
+      const pathAndQuery = match && match[1] ? match[1] : '';
+      return `${serverBase}${pathAndQuery.startsWith('/') ? '' : '/'}${pathAndQuery}`;
+    } catch {
+      return createInitialsAvatar(fallbackName);
+    }
   }
 
   if (clean.startsWith('http://') || clean.startsWith('https://')) {
     return clean;
   }
-  const apiBase = getApiBaseUrl();
-  const serverBase = apiBase.replace(/\/api\/?$/, '');
   return `${serverBase}${clean.startsWith('/') ? '' : '/'}${clean}`;
 };
 

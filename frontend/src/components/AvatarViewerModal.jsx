@@ -6,7 +6,7 @@ import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 export default function AvatarViewerModal({ isOpen, onClose, avatarUrl, name, handle, bio, customStatus }) {
   if (!isOpen) return null;
 
-  const resolvedUrl = getMediaUrl(avatarUrl) || DEFAULT_AVATAR;
+  const resolvedUrl = getMediaUrl(avatarUrl, name) || DEFAULT_AVATAR;
 
   return (
     <div

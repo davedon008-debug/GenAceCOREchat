@@ -5,6 +5,14 @@ import Conversation from '../models/Conversation.js';
 import { broadcastPresence } from '../config/socket.js';
 
 
+const sanitizeAvatarUrl = (url) => {
+  if (!url || typeof url !== 'string') return url;
+  if (url.includes('uploads/')) {
+    return '/uploads/' + url.substring(url.indexOf('uploads/') + 'uploads/'.length);
+  }
+  return url;
+};
+
 export const checkUsernameAvailability = async (req, res) => {
   try {
     const { username } = req.query;
@@ -45,7 +53,7 @@ export const createPersona = async (req, res) => {
       displayName: displayName || cleanUsername,
       type: type || 'personal',
       bio: bio || '',
-      avatar: avatar || '',
+      avatar: sanitizeAvatarUrl(avatar) || '',
       isDefault: false
     });
 
@@ -212,7 +220,7 @@ export const updatePersona = async (req, res) => {
 
     if (displayName !== undefined) persona.displayName = displayName.trim();
     if (bio !== undefined) persona.bio = bio;
-    if (avatar !== undefined) persona.avatar = avatar;
+    if (avatar !== undefined) persona.avatar = sanitizeAvatarUrl(avatar);
     if (customStatus !== undefined) persona.customStatus = customStatus;
     if (status !== undefined && ['online', 'away', 'dnd', 'offline'].includes(status)) persona.status = status;
 
