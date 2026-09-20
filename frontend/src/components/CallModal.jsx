@@ -75,7 +75,6 @@ export default function CallModal({
 
   if (!call) return null;
 
-  const { peerPersona, isVideo } = call;
   const peerName = peerPersona?.displayName || 'Chat Partner';
   const peerAvatar = getMediaUrl(peerPersona?.avatarUrl, peerName) || DEFAULT_AVATAR;
 
