@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Image, TouchableOpacity, Animated, Easing
+  View, Text, StyleSheet, Image, TouchableOpacity, Animated, Easing, Modal
 } from 'react-native';
 import { Zap, MessageSquare, X, ChevronRight } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
@@ -62,15 +62,22 @@ export default function InAppNotificationBanner({ notification, onDismiss, onPre
   const isSpace = notification.type === 'space';
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          transform: [{ translateY }],
-          opacity,
-        },
-      ]}
+    <Modal
+      transparent
+      visible={!!notification}
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={dismissBanner}
     >
+      <Animated.View
+        style={[
+          styles.container,
+          {
+            transform: [{ translateY }],
+            opacity,
+          },
+        ]}
+      >
       <TouchableOpacity
         activeOpacity={0.9}
         style={[
@@ -143,6 +150,7 @@ export default function InAppNotificationBanner({ notification, onDismiss, onPre
         </View>
       </TouchableOpacity>
     </Animated.View>
+    </Modal>
   );
 }
 

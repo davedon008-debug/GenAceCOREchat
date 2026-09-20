@@ -142,13 +142,8 @@ export const NotificationProvider = ({ children }) => {
       const isSpace = !!rawSpaceId;
       const targetRoomId = String(rawSpaceId || rawConvId || '');
 
-      // Do not drop notification banner or play sound if user is actively in this chat screen
-      if (targetRoomId && activeRoomId && String(targetRoomId) === String(activeRoomId)) {
-        return;
-      }
-
-      // Increment unread count badge for target conversation or space
-      if (targetRoomId) {
+      // Increment unread count badge for target conversation or space if not currently active
+      if (targetRoomId && (!activeRoomId || String(targetRoomId) !== String(activeRoomId))) {
         setUnreadMap((prev) => ({
           ...prev,
           [targetRoomId]: (prev[targetRoomId] || 0) + 1,
