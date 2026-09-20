@@ -34,6 +34,9 @@ export default function CallModal({
   // Attach remote media stream to dedicated audio & video elements
   useEffect(() => {
     if (remoteStream) {
+      console.log('[VOICE] Remote stream:', remoteStream);
+      console.log('[VOICE] Remote audio tracks:', remoteStream?.getAudioTracks());
+
       // Ensure remote audio tracks are active
       remoteStream.getAudioTracks().forEach(track => {
         track.enabled = true;
@@ -124,7 +127,12 @@ export default function CallModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-xl p-3 sm:p-6 animate-fadeIn select-none">
       {/* Dedicated Audio element ensuring remote voice stream plays through speakers */}
-      <audio ref={remoteAudioRef} autoPlay playsInline style={{ position: 'fixed', opacity: 0, pointerEvents: 'none', width: 1, height: 1 }} />
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
+        style={{ position: 'fixed', bottom: 0, right: 0, width: '200px', height: '40px', opacity: 0.01, pointerEvents: 'none' }}
+      />
 
       <div className="relative w-full max-w-4xl h-[85vh] bg-[#0c101c] border border-indigo-500/30 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
         {/* Top Floating Control Bar */}
@@ -160,7 +168,7 @@ export default function CallModal({
             style={
               isVideo && !isCameraOff
                 ? { width: '100%', height: '100%', objectFit: 'cover' }
-                : { width: 1, height: 1, opacity: 0, position: 'absolute', pointerEvents: 'none' }
+                : { width: '100%', height: '100%', opacity: 0, position: 'absolute', inset: 0, pointerEvents: 'none' }
             }
           />
 
