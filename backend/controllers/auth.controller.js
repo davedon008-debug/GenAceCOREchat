@@ -115,7 +115,7 @@ export const loginUser = async (req, res) => {
       userPersonas = await Persona.find({ userId: user._id });
     }
 
-    let defaultPersona = userPersonas.find(p => p.isDefault) || userPersonas[0];
+    let defaultPersona = userPersonas.find(p => p.username === cleanInput) || userPersonas.find(p => p.isDefault) || userPersonas[0];
 
     if (!defaultPersona) {
       const fallbackHandle = (user.email ? user.email.split('@')[0] : 'user') + '_' + Math.random().toString(36).substring(2, 6);

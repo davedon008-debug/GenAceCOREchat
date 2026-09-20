@@ -11,6 +11,40 @@ export const AuthProvider = ({ children }) => {
   const [personas, setPersonas] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchPersonas = async () => {
+    try {
+      const res = await api.get('/personas');
+      if (res.data?.success && Array.isArray(res.data.personas)) {
+        const fetchedList = res.data.personas;
+        setPersonas(fetchedList);
+
+        const savedPersonaStr = await storage.getItem('donchat_persona');
+        let currentId = activePersona?._id;
+        if (!currentId && savedPersonaStr) {
+          try { currentId = JSON.parse(savedPersonaStr)?._id; } catch (e) {}
+        }
+
+        if (currentId) {
+          const freshActive = fetchedList.find(p => String(p._id) === String(currentId));
+          if (freshActive) {
+            setActivePersona(freshActive);
+            await storage.setItem('donchat_persona', JSON.stringify(freshActive));
+          } else if (fetchedList.length > 0) {
+            const defaultP = fetchedList.find(p => p.isDefault) || fetchedList[0];
+            setActivePersona(defaultP);
+            await storage.setItem('donchat_persona', JSON.stringify(defaultP));
+          }
+        } else if (fetchedList.length > 0) {
+          const defaultP = fetchedList.find(p => p.isDefault) || fetchedList[0];
+          setActivePersona(defaultP);
+          await storage.setItem('donchat_persona', JSON.stringify(defaultP));
+        }
+      }
+    } catch (err) {
+      console.error('[AuthContext] Failed to fetch personas:', err);
+    }
+  };
+
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -22,6 +56,9 @@ export const AuthProvider = ({ children }) => {
           setToken(savedToken);
           setUser(JSON.parse(savedUser));
           setActivePersona(JSON.parse(savedPersona));
+          setLoading(false);
+          fetchPersonas();
+          return;
         }
       } catch (err) {
         console.error('[AuthContext] Init error:', err);
@@ -118,6 +155,7 @@ export const AuthProvider = ({ children }) => {
         loginDemo,
         switchPersona,
         logout,
+        fetchPersonas,
         setActivePersona: async (p) => {
           setActivePersona(p);
           await storage.setItem('donchat_persona', JSON.stringify(p));
