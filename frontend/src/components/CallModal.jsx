@@ -17,6 +17,7 @@ export default function CallModal({
   isCameraOff,
   isScreenSharing
 }) {
+  const { peerPersona, isVideo } = call || {};
   const [duration, setDuration] = useState(0);
   const [isMinimized, setIsMinimized] = useState(false);
   const localVideoRef = useRef(null);

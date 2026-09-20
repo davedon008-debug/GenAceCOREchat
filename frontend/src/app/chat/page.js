@@ -104,6 +104,7 @@ export default function ChatPage() {
   const activeCallRef = useRef(activeCall);
   const incomingCallRef = useRef(incomingCall);
   const localStreamRef = useRef(localStream);
+  const pendingCandidatesRef = useRef([]);
 
   useEffect(() => { activeCallRef.current = activeCall; }, [activeCall]);
   useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
@@ -111,6 +112,7 @@ export default function ChatPage() {
 
   const cleanupCall = () => {
     stopAllSFX();
+    pendingCandidatesRef.current = [];
     if (peerConnectionRef.current) {
       try {
         peerConnectionRef.current.close();
@@ -130,6 +132,20 @@ export default function ChatPage() {
     setIsMicMuted(false);
     setIsCameraOff(false);
     setIsScreenSharing(false);
+  };
+
+  const processPendingCandidates = async (pc) => {
+    if (pc && pc.remoteDescription && pendingCandidatesRef.current.length > 0) {
+      const candidates = [...pendingCandidatesRef.current];
+      pendingCandidatesRef.current = [];
+      for (const cand of candidates) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (e) {
+          console.warn('[WebRTC] Pending ICE candidate error:', e);
+        }
+      }
+    }
   };
 
   const addLocalTracksToPC = (pc, stream) => {
@@ -232,6 +248,7 @@ export default function ChatPage() {
         if (signal.type === 'offer') {
           await pc.setRemoteDescription(new RTCSessionDescription(signal));
           addLocalTracksToPC(pc, localStreamRef.current);
+          await processPendingCandidates(pc);
 
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
@@ -242,8 +259,17 @@ export default function ChatPage() {
           });
         } else if (signal.type === 'answer') {
           await pc.setRemoteDescription(new RTCSessionDescription(signal));
+          await processPendingCandidates(pc);
         } else if (signal.candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          if (pc.remoteDescription && pc.remoteDescription.type) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            } catch (e) {
+              console.warn('[WebRTC] addIceCandidate direct error:', e);
+            }
+          } else {
+            pendingCandidatesRef.current.push(signal.candidate);
+          }
         }
       } catch (err) {
         console.error('[Call] Signal handling error:', err);
