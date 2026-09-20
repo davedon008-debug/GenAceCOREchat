@@ -31,28 +31,37 @@ export default function CallModal({
     }
   }, [localStream]);
 
-  // Attach remote media stream to dedicated audio & video elements
+  // Attach remote media stream to dedicated audio or video element depending on call type
   useEffect(() => {
     if (remoteStream) {
-      console.log('[VOICE] Remote stream:', remoteStream);
+      console.log('[VOICE] Remote stream received in CallModal:', remoteStream);
       console.log('[VOICE] Remote audio tracks:', remoteStream?.getAudioTracks());
 
-      // Ensure remote audio tracks are active
       remoteStream.getAudioTracks().forEach(track => {
         track.enabled = true;
       });
 
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = remoteStream;
-        remoteAudioRef.current.muted = false;
-        remoteAudioRef.current.volume = 1.0;
-        remoteAudioRef.current.play().catch(err => console.log('[Audio Playback Error]', err));
-      }
-
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = remoteStream;
-        remoteVideoRef.current.muted = true; // Audio is handled by remoteAudioRef to prevent echo
-        remoteVideoRef.current.play().catch(err => console.log('[Video Playback Error]', err));
+      if (isVideo) {
+        // Video Call: Video tag handles both video & audio playback
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = remoteStream;
+          remoteVideoRef.current.muted = false;
+          remoteVideoRef.current.play().catch(err => console.log('[Video Playback Error]', err));
+        }
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = null;
+        }
+      } else {
+        // Voice Call: Dedicated audio element handles voice playback exclusively
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = remoteStream;
+          remoteAudioRef.current.muted = false;
+          remoteAudioRef.current.volume = 1.0;
+          remoteAudioRef.current.play().catch(err => console.log('[Audio Playback Error]', err));
+        }
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = null;
+        }
       }
     }
   }, [remoteStream, isVideo]);

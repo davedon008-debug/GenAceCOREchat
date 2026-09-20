@@ -152,18 +152,18 @@ export default function ChatPage() {
     if (!pc || !stream) return;
     try {
       stream.getAudioTracks().forEach(track => {
-        track.enabled = true; // Ensure local mic track is enabled
+        track.enabled = true; // Ensure local mic track is explicitly enabled
       });
       console.log('[VOICE DEBUG] local audio tracks:', stream.getAudioTracks());
       const senders = pc.getSenders() || [];
-      const existingTracks = senders.map(s => s.track).filter(Boolean);
+      const existingTrackIds = senders.map(s => s.track?.id).filter(Boolean);
       stream.getTracks().forEach(track => {
-        if (!existingTracks.includes(track)) {
-          console.log('[VOICE DEBUG] adding track to PC:', track.kind, track);
+        if (!existingTrackIds.includes(track.id)) {
+          console.log('[VOICE DEBUG] adding track to PC:', track.kind, track.id);
           pc.addTrack(track, stream);
         }
       });
-      console.log('[VOICE DEBUG] senders:', pc.getSenders().map(s => ({ kind: s.track?.kind, enabled: s.track?.enabled, readyState: s.track?.readyState })));
+      console.log('[VOICE DEBUG] senders:', pc.getSenders().map(s => ({ kind: s.track?.kind, id: s.track?.id, enabled: s.track?.enabled, readyState: s.track?.readyState })));
     } catch (err) {
       console.warn('[WebRTC] addTrack helper error:', err);
     }
@@ -343,7 +343,11 @@ export default function ChatPage() {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
         video: isVideo ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false
       });
       setLocalStream(stream);
@@ -381,7 +385,11 @@ export default function ChatPage() {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
         video: isVideo ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false
       });
       setLocalStream(stream);
