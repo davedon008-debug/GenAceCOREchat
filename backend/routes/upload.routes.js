@@ -122,6 +122,7 @@ router.post('/', protect, (req, res) => {
       const fileUrl = `/uploads/${savedFilename}`;
       let finalUrl = fileUrl;
       let publicId = null;
+      let uploadSucceededCloud = false;
 
       // Upload to Cloudinary if configured
       if (isCloudinaryConfigured) {
@@ -134,12 +135,29 @@ router.post('/', protect, (req, res) => {
           if (cloudRes && cloudRes.secure_url) {
             finalUrl = cloudRes.secure_url;
             publicId = cloudRes.public_id;
+            uploadSucceededCloud = true;
             if (fs.existsSync(localFilePath)) {
               fs.unlinkSync(localFilePath);
             }
           }
         } catch (cErr) {
-          console.warn('[Upload] Cloudinary upload fallback to local storage:', cErr.message);
+          console.warn('[Upload] Cloudinary upload fallback to persistent base64:', cErr.message);
+        }
+      }
+
+      // If Cloudinary didn't upload and it is an image, convert to persistent Base64 Data URI so Render server resets never lose profile pictures
+      if (!uploadSucceededCloud && savedFilename) {
+        const localFilePath = path.join(uploadsDir, savedFilename);
+        const ext = path.extname(savedFilename).toLowerCase();
+        const isImg = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg'].includes(ext) || (req.file && req.file.mimetype?.startsWith('image/'));
+        if (isImg && fs.existsSync(localFilePath) && savedSize < 8 * 1024 * 1024) {
+          try {
+            const imgBuffer = fs.readFileSync(localFilePath);
+            const mime = req.file?.mimetype || (ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.svg' ? 'image/svg+xml' : 'image/jpeg');
+            finalUrl = `data:${mime};base64,${imgBuffer.toString('base64')}`;
+          } catch (bErr) {
+            console.error('[Upload] Base64 image conversion error:', bErr);
+          }
         }
       }
 
