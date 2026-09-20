@@ -407,6 +407,11 @@ export default function ChatPage() {
         roomId: activeId
       });
 
+      const pc = createPeerConnection(targetPersonaId, callId);
+      if (pc) {
+        addLocalTracksToPC(pc, stream);
+      }
+
       playRingback();
 
       if (socket) {
