@@ -151,12 +151,16 @@ export default function ChatPage() {
   const addLocalTracksToPC = (pc, stream) => {
     if (!pc || !stream) return;
     try {
-      const existingTracks = (pc.getSenders() || []).map(s => s.track).filter(Boolean);
+      console.log('[VOICE DEBUG] local audio tracks:', stream.getAudioTracks());
+      const senders = pc.getSenders() || [];
+      const existingTracks = senders.map(s => s.track).filter(Boolean);
       stream.getTracks().forEach(track => {
         if (!existingTracks.includes(track)) {
+          console.log('[VOICE DEBUG] adding track to PC:', track.kind, track);
           pc.addTrack(track, stream);
         }
       });
+      console.log('[VOICE DEBUG] senders:', pc.getSenders().map(s => ({ kind: s.track?.kind, enabled: s.track?.enabled, readyState: s.track?.readyState })));
     } catch (err) {
       console.warn('[WebRTC] addTrack helper error:', err);
     }
@@ -172,15 +176,6 @@ export default function ChatPage() {
       ]
     });
 
-    try {
-      pc.addTransceiver('audio', { direction: 'sendrecv' });
-      if (activeCallRef.current?.isVideo || incomingCallRef.current?.isVideo) {
-        pc.addTransceiver('video', { direction: 'sendrecv' });
-      }
-    } catch (e) {
-      console.warn('[WebRTC] addTransceiver note:', e);
-    }
-
     pc.onicecandidate = (event) => {
       if (event.candidate && socket) {
         socket.emit('call:signal', {
@@ -192,19 +187,26 @@ export default function ChatPage() {
     };
 
     pc.ontrack = (event) => {
-      console.log('[WebRTC] Received remote track:', event.track?.kind, event.streams);
+      console.log('[VOICE DEBUG] ontrack fired');
+      console.log('[VOICE DEBUG] track:', event.track);
+      console.log('[VOICE DEBUG] kind:', event.track?.kind);
+      console.log('[VOICE DEBUG] enabled:', event.track?.enabled);
+      console.log('[VOICE DEBUG] muted:', event.track?.muted);
+      console.log('[VOICE DEBUG] readyState:', event.track?.readyState);
+      console.log('[VOICE DEBUG] streams:', event.streams);
+
       if (event.streams && event.streams[0]) {
+        console.log('[VOICE DEBUG] remote audio tracks:', event.streams[0].getAudioTracks());
+        console.log('[VOICE DEBUG] remote video tracks:', event.streams[0].getVideoTracks());
         setRemoteStream(event.streams[0]);
       } else if (event.track) {
         setRemoteStream(prev => {
-          if (prev) {
-            const tracks = prev.getTracks();
-            if (!tracks.some(t => t.id === event.track.id)) {
-              prev.addTrack(event.track);
-            }
-            return new MediaStream(prev.getTracks());
+          const newStream = prev ? new MediaStream(prev.getTracks()) : new MediaStream();
+          if (!newStream.getTracks().some(t => t.id === event.track.id)) {
+            newStream.addTrack(event.track);
           }
-          return new MediaStream([event.track]);
+          console.log('[VOICE DEBUG] remote audio tracks (manual):', newStream.getAudioTracks());
+          return newStream;
         });
       }
     };
