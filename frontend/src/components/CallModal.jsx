@@ -110,8 +110,8 @@ export default function CallModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-xl p-3 sm:p-6 animate-fadeIn select-none">
-      {/* Hidden Audio element ensuring remote voice stream plays through speakers */}
-      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+      {/* Dedicated Audio element ensuring remote voice stream plays through speakers */}
+      <audio ref={remoteAudioRef} autoPlay playsInline style={{ position: 'fixed', opacity: 0, pointerEvents: 'none', width: 1, height: 1 }} />
 
       <div className="relative w-full max-w-4xl h-[85vh] bg-[#0c101c] border border-indigo-500/30 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
         {/* Top Floating Control Bar */}
@@ -139,16 +139,16 @@ export default function CallModal({
 
         {/* Video / Audio Canvas Main Container */}
         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-          {/* Remote Video Stream (Main Feed) */}
-          {isVideo && remoteStream && !isCameraOff ? (
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            /* Voice Call or Video Disabled Avatar Screen */
+          {/* Always-mounted Remote Stream element (Handles Audio Output for Voice & Video calls) */}
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className={isVideo && !isCameraOff ? "w-full h-full object-cover" : "hidden"}
+          />
+
+          {/* Voice Call or Video Disabled Avatar Screen */}
+          {(!isVideo || isCameraOff) && (
             <div className="flex flex-col items-center justify-center text-center p-6">
               <div className="relative mb-6">
                 {isCallConnected && (
