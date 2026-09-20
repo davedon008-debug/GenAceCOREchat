@@ -273,10 +273,11 @@ export default function ConversationScreen({ route, navigation }) {
 
     pc.onicecandidate = (event) => {
       if (event.candidate && socket) {
+        const candJSON = typeof event.candidate.toJSON === 'function' ? event.candidate.toJSON() : event.candidate;
         socket.emit('call:signal', {
           targetPersonaId,
           callId,
-          signal: { candidate: event.candidate }
+          signal: { candidate: candJSON }
         });
       }
     };
