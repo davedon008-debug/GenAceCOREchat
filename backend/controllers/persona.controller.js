@@ -327,20 +327,73 @@ export const getBlockedPersonas = async (req, res) => {
   }
 };
 
+import PushSubscription from '../models/PushSubscription.js';
+
 export const registerPushToken = async (req, res) => {
   try {
-    const { token } = req.body;
-    if (!token || typeof token !== 'string') {
-      return res.status(400).json({ success: false, message: 'Push token string required' });
+    const { token, subscription } = req.body;
+    const tokenData = subscription || token;
+
+    if (!tokenData) {
+      return res.status(400).json({ success: false, message: 'Push subscription or token string required' });
+    }
+
+    let parsedSub = null;
+    let rawTokenStr = '';
+
+    if (typeof tokenData === 'object' && tokenData.endpoint) {
+      parsedSub = tokenData;
+      rawTokenStr = JSON.stringify(tokenData);
+    } else if (typeof tokenData === 'string') {
+      rawTokenStr = tokenData;
+      if (tokenData.startsWith('{') && tokenData.includes('endpoint')) {
+        try { parsedSub = JSON.parse(tokenData); } catch (e) {}
+      }
+    }
+
+    if (parsedSub && parsedSub.endpoint && parsedSub.keys?.p256dh && parsedSub.keys?.auth) {
+      await PushSubscription.findOneAndUpdate(
+        { endpoint: parsedSub.endpoint },
+        {
+          userId: req.userId,
+          personaId: req.personaId,
+          endpoint: parsedSub.endpoint,
+          keys: {
+            p256dh: parsedSub.keys.p256dh,
+            auth: parsedSub.keys.auth
+          },
+          userAgent: req.headers['user-agent'] || '',
+          platform: req.headers['sec-ch-ua-platform'] || ''
+        },
+        { upsert: true, new: true }
+      );
     }
 
     await Persona.findByIdAndUpdate(req.personaId, {
-      $addToSet: { pushTokens: token }
+      $addToSet: { pushTokens: rawTokenStr }
     });
 
     res.json({ success: true, message: 'Push token registered successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to register push token', error: error.message });
+  }
+};
+
+export const unregisterPushToken = async (req, res) => {
+  try {
+    const { endpoint, token } = req.body;
+    const targetEndpoint = endpoint || (typeof token === 'string' && token.includes('endpoint') ? (() => { try { return JSON.parse(token).endpoint; } catch (e) { return token; } })() : token);
+
+    if (targetEndpoint) {
+      await PushSubscription.deleteOne({ endpoint: targetEndpoint, personaId: req.personaId });
+      await Persona.findByIdAndUpdate(req.personaId, {
+        $pull: { pushTokens: { $regex: targetEndpoint } }
+      });
+    }
+
+    res.json({ success: true, message: 'Push notification subscription removed successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to unregister push token', error: error.message });
   }
 };
 
@@ -352,4 +405,5 @@ export const getVapidKey = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch VAPID key', error: error.message });
   }
 };
+
 

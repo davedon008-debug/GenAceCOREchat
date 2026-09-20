@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import api, { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 import { getNotifPrefs, saveNotifPrefs, playNotificationSound } from '../lib/sound';
-import { enableWebPushNotifications } from '../lib/pushSubscription';
+import { enableWebPushNotifications, disableWebPushNotifications, getWebPushStatus } from '../lib/pushSubscription';
 import PasscodeModal from './PasscodeModal';
 import {
   User, Palette, Bell, Shield, UserX, HelpCircle, Camera, Edit2,
@@ -534,6 +534,16 @@ export default function SettingsView({ onBack, defaultSection }) {
   const [notifPrefs, setNotifPrefs] = useState(getNotifPrefs);
   const [pushStatus, setPushStatus] = useState(null);
   const [enablingPush, setEnablingPush] = useState(false);
+  const [pushInfo, setPushInfo] = useState({ supported: true, permission: 'default', isSubscribed: false });
+
+  const refreshPushStatus = async () => {
+    const st = await getWebPushStatus();
+    setPushInfo(st);
+  };
+
+  useEffect(() => {
+    refreshPushStatus();
+  }, []);
 
   const handleEnablePush = async () => {
     setEnablingPush(true);
@@ -541,6 +551,16 @@ export default function SettingsView({ onBack, defaultSection }) {
     const res = await enableWebPushNotifications();
     setEnablingPush(false);
     setPushStatus(res);
+    refreshPushStatus();
+  };
+
+  const handleDisablePush = async () => {
+    setEnablingPush(true);
+    setPushStatus(null);
+    const res = await disableWebPushNotifications();
+    setEnablingPush(false);
+    setPushStatus(res);
+    refreshPushStatus();
   };
 
   const toggleNotifPref = (key) => {
@@ -953,19 +973,43 @@ export default function SettingsView({ onBack, defaultSection }) {
                     <Bell className="w-5 h-5 text-cyan-400" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white">Closed-App / Lock Screen Push Notifications</h4>
-                    <p className="text-[10px] text-gray-400">Receive DM & Space alerts on your device lock screen when browser is closed</p>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold text-white">Closed-App / Lock Screen Push Notifications</h4>
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-semibold border ${
+                        pushInfo.isSubscribed
+                          ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                          : pushInfo.permission === 'denied'
+                            ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+                            : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                      }`}>
+                        {pushInfo.isSubscribed ? 'ENABLED 🔔' : pushInfo.permission === 'denied' ? 'BLOCKED 🚫' : 'NOT ENABLED'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-400">Receive DM & Space alerts on your device lock screen when browser tab is closed</p>
                   </div>
                 </div>
 
-                <button
-                  onClick={handleEnablePush}
-                  disabled={enablingPush}
-                  className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/20 disabled:opacity-60 shrink-0"
-                >
-                  {enablingPush ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bell className="w-3.5 h-3.5" />}
-                  {enablingPush ? 'Enabling…' : 'Enable Closed-App Push'}
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {pushInfo.isSubscribed ? (
+                    <button
+                      onClick={handleDisablePush}
+                      disabled={enablingPush}
+                      className="px-3.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-semibold transition flex items-center justify-center gap-1.5 disabled:opacity-60"
+                    >
+                      {enablingPush ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                      {enablingPush ? 'Disabling…' : 'Disable Push'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleEnablePush}
+                      disabled={enablingPush}
+                      className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/20 disabled:opacity-60"
+                    >
+                      {enablingPush ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bell className="w-3.5 h-3.5" />}
+                      {enablingPush ? 'Enabling…' : 'Enable Closed-App Push'}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {pushStatus && (

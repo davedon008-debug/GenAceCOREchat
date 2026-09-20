@@ -1,5 +1,5 @@
 import express from 'express';
-import { getPersonas, createPersona, switchPersona, searchPersonas, checkUsernameAvailability, getAllContacts, updatePersona, blockPersona, unblockPersona, getBlockedPersonas, addContact, removeContact, registerPushToken, getVapidKey } from '../controllers/persona.controller.js';
+import { getPersonas, createPersona, switchPersona, searchPersonas, checkUsernameAvailability, getAllContacts, updatePersona, blockPersona, unblockPersona, getBlockedPersonas, addContact, removeContact, registerPushToken, unregisterPushToken, getVapidKey } from '../controllers/persona.controller.js';
 import { protect } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
@@ -10,6 +10,7 @@ router.use(protect);
 
 router.get('/vapid-key', getVapidKey);
 router.post('/push-token', registerPushToken);
+router.delete('/push-token', unregisterPushToken);
 router.get('/', getPersonas);
 router.get('/all', getAllContacts);
 router.get('/blocked', getBlockedPersonas);

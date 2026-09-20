@@ -44,7 +44,7 @@ export const enableWebPushNotifications = async () => {
     }
 
     const subString = JSON.stringify(subscription);
-    await api.post('/personas/push-token', { token: subString });
+    await api.post('/personas/push-token', { subscription, token: subString });
 
     return { success: true, message: 'Push notifications enabled successfully! You will now receive alerts even when tab is closed.' };
   } catch (err) {
@@ -52,3 +52,48 @@ export const enableWebPushNotifications = async () => {
     return { success: false, message: err.message || 'Failed to enable push notifications.' };
   }
 };
+
+export const disableWebPushNotifications = async () => {
+  if (typeof window === 'undefined') return { success: false, message: 'Browser environment required' };
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return { success: false, message: 'Push notifications are not supported by this browser.' };
+  }
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (reg && reg.pushManager) {
+      const subscription = await reg.pushManager.getSubscription();
+      if (subscription) {
+        const endpoint = subscription.endpoint;
+        await subscription.unsubscribe();
+        await api.delete('/personas/push-token', { data: { endpoint } });
+      }
+    }
+    return { success: true, message: 'Push notifications disabled for this device.' };
+  } catch (err) {
+    console.error('Failed to disable Web Push:', err);
+    return { success: false, message: err.message || 'Failed to disable push notifications.' };
+  }
+};
+
+export const getWebPushStatus = async () => {
+  if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
+    return { supported: false, permission: 'denied', isSubscribed: false };
+  }
+
+  try {
+    const permission = Notification.permission;
+    let isSubscribed = false;
+    if (permission === 'granted') {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && reg.pushManager) {
+        const sub = await reg.pushManager.getSubscription();
+        isSubscribed = !!sub;
+      }
+    }
+    return { supported: true, permission, isSubscribed };
+  } catch (err) {
+    return { supported: true, permission: Notification.permission || 'default', isSubscribed: false };
+  }
+};
+
