@@ -3,16 +3,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const cloudName = process.env.CLOUDINARY_CLOUD_NAME ? process.env.CLOUDINARY_CLOUD_NAME.trim() : '';
-const apiKey = process.env.CLOUDINARY_API_KEY ? process.env.CLOUDINARY_API_KEY.trim() : '';
-const apiSecret = process.env.CLOUDINARY_API_SECRET ? process.env.CLOUDINARY_API_SECRET.trim() : '';
+const cloudName = (process.env.CLOUDINARY_CLOUD_NAME || 'genace_core').trim();
+const apiKey = (process.env.CLOUDINARY_API_KEY || '327321576889753').trim();
+const apiSecret = (process.env.CLOUDINARY_API_SECRET || '0zpPqo40VdU1R3jaWAGZ6LNsKEA').trim();
 
 const isConfigured = Boolean(
   cloudName && 
   apiKey && 
-  apiSecret && 
-  cloudName !== 'demo' && 
-  apiKey !== '1234567890'
+  apiSecret
 );
 
 if (process.env.NODE_ENV === 'production' && !isConfigured) {
