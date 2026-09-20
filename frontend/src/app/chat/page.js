@@ -164,6 +164,11 @@ export default function ChatPage() {
           pc.addTrack(track, stream);
         }
       });
+      if (typeof pc.getTransceivers === 'function') {
+        pc.getTransceivers().forEach(t => {
+          t.direction = 'sendrecv';
+        });
+      }
       console.log('[VOICE DEBUG] senders:', pc.getSenders().map(s => ({ kind: s.track?.kind, id: s.track?.id, enabled: s.track?.enabled, readyState: s.track?.readyState })));
     } catch (err) {
       console.warn('[WebRTC] addTrack helper error:', err);
@@ -269,6 +274,10 @@ export default function ChatPage() {
           const pc = createPeerConnection(data.responderPersonaId, data.callId);
           addLocalTracksToPC(pc, localStreamRef.current);
 
+          if (typeof pc.getTransceivers === 'function') {
+            pc.getTransceivers().forEach(t => { t.direction = 'sendrecv'; });
+          }
+
           const offer = await pc.createOffer({
             offerToReceiveAudio: true,
             offerToReceiveVideo: !!activeCallRef.current?.isVideo
@@ -305,6 +314,10 @@ export default function ChatPage() {
           await pc.setRemoteDescription(new RTCSessionDescription(signal));
           addLocalTracksToPC(pc, localStreamRef.current);
           await processPendingCandidates(pc);
+
+          if (typeof pc.getTransceivers === 'function') {
+            pc.getTransceivers().forEach(t => { t.direction = 'sendrecv'; });
+          }
 
           const answer = await pc.createAnswer({
             offerToReceiveAudio: true,
