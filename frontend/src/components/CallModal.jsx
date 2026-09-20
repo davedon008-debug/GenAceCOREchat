@@ -63,7 +63,9 @@ export default function CallModal({
       if (isVideo) {
         // Video Call: Video tag handles both video & audio playback
         if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = remoteStream;
+          if (remoteVideoRef.current.srcObject !== remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+          }
           remoteVideoRef.current.muted = false;
           remoteVideoRef.current.play()
             .then(() => setAudioBlocked(false))
@@ -78,7 +80,9 @@ export default function CallModal({
       } else {
         // Voice Call: Dedicated audio element handles voice playback exclusively
         if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = remoteStream;
+          if (remoteAudioRef.current.srcObject !== remoteStream) {
+            remoteAudioRef.current.srcObject = remoteStream;
+          }
           remoteAudioRef.current.muted = false;
           remoteAudioRef.current.volume = 1.0;
           remoteAudioRef.current.play()

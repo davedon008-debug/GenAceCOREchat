@@ -206,7 +206,9 @@ export default function ChatPage() {
 
     pc.oniceconnectionstatechange = () => {
       console.log('[WebRTC] ICE Connection State:', pc.iceConnectionState);
-      if (pc.iceConnectionState === 'failed') {
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        setIsCallConnected(true);
+      } else if (pc.iceConnectionState === 'failed') {
         console.warn('[WebRTC] ICE Connection failed. Restarting ICE candidate search...');
         if (typeof pc.restartIce === 'function') {
           pc.restartIce();
@@ -226,26 +228,21 @@ export default function ChatPage() {
     };
 
     pc.ontrack = (event) => {
-      console.log('[VOICE DEBUG] ontrack fired');
-      console.log('[VOICE DEBUG] track:', event.track);
-      console.log('[VOICE DEBUG] kind:', event.track?.kind);
-      console.log('[VOICE DEBUG] enabled:', event.track?.enabled);
-      console.log('[VOICE DEBUG] muted:', event.track?.muted);
-      console.log('[VOICE DEBUG] readyState:', event.track?.readyState);
-      console.log('[VOICE DEBUG] streams:', event.streams);
-
+      console.log('[VOICE DEBUG] ontrack fired:', event.track?.kind, event.track?.id);
+      setIsCallConnected(true);
       if (event.streams && event.streams[0]) {
-        console.log('[VOICE DEBUG] remote audio tracks:', event.streams[0].getAudioTracks());
-        console.log('[VOICE DEBUG] remote video tracks:', event.streams[0].getVideoTracks());
+        event.streams[0].getTracks().forEach(t => { t.enabled = true; });
         setRemoteStream(event.streams[0]);
       } else if (event.track) {
+        event.track.enabled = true;
         setRemoteStream(prev => {
-          const newStream = prev ? new MediaStream(prev.getTracks()) : new MediaStream();
-          if (!newStream.getTracks().some(t => t.id === event.track.id)) {
-            newStream.addTrack(event.track);
+          if (!prev) {
+            return new MediaStream([event.track]);
           }
-          console.log('[VOICE DEBUG] remote audio tracks (manual):', newStream.getAudioTracks());
-          return newStream;
+          if (!prev.getTracks().some(t => t.id === event.track.id)) {
+            prev.addTrack(event.track);
+          }
+          return prev;
         });
       }
     };
