@@ -32,13 +32,25 @@ export default function CallModal({
 
   // Attach remote media stream to dedicated audio & video elements
   useEffect(() => {
-    if (remoteAudioRef.current && remoteStream) {
-      remoteAudioRef.current.srcObject = remoteStream;
-      remoteAudioRef.current.play().catch(err => console.log('[Audio Playback Error]', err));
-    }
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
-      remoteVideoRef.current.play().catch(err => console.log('[Video Playback Error]', err));
+    if (remoteStream) {
+      // Ensure remote audio tracks are active
+      remoteStream.getAudioTracks().forEach(track => {
+        track.enabled = true;
+      });
+
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = remoteStream;
+        remoteAudioRef.current.muted = false;
+        remoteAudioRef.current.volume = 1.0;
+        remoteAudioRef.current.play().catch(err => console.log('[Audio Playback Error]', err));
+      }
+
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = remoteStream;
+        remoteVideoRef.current.muted = false;
+        remoteVideoRef.current.volume = 1.0;
+        remoteVideoRef.current.play().catch(err => console.log('[Video Playback Error]', err));
+      }
     }
   }, [remoteStream, isVideo]);
 
@@ -144,7 +156,11 @@ export default function CallModal({
             ref={remoteVideoRef}
             autoPlay
             playsInline
-            className={isVideo && !isCameraOff ? "w-full h-full object-cover" : "hidden"}
+            style={
+              isVideo && !isCameraOff
+                ? { width: '100%', height: '100%', objectFit: 'cover' }
+                : { width: 1, height: 1, opacity: 0, position: 'absolute', pointerEvents: 'none' }
+            }
           />
 
           {/* Voice Call or Video Disabled Avatar Screen */}

@@ -132,6 +132,20 @@ export default function ChatPage() {
     setIsScreenSharing(false);
   };
 
+  const addLocalTracksToPC = (pc, stream) => {
+    if (!pc || !stream) return;
+    try {
+      const existingTracks = (pc.getSenders() || []).map(s => s.track).filter(Boolean);
+      stream.getTracks().forEach(track => {
+        if (!existingTracks.includes(track)) {
+          pc.addTrack(track, stream);
+        }
+      });
+    } catch (err) {
+      console.warn('[WebRTC] addTrack helper error:', err);
+    }
+  };
+
   const createPeerConnection = (targetPersonaId, callId) => {
     if (peerConnectionRef.current) return peerConnectionRef.current;
 
@@ -184,11 +198,8 @@ export default function ChatPage() {
       if (activeCallRef.current && activeCallRef.current.isCaller) {
         try {
           const pc = createPeerConnection(data.responderPersonaId, data.callId);
-          if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(track => {
-              pc.addTrack(track, localStreamRef.current);
-            });
-          }
+          addLocalTracksToPC(pc, localStreamRef.current);
+
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
           socket.emit('call:signal', {
@@ -220,11 +231,8 @@ export default function ChatPage() {
       try {
         if (signal.type === 'offer') {
           await pc.setRemoteDescription(new RTCSessionDescription(signal));
-          if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(track => {
-              pc.addTrack(track, localStreamRef.current);
-            });
-          }
+          addLocalTracksToPC(pc, localStreamRef.current);
+
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           socket.emit('call:signal', {
@@ -344,11 +352,7 @@ export default function ChatPage() {
       }
 
       const pc = createPeerConnection(String(callerPersona._id), callId);
-      if (stream) {
-        stream.getTracks().forEach(track => {
-          pc.addTrack(track, stream);
-        });
-      }
+      addLocalTracksToPC(pc, stream);
     } catch (err) {
       console.error('[Call] Error accepting call:', err);
       showToast('Could not access microphone/camera to accept call.', 'error');
