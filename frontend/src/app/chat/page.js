@@ -140,7 +140,7 @@ export default function ChatPage() {
       pendingCandidatesRef.current = [];
       for (const cand of candidates) {
         try {
-          await pc.addIceCandidate(new RTCIceCandidate(cand));
+          await pc.addIceCandidate(cand);
         } catch (e) {
           console.warn('[WebRTC] Pending ICE candidate error:', e);
         }
@@ -151,10 +151,10 @@ export default function ChatPage() {
   const addLocalTracksToPC = (pc, stream) => {
     if (!pc || !stream) return;
     try {
-      stream.getAudioTracks().forEach(track => {
-        track.enabled = true; // Ensure local mic track is explicitly enabled
+      stream.getTracks().forEach(track => {
+        track.enabled = true; // Ensure all local tracks (mic + camera) are explicitly enabled
       });
-      console.log('[VOICE DEBUG] local audio tracks:', stream.getAudioTracks());
+      console.log('[VOICE DEBUG] local tracks:', stream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled, id: t.id })));
       const senders = pc.getSenders() || [];
       const existingTrackIds = senders.map(s => s.track?.id).filter(Boolean);
       stream.getTracks().forEach(track => {
@@ -320,7 +320,7 @@ export default function ChatPage() {
         } else if (signal.candidate) {
           if (pc.remoteDescription && pc.remoteDescription.type) {
             try {
-              await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+              await pc.addIceCandidate(signal.candidate);
             } catch (e) {
               console.warn('[WebRTC] addIceCandidate direct error:', e);
             }

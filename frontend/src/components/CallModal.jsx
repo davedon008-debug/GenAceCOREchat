@@ -206,21 +206,21 @@ export default function CallModal({
 
         {/* Video / Audio Canvas Main Container */}
         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-          {/* Always-mounted Remote Stream element (Handles Audio Output for Voice & Video calls) */}
+          {/* Always-mounted Remote Stream element (Handles Video & Audio Output for Calls) */}
           <video
             ref={remoteVideoRef}
             autoPlay
             playsInline
             style={
-              isVideo && !isCameraOff
+              isVideo
                 ? { width: '100%', height: '100%', objectFit: 'cover' }
-                : { width: '100%', height: '100%', opacity: 0, position: 'absolute', inset: 0, pointerEvents: 'none' }
+                : { width: '1px', height: '1px', opacity: 0.01, position: 'absolute', pointerEvents: 'none' }
             }
           />
 
-          {/* Voice Call or Video Disabled Avatar Screen */}
+          {/* Voice Call or Video Disabled Avatar Overlay */}
           {(!isVideo || isCameraOff) && (
-            <div className="flex flex-col items-center justify-center text-center p-6">
+            <div className="absolute inset-0 z-10 bg-[#0c101c]/90 backdrop-blur-md flex flex-col items-center justify-center text-center p-6">
               <div className="relative mb-6">
                 {isCallConnected && (
                   <div className="absolute inset-0 rounded-full bg-indigo-500/30 blur-2xl animate-pulse" />
