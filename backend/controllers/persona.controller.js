@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Persona from '../models/Persona.js';
 import Conversation from '../models/Conversation.js';
-import { broadcastPresence } from '../config/socket.js';
+import { broadcastPresence, getIO } from '../config/socket.js';
 
 
 const sanitizeAvatarUrl = (url) => {
@@ -228,7 +228,16 @@ export const updatePersona = async (req, res) => {
 
     await persona.save();
 
-    // Trigger real-time presence broadcast update so changes reflect immediately
+    // Trigger real-time profile update broadcast to all user/persona device channels
+    const io = getIO();
+    if (io) {
+      const personaObj = persona.toObject ? persona.toObject({ virtuals: true }) : persona;
+      io.to(`persona:${persona._id}`).emit('persona:updated', personaObj);
+      if (persona.userId) {
+        io.to(`user:${persona.userId}`).emit('persona:updated', personaObj);
+      }
+    }
+
     broadcastPresence();
 
     // Update localStorage-cached persona on client via response

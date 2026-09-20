@@ -72,14 +72,24 @@ export const SocketProvider = ({ children }) => {
       if (logout) logout();
     };
 
+    const onPersonaUpdated = (updatedPersona) => {
+      if (updatedPersona && activePersona?._id && String(updatedPersona._id) === String(activePersona._id)) {
+        if (typeof setActivePersona === 'function') {
+          setActivePersona(updatedPersona);
+        }
+      }
+    };
+
     newSocket.on('account:terminated', onAccountTerminated);
+    newSocket.on('persona:updated', onPersonaUpdated);
 
     return () => {
       newSocket.off('account:terminated', onAccountTerminated);
+      newSocket.off('persona:updated', onPersonaUpdated);
       newSocket.disconnect();
       socketRef.current = null;
     };
-  }, [token, activePersona?._id, logout]);
+  }, [token, activePersona?._id, logout, setActivePersona]);
 
   const joinRoom = (roomId) => {
     if (socketRef.current && roomId) {

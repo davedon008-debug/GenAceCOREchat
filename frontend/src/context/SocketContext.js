@@ -50,10 +50,22 @@ export const SocketProvider = ({ children }) => {
         }
       };
 
+      const onPersonaUpdated = (updatedPersona) => {
+        if (updatedPersona && activePersona?._id && String(updatedPersona._id) === String(activePersona._id)) {
+          if (typeof setActivePersona === 'function') {
+            setActivePersona(updatedPersona);
+          }
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('donchat_persona', JSON.stringify(updatedPersona));
+          }
+        }
+      };
+
       s.on('connect', onConnect);
       s.on('disconnect', onDisconnect);
       s.on('presence:update', onPresenceUpdate);
       s.on('account:terminated', onAccountTerminated);
+      s.on('persona:updated', onPersonaUpdated);
 
       if (s.connected) {
         setConnected(true);
@@ -68,6 +80,7 @@ export const SocketProvider = ({ children }) => {
         s.off('disconnect', onDisconnect);
         s.off('presence:update', onPresenceUpdate);
         s.off('account:terminated', onAccountTerminated);
+        s.off('persona:updated', onPersonaUpdated);
       };
     }
   }, [token, activePersona, logout]);
