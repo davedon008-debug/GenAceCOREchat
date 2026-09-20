@@ -31,6 +31,25 @@ export default function CallModal({
     }
   }, [localStream]);
 
+  const [audioBlocked, setAudioBlocked] = useState(false);
+
+  // Resume audio playback on any user click inside modal if blocked by browser policy
+  const handleResumeAudio = () => {
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = false;
+      remoteAudioRef.current.volume = 1.0;
+      remoteAudioRef.current.play()
+        .then(() => setAudioBlocked(false))
+        .catch(err => console.log('[Audio Resume Error]', err));
+    }
+    if (remoteVideoRef.current && isVideo) {
+      remoteVideoRef.current.muted = false;
+      remoteVideoRef.current.play()
+        .then(() => setAudioBlocked(false))
+        .catch(err => console.log('[Video Audio Resume Error]', err));
+    }
+  };
+
   // Attach remote media stream to dedicated audio or video element depending on call type
   useEffect(() => {
     if (remoteStream) {
@@ -46,7 +65,12 @@ export default function CallModal({
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = remoteStream;
           remoteVideoRef.current.muted = false;
-          remoteVideoRef.current.play().catch(err => console.log('[Video Playback Error]', err));
+          remoteVideoRef.current.play()
+            .then(() => setAudioBlocked(false))
+            .catch(err => {
+              console.log('[Video Playback Deferred by Browser]', err);
+              setAudioBlocked(true);
+            });
         }
         if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = null;
@@ -57,7 +81,12 @@ export default function CallModal({
           remoteAudioRef.current.srcObject = remoteStream;
           remoteAudioRef.current.muted = false;
           remoteAudioRef.current.volume = 1.0;
-          remoteAudioRef.current.play().catch(err => console.log('[Audio Playback Error]', err));
+          remoteAudioRef.current.play()
+            .then(() => setAudioBlocked(false))
+            .catch(err => {
+              console.log('[Audio Playback Deferred by Browser Autoplay Policy]', err);
+              setAudioBlocked(true);
+            });
         }
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = null;
@@ -132,7 +161,7 @@ export default function CallModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-xl p-3 sm:p-6 animate-fadeIn select-none">
+    <div onClick={handleResumeAudio} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-xl p-3 sm:p-6 animate-fadeIn select-none">
       {/* Dedicated Audio element ensuring remote voice stream plays through speakers */}
       <audio
         ref={remoteAudioRef}
@@ -142,6 +171,16 @@ export default function CallModal({
       />
 
       <div className="relative w-full max-w-4xl h-[85vh] bg-[#0c101c] border border-indigo-500/30 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+        {/* Autoplay Deferred Audio Banner */}
+        {audioBlocked && (
+          <div
+            onClick={handleResumeAudio}
+            className="absolute top-16 left-1/2 -translate-x-1/2 z-30 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-2xl border border-indigo-400/50 cursor-pointer animate-pulse flex items-center gap-2"
+          >
+            <span>🔊 Click anywhere to hear remote speaker voice</span>
+          </div>
+        )}
+
         {/* Top Floating Control Bar */}
         <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
           <div className="pointer-events-auto flex items-center gap-3 bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 shadow-lg">
