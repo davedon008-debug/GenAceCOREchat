@@ -106,6 +106,8 @@ export const initSocketServer = (httpServer) => {
       origin: '*',
       methods: ['GET', 'POST']
     },
+    pingInterval: 10000,
+    pingTimeout: 5000,
     maxHttpBufferSize: 2 * 1024 * 1024 // 2MB frame buffer for real-time chat metadata and events
   });
 

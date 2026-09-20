@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { Alert } from 'react-native';
+import { Alert, AppState } from 'react-native';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { getApiBaseUrl } from '../config/api';
@@ -34,20 +34,28 @@ export const SocketProvider = ({ children }) => {
       auth: { token },
       transports: ['websocket', 'polling'],
       autoConnect: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 2000,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 15000
     });
 
     socketRef.current = newSocket;
     setSocket(newSocket);
 
-    newSocket.on('connect', () => {
-      setIsConnected(true);
-      if (activePersona?._id) {
-        newSocket.emit('presence:announce', { personaId: activePersona._id });
+    const announcePresence = () => {
+      if (newSocket && newSocket.connected) {
+        setIsConnected(true);
+        if (activePersona?._id) {
+          newSocket.emit('presence:announce', { personaId: activePersona._id });
+        }
+        newSocket.emit('presence:get');
       }
-      newSocket.emit('presence:get');
-    });
+    };
+
+    newSocket.on('connect', announcePresence);
+    newSocket.on('reconnect', announcePresence);
 
     newSocket.on('disconnect', () => {
       setIsConnected(false);
@@ -83,7 +91,22 @@ export const SocketProvider = ({ children }) => {
     newSocket.on('account:terminated', onAccountTerminated);
     newSocket.on('persona:updated', onPersonaUpdated);
 
+    const handleAppStateChange = (nextAppState) => {
+      if (nextAppState === 'active' && newSocket) {
+        if (!newSocket.connected) {
+          newSocket.connect();
+        } else {
+          announcePresence();
+        }
+      }
+    };
+
+    const appStateSub = AppState.addEventListener('change', handleAppStateChange);
+
     return () => {
+      appStateSub?.remove();
+      newSocket.off('connect', announcePresence);
+      newSocket.off('reconnect', announcePresence);
       newSocket.off('account:terminated', onAccountTerminated);
       newSocket.off('persona:updated', onPersonaUpdated);
       newSocket.disconnect();

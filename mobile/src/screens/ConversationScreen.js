@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  FlatList, Image, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Linking
+  FlatList, Image, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Linking, AppState
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio, ImagePicker, DocumentPicker } from '../config/safeMedia';
@@ -432,7 +432,20 @@ export default function ConversationScreen({ route, navigation }) {
       }
     }
 
+    const handleAppStateChange = (nextAppState) => {
+      if (nextAppState === 'active' && passcodeUnlocked && targetRoomId) {
+        joinRoom(targetRoomId);
+        fetchMessages();
+        if (socket && socket.connected) {
+          socket.emit('message:read', { roomId: targetRoomId, conversationId, spaceId });
+        }
+      }
+    };
+
+    const appStateSub = AppState.addEventListener('change', handleAppStateChange);
+
     return () => {
+      appStateSub?.remove();
       if (targetRoomId) {
         leaveRoom(targetRoomId);
       }

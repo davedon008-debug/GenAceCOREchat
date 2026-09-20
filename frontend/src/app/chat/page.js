@@ -268,6 +268,106 @@ export default function ChatPage() {
     }
   };
 
+  // Active state references for real-time backgrounding sync
+  const activeIdRef = useRef(activeId);
+  const activeTypeRef = useRef(activeType);
+  const conversationsRef = useRef(conversations);
+  const spacesRef = useRef(spaces);
+
+  useEffect(() => {
+    activeIdRef.current = activeId;
+    activeTypeRef.current = activeType;
+  }, [activeId, activeType]);
+
+  useEffect(() => {
+    conversationsRef.current = conversations;
+    spacesRef.current = spaces;
+  }, [conversations, spaces]);
+
+  const refreshActiveMessages = async (targetId = activeIdRef.current, targetType = activeTypeRef.current) => {
+    if (!targetId) return;
+    try {
+      if (targetType === 'conversation') {
+        const msgRes = await api.get(`/messages/conversation/${targetId}`);
+        if (msgRes.data.success && Array.isArray(msgRes.data.messages)) {
+          setMessages(msgRes.data.messages);
+        }
+      } else if (targetType === 'space') {
+        const spaceObj = (spacesRef.current || []).find(s => String(s._id) === String(targetId));
+        const rawConvId = spaceObj?.conversationId;
+        const convId = (typeof rawConvId === 'object' && rawConvId ? (rawConvId._id || rawConvId.id) : rawConvId) || 'none';
+        const msgRes = await api.get(`/messages/conversation/${convId}?spaceId=${targetId}`);
+        if (msgRes.data.success && Array.isArray(msgRes.data.messages)) {
+          setMessages(msgRes.data.messages);
+        }
+      }
+    } catch (err) {
+      console.error('Error refreshing active messages:', err);
+    }
+  };
+
+  // Automatic Sync & Reconnect Listener for Mobile & Backgrounded Tabs
+  useEffect(() => {
+    if (!socket) return;
+
+    const syncStateAndRooms = () => {
+      if (activeIdRef.current) {
+        joinRoom(activeIdRef.current);
+      }
+      (conversationsRef.current || []).forEach(c => {
+        if (c?._id) joinRoom(c._id);
+      });
+      (spacesRef.current || []).forEach(s => {
+        if (s?._id) joinRoom(s._id);
+      });
+
+      fetchConversations();
+      fetchSpaces();
+
+      if (activeIdRef.current) {
+        refreshActiveMessages(activeIdRef.current, activeTypeRef.current);
+      }
+    };
+
+    const handleSocketReconnect = () => {
+      syncStateAndRooms();
+    };
+
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        if (!socket.connected) {
+          socket.connect();
+        } else {
+          syncStateAndRooms();
+        }
+      }
+    };
+
+    socket.on('connect', handleSocketReconnect);
+    socket.on('reconnect', handleSocketReconnect);
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleVisibilityOrFocus);
+      document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    }
+
+    const pollInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && activeIdRef.current) {
+        refreshActiveMessages(activeIdRef.current, activeTypeRef.current);
+      }
+    }, 12000);
+
+    return () => {
+      socket.off('connect', handleSocketReconnect);
+      socket.off('reconnect', handleSocketReconnect);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleVisibilityOrFocus);
+        document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      }
+      clearInterval(pollInterval);
+    };
+  }, [socket]);
+
   // Real-time Socket Event Listeners
   useEffect(() => {
     if (!socket) return;

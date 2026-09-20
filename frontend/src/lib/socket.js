@@ -30,8 +30,11 @@ export const getSocket = () => {
       auth: { token },
       transports: ['websocket', 'polling'],
       autoConnect: true,
-      reconnectionAttempts: 20,
-      reconnectionDelay: 1000
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 15000
     });
   } else {
     if (socket.auth?.token !== token) {

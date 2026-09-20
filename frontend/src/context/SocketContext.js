@@ -62,10 +62,26 @@ export const SocketProvider = ({ children }) => {
       };
 
       s.on('connect', onConnect);
+      s.on('reconnect', onConnect);
       s.on('disconnect', onDisconnect);
       s.on('presence:update', onPresenceUpdate);
       s.on('account:terminated', onAccountTerminated);
       s.on('persona:updated', onPersonaUpdated);
+
+      const handleVisibilityOrFocus = () => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          if (!s.connected) {
+            s.connect();
+          } else {
+            onConnect();
+          }
+        }
+      };
+
+      if (typeof window !== 'undefined') {
+        window.addEventListener('focus', handleVisibilityOrFocus);
+        document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+      }
 
       if (s.connected) {
         setConnected(true);
@@ -77,10 +93,15 @@ export const SocketProvider = ({ children }) => {
 
       return () => {
         s.off('connect', onConnect);
+        s.off('reconnect', onConnect);
         s.off('disconnect', onDisconnect);
         s.off('presence:update', onPresenceUpdate);
         s.off('account:terminated', onAccountTerminated);
         s.off('persona:updated', onPersonaUpdated);
+        if (typeof window !== 'undefined') {
+          window.removeEventListener('focus', handleVisibilityOrFocus);
+          document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+        }
       };
     }
   }, [token, activePersona, logout]);
