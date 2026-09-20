@@ -21,6 +21,7 @@ export default function CallModal({
   const [isMinimized, setIsMinimized] = useState(false);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const remoteAudioRef = useRef(null);
 
   // Attach local media stream to video element
   useEffect(() => {
@@ -29,12 +30,17 @@ export default function CallModal({
     }
   }, [localStream]);
 
-  // Attach remote media stream to video element
+  // Attach remote media stream to dedicated audio & video elements
   useEffect(() => {
+    if (remoteAudioRef.current && remoteStream) {
+      remoteAudioRef.current.srcObject = remoteStream;
+      remoteAudioRef.current.play().catch(err => console.log('[Audio Playback Error]', err));
+    }
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play().catch(err => console.log('[Video Playback Error]', err));
     }
-  }, [remoteStream]);
+  }, [remoteStream, isVideo]);
 
   // Call timer counter
   useEffect(() => {
@@ -104,6 +110,9 @@ export default function CallModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-xl p-3 sm:p-6 animate-fadeIn select-none">
+      {/* Hidden Audio element ensuring remote voice stream plays through speakers */}
+      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+
       <div className="relative w-full max-w-4xl h-[85vh] bg-[#0c101c] border border-indigo-500/30 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
         {/* Top Floating Control Bar */}
         <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">

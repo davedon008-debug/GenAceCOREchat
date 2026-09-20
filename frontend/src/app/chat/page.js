@@ -153,8 +153,12 @@ export default function ChatPage() {
     };
 
     pc.ontrack = (event) => {
+      console.log('[WebRTC] Received remote track:', event.track?.kind, event.streams);
       if (event.streams && event.streams[0]) {
         setRemoteStream(event.streams[0]);
+      } else if (event.track) {
+        const inboundStream = new MediaStream([event.track]);
+        setRemoteStream(inboundStream);
       }
     };
 
@@ -281,6 +285,7 @@ export default function ChatPage() {
         video: isVideo ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false
       });
       setLocalStream(stream);
+      localStreamRef.current = stream;
 
       const callId = 'call_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
       setActiveCall({
@@ -318,6 +323,7 @@ export default function ChatPage() {
         video: isVideo ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false
       });
       setLocalStream(stream);
+      localStreamRef.current = stream;
 
       setActiveCall({
         callId,
@@ -337,7 +343,12 @@ export default function ChatPage() {
         });
       }
 
-      createPeerConnection(String(callerPersona._id), callId);
+      const pc = createPeerConnection(String(callerPersona._id), callId);
+      if (stream) {
+        stream.getTracks().forEach(track => {
+          pc.addTrack(track, stream);
+        });
+      }
     } catch (err) {
       console.error('[Call] Error accepting call:', err);
       showToast('Could not access microphone/camera to accept call.', 'error');
