@@ -427,14 +427,13 @@ export default function ChatPage() {
         });
 
         if (!isFromMe) {
-          playNotificationSound();
           markActiveRoomAsRead(activeId, activeType);
         }
       }
 
-      // Trigger notification toast & sound chime if message is from someone else AND not in current open chat
-      if (!isFromMe && !isForCurrentSpace && !isForCurrentConv) {
-        const senderName = newMsg.senderPersonaId?.displayName || 'Someone';
+      // Trigger visual toast banner & sound chime for ALL incoming messages from other users
+      if (!isFromMe) {
+        const senderName = newMsg.senderPersonaId?.displayName || newMsg.senderPersonaId?.username || 'Someone';
         const senderAvatar = newMsg.senderPersonaId?.avatar;
         const targetId = msgSpaceId || msgConvId;
         const targetType = msgSpaceId ? 'space' : 'conversation';

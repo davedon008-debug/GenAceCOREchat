@@ -24,7 +24,7 @@ export default function NotificationToast({ notification, onClick, onClose }) {
   return (
     <div 
       className={`
-        fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm sm:max-w-md px-4
+        fixed top-4 left-1/2 -translate-x-1/2 z-[99999] w-full max-w-sm sm:max-w-md px-4
         transition-all duration-300 ease-out transform
         ${visible ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-6 opacity-0 scale-95 pointer-events-none'}
       `}
