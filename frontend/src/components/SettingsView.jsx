@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import api, { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 import { getNotifPrefs, saveNotifPrefs, playNotificationSound } from '../lib/sound';
+import { enableWebPushNotifications } from '../lib/pushSubscription';
 import PasscodeModal from './PasscodeModal';
 import {
   User, Palette, Bell, Shield, UserX, HelpCircle, Camera, Edit2,
@@ -531,6 +532,16 @@ export default function SettingsView({ onBack, defaultSection }) {
 
   // ── Notification preferences (persisted to localStorage) ──
   const [notifPrefs, setNotifPrefs] = useState(getNotifPrefs);
+  const [pushStatus, setPushStatus] = useState(null);
+  const [enablingPush, setEnablingPush] = useState(false);
+
+  const handleEnablePush = async () => {
+    setEnablingPush(true);
+    setPushStatus(null);
+    const res = await enableWebPushNotifications();
+    setEnablingPush(false);
+    setPushStatus(res);
+  };
 
   const toggleNotifPref = (key) => {
     setNotifPrefs(prev => {
@@ -932,6 +943,36 @@ export default function SettingsView({ onBack, defaultSection }) {
                 ))}
               </div>
               <p className="text-[10px] text-gray-500">Changes are saved instantly and apply to all new messages.</p>
+            </div>
+
+            {/* Closed-App / Lock Screen Background Push Card */}
+            <div className="p-5 rounded-3xl bg-[#0f172a] border border-cyan-500/20 space-y-3 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                    <Bell className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">Closed-App / Lock Screen Push Notifications</h4>
+                    <p className="text-[10px] text-gray-400">Receive DM & Space alerts on your device lock screen when browser is closed</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleEnablePush}
+                  disabled={enablingPush}
+                  className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/20 disabled:opacity-60 shrink-0"
+                >
+                  {enablingPush ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bell className="w-3.5 h-3.5" />}
+                  {enablingPush ? 'Enabling…' : 'Enable Closed-App Push'}
+                </button>
+              </div>
+
+              {pushStatus && (
+                <div className={`p-3 rounded-xl border text-xs font-medium ${pushStatus.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-rose-500/10 border-rose-500/30 text-rose-300'}`}>
+                  {pushStatus.message}
+                </div>
+              )}
             </div>
           </div>
         )}

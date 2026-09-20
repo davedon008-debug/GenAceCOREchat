@@ -1,4 +1,21 @@
 import Persona from '../models/Persona.js';
+import webpush from 'web-push';
+
+// Generate dynamic valid VAPID keypair for Web Push API
+const vapidKeys = webpush.generateVAPIDKeys();
+try {
+  webpush.setVapidDetails(
+    'mailto:support@genace.app',
+    process.env.VAPID_PUBLIC_KEY || vapidKeys.publicKey,
+    process.env.VAPID_PRIVATE_KEY || vapidKeys.privateKey
+  );
+} catch (e) {
+  console.warn('[Push] VAPID setup warning:', e.message);
+}
+
+export const getVapidPublicKey = () => {
+  return process.env.VAPID_PUBLIC_KEY || vapidKeys.publicKey;
+};
 
 export const sendPushNotifications = async (recipientPersonaIds = [], title, body, data = {}) => {
   if (!recipientPersonaIds || !recipientPersonaIds.length) return;
@@ -50,6 +67,24 @@ export const sendPushNotifications = async (recipientPersonaIds = [], title, bod
       } catch (expoErr) {
         console.error('[Push] Expo push dispatch error:', expoErr);
       }
+    }
+
+    // 2. Dispatch Web Push Notifications for Web Browsers (Closed Tab / Background)
+    if (webSubscriptions.length > 0) {
+      const payload = JSON.stringify({
+        title: title || 'New Message',
+        body: body || 'You received a message on GenAce',
+        icon: '/favicon.ico',
+        url: data.spaceId ? '/chat' : '/chat',
+        data
+      });
+
+      webSubscriptions.forEach(sub => {
+        webpush.sendNotification(sub, payload).catch(err => {
+          console.warn('[Push] Web push endpoint delivery warning:', err?.message || err);
+        });
+      });
+      console.log(`[Push] Dispatched Web Push notification to ${webSubscriptions.length} browser endpoints.`);
     }
   } catch (err) {
     console.error('[Push] Push notification service error:', err);

@@ -344,3 +344,12 @@ export const registerPushToken = async (req, res) => {
   }
 };
 
+export const getVapidKey = async (req, res) => {
+  try {
+    const { getVapidPublicKey } = await import('../config/push.js');
+    res.json({ success: true, vapidPublicKey: getVapidPublicKey() });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch VAPID key', error: error.message });
+  }
+};
+
