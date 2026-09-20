@@ -22,7 +22,8 @@ const PersonaSchema = new mongoose.Schema({
   customStatus: { type: String, default: '' },
   isDefault: { type: Boolean, default: false },
   blockedPersonas: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Persona' }],
-  contacts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Persona' }]
+  contacts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Persona' }],
+  pushTokens: [{ type: String }]
 }, { timestamps: true });
 
 PersonaSchema.index({ userId: 1 });

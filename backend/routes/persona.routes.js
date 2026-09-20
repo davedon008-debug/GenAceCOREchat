@@ -1,5 +1,5 @@
 import express from 'express';
-import { getPersonas, createPersona, switchPersona, searchPersonas, checkUsernameAvailability, getAllContacts, updatePersona, blockPersona, unblockPersona, getBlockedPersonas, addContact, removeContact } from '../controllers/persona.controller.js';
+import { getPersonas, createPersona, switchPersona, searchPersonas, checkUsernameAvailability, getAllContacts, updatePersona, blockPersona, unblockPersona, getBlockedPersonas, addContact, removeContact, registerPushToken } from '../controllers/persona.controller.js';
 import { protect } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
@@ -8,6 +8,7 @@ router.get('/check-username', checkUsernameAvailability);
 
 router.use(protect);
 
+router.post('/push-token', registerPushToken);
 router.get('/', getPersonas);
 router.get('/all', getAllContacts);
 router.get('/blocked', getBlockedPersonas);

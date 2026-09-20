@@ -177,6 +177,22 @@ export default function ChatPage() {
     }
   }, [socket, spaces]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((registration) => {
+        console.log('[SW] Service Worker registered:', registration.scope);
+      }).catch(() => {});
+    }
+
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then((perm) => {
+        if (perm === 'granted' && activePersona?._id) {
+          api.post('/personas/push-token', { token: `web-granted:${activePersona._id}` }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  }, [activePersona]);
+
   // Real-time Notification Sound & Toast Listener
   const triggerNotification = (senderName, senderAvatar, content, targetId, targetType, isSpace = false, privacyMode = 'normal') => {
     const prefs = getNotifPrefs();

@@ -5,6 +5,7 @@ import { useAuth } from './AuthContext';
 import { navigate } from '../navigation/navigationRef';
 import InAppNotificationBanner from '../components/InAppNotificationBanner';
 import { playChimeSound } from '../config/safeAudio';
+import api from '../config/api';
 
 const NotificationContext = createContext();
 
@@ -41,6 +42,32 @@ export const NotificationProvider = ({ children }) => {
       }
     })();
   }, []);
+
+  // Register device push token for background notifications
+  useEffect(() => {
+    if (activePersona?._id) {
+      try {
+        let Notifications = null;
+        try { Notifications = require('expo-notifications'); } catch (e) {}
+        if (Notifications && typeof Notifications.getExpoPushTokenAsync === 'function') {
+          Notifications.getPermissionsAsync().then(({ status }) => {
+            if (status !== 'granted') {
+              return Notifications.requestPermissionsAsync();
+            }
+            return { status };
+          }).then(res => {
+            if (res && res.status === 'granted') {
+              return Notifications.getExpoPushTokenAsync();
+            }
+          }).then(tokenObj => {
+            if (tokenObj && tokenObj.data) {
+              api.post('/personas/push-token', { token: tokenObj.data }).catch(() => {});
+            }
+          }).catch(() => {});
+        }
+      } catch (err) {}
+    }
+  }, [activePersona?._id]);
 
   const setNotifMsgEnabled = (val) => {
     setNotifMsgEnabledState(val);

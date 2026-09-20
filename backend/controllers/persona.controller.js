@@ -327,3 +327,20 @@ export const getBlockedPersonas = async (req, res) => {
   }
 };
 
+export const registerPushToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ success: false, message: 'Push token string required' });
+    }
+
+    await Persona.findByIdAndUpdate(req.personaId, {
+      $addToSet: { pushTokens: token }
+    });
+
+    res.json({ success: true, message: 'Push token registered successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to register push token', error: error.message });
+  }
+};
+

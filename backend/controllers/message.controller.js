@@ -4,6 +4,7 @@ import Conversation from '../models/Conversation.js';
 import Persona from '../models/Persona.js';
 import Space from '../models/Space.js';
 import { getIO } from '../config/socket.js';
+import { sendPushNotifications } from '../config/push.js';
 
 export const getMessages = async (req, res) => {
   try {
@@ -322,6 +323,18 @@ export const sendMessage = async (req, res) => {
         console.error('[sendMessage Controller] Socket dispatch error:', socketErr);
       }
     }
+
+    // Dispatch background push notifications for closed/background app users
+    const otherRecipientIds = recipientPersonaIds.filter(id => String(id) !== String(req.personaId));
+    const senderName = populated.senderPersonaId?.displayName || populated.senderPersonaId?.username || 'Someone';
+    const pushTitle = spaceId ? `[Space] ${senderName}` : senderName;
+    const pushBody = activePrivacyMode === 'burn' ? '🔥 Burn on read message received' : (content || (contentType === 'voice' ? '🎙️ Voice note' : contentType === 'image' ? '📷 Photo attachment' : 'Sent a message'));
+
+    sendPushNotifications(otherRecipientIds, pushTitle, pushBody, {
+      conversationId: conversationId || null,
+      spaceId: spaceId || null,
+      senderPersonaId: String(req.personaId)
+    }).catch(err => console.error('[Push] Background dispatch error:', err));
 
     res.status(201).json({ success: true, message: populated });
   } catch (error) {
