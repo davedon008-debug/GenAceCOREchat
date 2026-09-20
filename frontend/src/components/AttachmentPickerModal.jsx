@@ -49,6 +49,14 @@ export default function AttachmentPickerModal({
     }
   };
 
+  useEffect(() => {
+    if (showCameraStream && videoRef.current && mediaStreamRef.current) {
+      if (videoRef.current.srcObject !== mediaStreamRef.current) {
+        videoRef.current.srcObject = mediaStreamRef.current;
+      }
+    }
+  }, [showCameraStream, capturedPhoto]);
+
   const startCamera = async (overrideFacing) => {
     setCameraError(null);
     setCapturedPhoto(null);
@@ -59,10 +67,26 @@ export default function AttachmentPickerModal({
     const targetFacing = overrideFacing || facingMode;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: targetFacing }
-      });
+      let stream = null;
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: targetFacing }
+          });
+        } catch (firstErr) {
+          // Fallback for mobile browsers that fail on facingMode / resolution constraints
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        }
+      } else if (navigator.getUserMedia) {
+        stream = await new Promise((resolve, reject) => {
+          navigator.getUserMedia({ video: true }, resolve, reject);
+        });
+      } else {
+        throw new Error('MediaDevices unavailable');
+      }
+
       mediaStreamRef.current = stream;
+      setCameraError(null);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
