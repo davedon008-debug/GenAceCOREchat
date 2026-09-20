@@ -78,78 +78,78 @@ export default function InAppNotificationBanner({ notification, onDismiss, onPre
           },
         ]}
       >
-      <TouchableOpacity
-        activeOpacity={0.9}
-        style={[
-          styles.bannerCard,
-          {
-            backgroundColor: isLight ? '#ffffff' : '#1e1e2d',
-            borderColor: isSpace ? '#06b6d4' : dynamicColors.primary,
-          },
-        ]}
-        onPress={() => {
-          dismissBanner();
-          onPress && onPress(notification);
-        }}
-      >
-        {/* Top Type Indicator Badge */}
-        <View style={styles.headerBadgeRow}>
-          <View
-            style={[
-              styles.typeBadge,
-              { backgroundColor: isSpace ? 'rgba(6, 182, 212, 0.15)' : 'rgba(99, 102, 241, 0.15)' },
-            ]}
-          >
-            {isSpace ? (
-              <Zap size={11} color="#06b6d4" />
-            ) : (
-              <MessageSquare size={11} color="#6366f1" />
-            )}
-            <Text
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={[
+            styles.bannerCard,
+            {
+              backgroundColor: isLight ? '#ffffff' : '#1e1e2d',
+              borderColor: isSpace ? '#06b6d4' : dynamicColors.primary,
+            },
+          ]}
+          onPress={() => {
+            dismissBanner();
+            onPress && onPress(notification);
+          }}
+        >
+          {/* Top Type Indicator Badge */}
+          <View style={styles.headerBadgeRow}>
+            <View
               style={[
-                styles.typeBadgeText,
-                { color: isSpace ? '#06b6d4' : '#6366f1' },
+                styles.typeBadge,
+                { backgroundColor: isSpace ? 'rgba(6, 182, 212, 0.15)' : 'rgba(99, 102, 241, 0.15)' },
               ]}
             >
-              {isSpace ? 'FLUID SPACE MESSAGE' : 'DIRECT MESSAGE'}
-            </Text>
+              {isSpace ? (
+                <Zap size={11} color="#06b6d4" />
+              ) : (
+                <MessageSquare size={11} color="#6366f1" />
+              )}
+              <Text
+                style={[
+                  styles.typeBadgeText,
+                  { color: isSpace ? '#06b6d4' : '#6366f1' },
+                ]}
+              >
+                {isSpace ? 'FLUID SPACE MESSAGE' : 'DIRECT MESSAGE'}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={(e) => {
+                e.stopPropagation();
+                dismissBanner();
+              }}
+            >
+              <X size={14} color={dynamicColors.textMuted} />
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={(e) => {
-              e.stopPropagation();
-              dismissBanner();
-            }}
-          >
-            <X size={14} color={dynamicColors.textMuted} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Content Row */}
-        <View style={styles.contentRow}>
-          <Image
-            source={{ uri: getMediaUrl(notification.avatar || DEFAULT_AVATAR) }}
-            style={styles.avatar}
-          />
-          <View style={styles.textCol}>
-            <Text
-              style={[styles.titleText, { color: dynamicColors.text }]}
-              numberOfLines={1}
-            >
-              {notification.title || 'New Message'}
-            </Text>
-            <Text
-              style={[styles.subtitleText, { color: dynamicColors.textSecondary }]}
-              numberOfLines={2}
-            >
-              {notification.subtitle || notification.body || ''}
-            </Text>
+          {/* Content Row */}
+          <View style={styles.contentRow}>
+            <Image
+              source={{ uri: getMediaUrl(notification.avatar || DEFAULT_AVATAR) }}
+              style={styles.avatar}
+            />
+            <View style={styles.textCol}>
+              <Text
+                style={[styles.titleText, { color: dynamicColors.text }]}
+                numberOfLines={1}
+              >
+                {notification.title || 'New Message'}
+              </Text>
+              <Text
+                style={[styles.subtitleText, { color: dynamicColors.textSecondary }]}
+                numberOfLines={2}
+              >
+                {notification.subtitle || notification.body || ''}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={dynamicColors.textMuted} />
           </View>
-          <ChevronRight size={18} color={dynamicColors.textMuted} />
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
+        </TouchableOpacity>
+      </Animated.View>
     </Modal>
   );
 }

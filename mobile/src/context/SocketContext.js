@@ -7,7 +7,7 @@ import { getApiBaseUrl } from '../config/api';
 const SocketContext = createContext();
 
 export const SocketProvider = ({ children }) => {
-  const { token, activePersona, logout } = useAuth();
+  const { token, activePersona, logout, setActivePersona } = useAuth();
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [onlinePersonaIds, setOnlinePersonaIds] = useState([]);
