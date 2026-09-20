@@ -30,6 +30,7 @@ import AdminView from '../../components/AdminView';
 import PasscodeModal from '../../components/PasscodeModal';
 import MobileBottomNav from '../../components/MobileBottomNav';
 import { playNotificationSound, playSentSound, getNotifPrefs } from '../../lib/sound';
+import { enableWebPushNotifications } from '../../lib/pushSubscription';
 
 import { Plus, Search, User, X, Bell, UserX } from 'lucide-react';
 
@@ -184,12 +185,8 @@ export default function ChatPage() {
       }).catch(() => {});
     }
 
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().then((perm) => {
-        if (perm === 'granted' && activePersona?._id) {
-          api.post('/personas/push-token', { token: `web-granted:${activePersona._id}` }).catch(() => {});
-        }
-      }).catch(() => {});
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && activePersona?._id) {
+      enableWebPushNotifications().catch(() => {});
     }
   }, [activePersona]);
 

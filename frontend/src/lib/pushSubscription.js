@@ -23,10 +23,12 @@ export const enableWebPushNotifications = async () => {
       return { success: false, message: 'Notification permission was denied. Please allow notifications in browser site settings.' };
     }
 
-    const reg = await navigator.serviceWorker.ready;
+    // Guarantee service worker registration is active
+    let reg = await navigator.serviceWorker.getRegistration();
     if (!reg) {
-      return { success: false, message: 'Service worker is not active.' };
+      reg = await navigator.serviceWorker.register('/sw.js');
     }
+    await navigator.serviceWorker.ready;
 
     const keyRes = await api.get('/personas/vapid-key');
     if (!keyRes.data?.success || !keyRes.data?.vapidPublicKey) {
@@ -35,13 +37,21 @@ export const enableWebPushNotifications = async () => {
 
     const applicationServerKey = urlBase64ToUint8Array(keyRes.data.vapidPublicKey);
 
+    // Unsubscribe any stale subscription to clear old VAPID keys
     let subscription = await reg.pushManager.getSubscription();
-    if (!subscription) {
-      subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey
-      });
+    if (subscription) {
+      try {
+        await subscription.unsubscribe();
+      } catch (e) {
+        console.warn('Could not unsubscribe stale push subscription:', e);
+      }
     }
+
+    // Subscribe cleanly with active VAPID public key
+    subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey
+    });
 
     const subString = JSON.stringify(subscription);
     await api.post('/personas/push-token', { subscription, token: subString });

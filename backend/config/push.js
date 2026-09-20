@@ -2,8 +2,25 @@ import Persona from '../models/Persona.js';
 import PushSubscription from '../models/PushSubscription.js';
 import webpush from 'web-push';
 
-// Generate dynamic valid VAPID keypair for Web Push API if env vars not provided
-const fallbackVapidKeys = webpush.generateVAPIDKeys();
+import fs from 'fs';
+import path from 'path';
+
+// Persist fallback VAPID keys to file if process.env keypair is omitted
+let fallbackVapidKeys = null;
+const vapidFilePath = path.resolve(process.cwd(), 'config', 'vapid.json');
+
+if (fs.existsSync(vapidFilePath)) {
+  try {
+    fallbackVapidKeys = JSON.parse(fs.readFileSync(vapidFilePath, 'utf8'));
+  } catch (e) {}
+}
+
+if (!fallbackVapidKeys || !fallbackVapidKeys.publicKey || !fallbackVapidKeys.privateKey) {
+  fallbackVapidKeys = webpush.generateVAPIDKeys();
+  try {
+    fs.writeFileSync(vapidFilePath, JSON.stringify(fallbackVapidKeys, null, 2));
+  } catch (e) {}
+}
 
 const getVapidPublicKeyInternal = () => process.env.VAPID_PUBLIC_KEY || fallbackVapidKeys.publicKey;
 const getVapidPrivateKeyInternal = () => process.env.VAPID_PRIVATE_KEY || fallbackVapidKeys.privateKey;
