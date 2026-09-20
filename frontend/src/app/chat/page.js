@@ -151,6 +151,9 @@ export default function ChatPage() {
   const addLocalTracksToPC = (pc, stream) => {
     if (!pc || !stream) return;
     try {
+      stream.getAudioTracks().forEach(track => {
+        track.enabled = true; // Ensure local mic track is enabled
+      });
       console.log('[VOICE DEBUG] local audio tracks:', stream.getAudioTracks());
       const senders = pc.getSenders() || [];
       const existingTracks = senders.map(s => s.track).filter(Boolean);

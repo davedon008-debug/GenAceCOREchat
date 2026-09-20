@@ -51,8 +51,7 @@ export default function CallModal({
 
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = remoteStream;
-        remoteVideoRef.current.muted = false;
-        remoteVideoRef.current.volume = 1.0;
+        remoteVideoRef.current.muted = true; // Audio is handled by remoteAudioRef to prevent echo
         remoteVideoRef.current.play().catch(err => console.log('[Video Playback Error]', err));
       }
     }
