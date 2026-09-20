@@ -172,6 +172,15 @@ export default function ChatPage() {
       ]
     });
 
+    try {
+      pc.addTransceiver('audio', { direction: 'sendrecv' });
+      if (activeCallRef.current?.isVideo || incomingCallRef.current?.isVideo) {
+        pc.addTransceiver('video', { direction: 'sendrecv' });
+      }
+    } catch (e) {
+      console.warn('[WebRTC] addTransceiver note:', e);
+    }
+
     pc.onicecandidate = (event) => {
       if (event.candidate && socket) {
         socket.emit('call:signal', {
@@ -187,8 +196,16 @@ export default function ChatPage() {
       if (event.streams && event.streams[0]) {
         setRemoteStream(event.streams[0]);
       } else if (event.track) {
-        const inboundStream = new MediaStream([event.track]);
-        setRemoteStream(inboundStream);
+        setRemoteStream(prev => {
+          if (prev) {
+            const tracks = prev.getTracks();
+            if (!tracks.some(t => t.id === event.track.id)) {
+              prev.addTrack(event.track);
+            }
+            return new MediaStream(prev.getTracks());
+          }
+          return new MediaStream([event.track]);
+        });
       }
     };
 
@@ -216,7 +233,10 @@ export default function ChatPage() {
           const pc = createPeerConnection(data.responderPersonaId, data.callId);
           addLocalTracksToPC(pc, localStreamRef.current);
 
-          const offer = await pc.createOffer();
+          const offer = await pc.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: !!activeCallRef.current?.isVideo
+          });
           await pc.setLocalDescription(offer);
           socket.emit('call:signal', {
             targetPersonaId: data.responderPersonaId,
@@ -250,7 +270,10 @@ export default function ChatPage() {
           addLocalTracksToPC(pc, localStreamRef.current);
           await processPendingCandidates(pc);
 
-          const answer = await pc.createAnswer();
+          const answer = await pc.createAnswer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: !!(activeCallRef.current?.isVideo || incomingCallRef.current?.isVideo)
+          });
           await pc.setLocalDescription(answer);
           socket.emit('call:signal', {
             targetPersonaId: senderPersonaId,
