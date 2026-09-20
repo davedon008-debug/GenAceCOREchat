@@ -140,7 +140,8 @@ export default function ChatPage() {
       pendingCandidatesRef.current = [];
       for (const cand of candidates) {
         try {
-          await pc.addIceCandidate(cand);
+          const candObj = (cand && typeof cand === 'object') ? new RTCIceCandidate(cand) : cand;
+          await pc.addIceCandidate(candObj);
         } catch (e) {
           console.warn('[WebRTC] Pending ICE candidate error:', e);
         }
@@ -321,7 +322,8 @@ export default function ChatPage() {
         } else if (signal.candidate) {
           if (pc.remoteDescription && pc.remoteDescription.type) {
             try {
-              await pc.addIceCandidate(signal.candidate);
+              const candObj = (signal.candidate && typeof signal.candidate === 'object') ? new RTCIceCandidate(signal.candidate) : signal.candidate;
+              await pc.addIceCandidate(candObj);
             } catch (e) {
               console.warn('[WebRTC] addIceCandidate direct error:', e);
             }
