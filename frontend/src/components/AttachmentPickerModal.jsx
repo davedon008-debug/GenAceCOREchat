@@ -67,32 +67,15 @@ export default function AttachmentPickerModal({
     const targetFacing = overrideFacing || facingMode;
 
     try {
-      let stream = null;
-      if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: targetFacing }
-          });
-        } catch (firstErr) {
-          // Fallback for mobile browsers that fail on facingMode / resolution constraints
-          stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        }
-      } else if (navigator.getUserMedia) {
-        stream = await new Promise((resolve, reject) => {
-          navigator.getUserMedia({ video: true }, resolve, reject);
-        });
-      } else {
-        throw new Error('MediaDevices unavailable');
-      }
-
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: targetFacing }
+      });
       mediaStreamRef.current = stream;
-      setCameraError(null);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
     } catch (err) {
       console.warn('Webcam stream failed:', err);
-      setCameraError('Camera access denied or unavailable. You can upload or select photos instead.');
     }
   };
 
@@ -212,21 +195,7 @@ export default function AttachmentPickerModal({
 
       {/* 2. CENTER VIEWFINDER DISPLAY */}
       <div className="flex-1 w-full relative bg-black flex items-center justify-center overflow-hidden">
-        {cameraError ? (
-          <div className="p-6 bg-rose-500/10 border border-rose-500/30 rounded-3xl text-rose-300 text-xs flex flex-col items-center text-center gap-4 max-w-sm mx-4">
-            <p className="text-sm font-semibold">{cameraError}</p>
-            <button
-              onClick={() => {
-                stopCameraStream();
-                setShowCameraStream(false);
-                onSelectCameraFile(null);
-              }}
-              className="px-5 py-2.5 bg-pink-600 hover:bg-pink-500 text-white rounded-2xl font-bold text-xs transition shadow-xl"
-            >
-              Open Gallery Instead
-            </button>
-          </div>
-        ) : capturedPhoto ? (
+        {capturedPhoto ? (
           <img src={capturedPhoto} alt="Snapshot Preview" className="w-full h-full object-contain" />
         ) : (
           <div className={`w-full h-full relative flex items-center justify-center ${aspectRatio === '1:1' ? 'aspect-square max-h-[70vh]' : ''}`}>
