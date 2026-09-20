@@ -36,15 +36,17 @@ export default function MainTabScreen({ navigation }) {
   const { socket, onlinePersonaIds = [], personaStatuses = {} } = useSocket() || {};
   const safeOnlineIds = Array.isArray(onlinePersonaIds) ? onlinePersonaIds.map(String) : [];
 
-  const getStatusColor = (personaId) => {
-    if (!personaId) return null;
+  const getStatusInfo = (personaId) => {
+    if (!personaId) return { color: null, label: 'Offline', isOnline: false };
     const idStr = String(personaId);
     const st = personaStatuses?.[idStr];
-    if (st === 'away') return '#f59e0b';
-    if (st === 'dnd') return '#ef4444';
-    if (st === 'online' || safeOnlineIds.includes(idStr)) return dynamicColors.success || '#10b981';
-    return null;
+    if (st === 'away') return { color: '#f59e0b', label: '🟡 Away', isOnline: true };
+    if (st === 'dnd') return { color: '#ef4444', label: '🔴 Do Not Disturb', isOnline: true };
+    if (st === 'online' || safeOnlineIds.includes(idStr)) return { color: dynamicColors.success || '#10b981', label: '🟢 Online', isOnline: true };
+    return { color: '#64748b', label: 'Offline', isOnline: false };
   };
+
+  const getStatusColor = (personaId) => getStatusInfo(personaId).color;
   const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'spaces' | 'friends' | 'settings'
 
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -846,7 +848,14 @@ export default function MainTabScreen({ navigation }) {
 
                         <View style={styles.chatInfoMain}>
                           <View style={styles.chatHeaderRow}>
-                            <Text style={[styles.chatNameText, { color: dynamicColors.text }]} numberOfLines={1}>{name}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                              <Text style={[styles.chatNameText, { color: dynamicColors.text }]} numberOfLines={1}>{name}</Text>
+                              {partnerStatusColor ? (
+                                <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 6 }}>
+                                  <Text style={{ fontSize: 8, fontWeight: 'bold', color: partnerStatusColor }}>ONLINE</Text>
+                                </View>
+                              ) : null}
+                            </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                               <Text style={[styles.chatTimeText, { color: dynamicColors.textMuted }]}>{lastTime}</Text>
                               <TouchableOpacity
@@ -1065,6 +1074,44 @@ export default function MainTabScreen({ navigation }) {
               <Text style={[styles.presenceSub, { color: dynamicColors.textSecondary }]}>Good vibes only! 🌙 🚀</Text>
             </View>
 
+            {/* ONLINE FRIENDS CAROUSEL STRIP */}
+            {(() => {
+              const onlineFriends = (contacts || []).filter(c => c && safeOnlineIds.includes(String(c._id || c.id)));
+              if (onlineFriends.length === 0) return null;
+              return (
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={[styles.sectionTitle, { color: dynamicColors.textMuted, marginBottom: 8 }]}>
+                    🟢 ONLINE FRIENDS ({onlineFriends.length})
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+                    {onlineFriends.map(friend => {
+                      const name = friend.displayName || friend.username || 'Friend';
+                      const friendAvatar = getMediaUrl(friend.avatar, name);
+                      return (
+                        <TouchableOpacity
+                          key={friend._id || friend.id}
+                          style={{ alignItems: 'center', width: 68 }}
+                          onPress={() => handleStartDM(friend._id || friend.id)}
+                          activeOpacity={0.8}
+                        >
+                          <View style={{ position: 'relative', marginBottom: 4 }}>
+                            <Image
+                              source={{ uri: friendAvatar }}
+                              style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: '#10b981' }}
+                            />
+                            <View style={[styles.onlineDot, { backgroundColor: '#10b981', bottom: 1, right: 1 }]} />
+                          </View>
+                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: dynamicColors.text, textAlign: 'center' }} numberOfLines={1}>
+                            {name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              );
+            })()}
+
             <View style={styles.searchContainer}>
               <TextInput
                 style={[styles.searchInput, { backgroundColor: dynamicColors.inputBg, borderColor: dynamicColors.inputBorder, color: dynamicColors.text }]}
@@ -1082,20 +1129,36 @@ export default function MainTabScreen({ navigation }) {
                 data={foundUsers.length > 0 ? foundUsers : contacts}
                 keyExtractor={item => item._id}
                 renderItem={({ item }) => {
-                  const contactStatusColor = getStatusColor(item._id);
+                  const statusInfo = getStatusInfo(item._id);
                   return (
                     <View style={[styles.friendCard, { backgroundColor: dynamicColors.card }]}>
                       <TouchableOpacity
                         style={styles.avatarWrapper}
-                        onPress={() => setAvatarViewerTarget({ visible: true, avatarUrl: item.avatar, name: item.displayName || item.username, handle: item.username, bio: item.bio, customStatus: item.customStatus })}
+                        onPress={() => setAvatarViewerTarget({
+                          visible: true,
+                          avatarUrl: item.avatar,
+                          name: item.displayName || item.username,
+                          handle: item.username,
+                          bio: item.bio,
+                          customStatus: item.customStatus,
+                          status: statusInfo.label,
+                          targetPersonaId: item._id
+                        })}
                         activeOpacity={0.8}
                       >
                         <Image source={{ uri: getMediaUrl(item.avatar, item.displayName || item.username) }} style={styles.contactAvatar} />
-                        {contactStatusColor ? <View style={[styles.onlineDot, { backgroundColor: contactStatusColor }]} /> : null}
+                        {statusInfo.color ? <View style={[styles.onlineDot, { backgroundColor: statusInfo.color }]} /> : null}
                       </TouchableOpacity>
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.contactName, { color: dynamicColors.text }]}>{item.displayName || item.username}</Text>
-                        <Text style={[styles.contactHandle, { color: dynamicColors.textMuted }]}>@{item.username}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={[styles.contactName, { color: dynamicColors.text }]}>{item.displayName || item.username}</Text>
+                          {statusInfo.isOnline && (
+                            <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                              <Text style={{ fontSize: 9, fontWeight: 'bold', color: statusInfo.color || '#10b981' }}>{statusInfo.label}</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={[styles.contactHandle, { color: dynamicColors.textMuted }]}>@{item.username}{!statusInfo.isOnline ? ' • Offline' : ''}</Text>
                       </View>
                       <TouchableOpacity
                         style={[styles.addBtn, { backgroundColor: dynamicColors.primary }]}

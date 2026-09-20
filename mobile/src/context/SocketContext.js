@@ -8,7 +8,7 @@ const SocketContext = createContext();
 
 export const SocketProvider = ({ children }) => {
   const auth = useAuth() || {};
-  const { token, activePersona, logout } = auth;
+  const { token, activePersona, logout, setActivePersona } = auth;
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [onlinePersonaIds, setOnlinePersonaIds] = useState([]);
@@ -83,8 +83,8 @@ export const SocketProvider = ({ children }) => {
 
     const onPersonaUpdated = (updatedPersona) => {
       if (updatedPersona && activePersona?._id && String(updatedPersona._id) === String(activePersona._id)) {
-        if (typeof auth.setActivePersona === 'function') {
-          auth.setActivePersona(updatedPersona);
+        if (typeof setActivePersona === 'function') {
+          setActivePersona(updatedPersona);
         }
       }
     };
@@ -113,7 +113,7 @@ export const SocketProvider = ({ children }) => {
       newSocket.disconnect();
       socketRef.current = null;
     };
-  }, [token, activePersona?._id, logout]);
+  }, [token, activePersona?._id, logout, setActivePersona]);
 
   const joinRoom = (roomId) => {
     if (socketRef.current && roomId) {

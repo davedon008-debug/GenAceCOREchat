@@ -117,9 +117,16 @@ export default function AvatarViewerModal({
               <Text style={styles.userName} numberOfLines={1}>
                 {name || 'User Profile'}
               </Text>
-              {cleanHandle ? (
-                <Text style={styles.userHandle}>@{cleanHandle}</Text>
-              ) : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                {cleanHandle ? (
+                  <Text style={styles.userHandle}>@{cleanHandle}</Text>
+                ) : null}
+                {status ? (
+                  <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#10b981' }}>{status}</Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
 
             <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>

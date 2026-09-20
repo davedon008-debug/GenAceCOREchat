@@ -500,6 +500,8 @@ export default function ConversationScreen({ route, navigation }) {
     };
 
     const handleMessagesRead = ({ conversationId: readConvId, spaceId: readSpaceId, readerPersonaId }) => {
+      if (!readerPersonaId) return;
+
       setMessages(prev => prev.map(m => {
         const mConvId = String(m.conversationId?._id || m.conversationId || '');
         const mSpaceId = String(m.spaceId?._id || m.spaceId || '');
@@ -509,12 +511,19 @@ export default function ConversationScreen({ route, navigation }) {
                         mSpaceId === String(spaceId);
 
         if (isMatch) {
+          const updatedReadBy = Array.from(new Set([...(m.readBy || []), readerPersonaId].filter(Boolean)));
+          const senderIdStr = String(m.senderPersonaId?._id || m.senderPersonaId || '');
+          const hasOtherReader = updatedReadBy.some(pId => {
+            const idStr = typeof pId === 'object' ? (pId._id || pId.id) : pId;
+            return idStr && String(idStr) !== senderIdStr;
+          });
+
           return {
             ...m,
-            status: 'read',
-            read: true,
-            isRead: true,
-            readBy: Array.from(new Set([...(m.readBy || []), readerPersonaId].filter(Boolean)))
+            readBy: updatedReadBy,
+            status: hasOtherReader ? 'read' : m.status,
+            read: hasOtherReader,
+            isRead: hasOtherReader
           };
         }
         return m;
@@ -889,7 +898,7 @@ export default function ConversationScreen({ route, navigation }) {
     }
   };
 
-  const renderMessageItem = ({ item }) => {
+  const renderMessageItem = useCallback(({ item }) => {
     if (item.isBurned) {
       return (
         <View style={{ width: '100%', alignItems: 'center', marginVertical: 6 }}>
@@ -1047,18 +1056,15 @@ export default function ConversationScreen({ route, navigation }) {
             </Text>
             {isMe && (() => {
               const isPending = item.pending === true || item.sending === true || item.status === 'pending' || (!item._id && !item.id);
-              if (isPending) return null; // 0 ticks ("if not no tick")
+              if (isPending) return null; // 0 ticks (pending/uploading)
 
-              const isRead = item.status === 'read' ||
-                             item.read === true ||
-                             item.isRead === true ||
-                             (Array.isArray(item.readBy) && item.readBy.some(pId => {
-                               const idStr = typeof pId === 'object' ? (pId._id || pId.id) : pId;
-                               return idStr && String(idStr) !== String(activePersona?._id);
-                             }));
+              const isSeenByRecipient = Array.isArray(item.readBy) && item.readBy.some(pId => {
+                const idStr = typeof pId === 'object' ? (pId._id || pId.id) : pId;
+                return idStr && String(idStr) !== String(activePersona?._id);
+              });
 
-              if (isRead) {
-                // 2 ticks ("it should only tick two when the person has seen the message")
+              if (isSeenByRecipient) {
+                // 2 ticks (Blue double checkmarks when recipient has actually seen the message)
                 return (
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 3 }}>
                     <CheckCheck size={13} color="#38bdf8" />
@@ -1066,7 +1072,7 @@ export default function ConversationScreen({ route, navigation }) {
                 );
               }
 
-              // 1 tick ("if its has gone it should show one")
+              // 1 tick (Single checkmark when sent to server but recipient hasn't opened chat)
               return (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 3 }}>
                   <Check size={13} color="rgba(255, 255, 255, 0.65)" />
@@ -1077,7 +1083,7 @@ export default function ConversationScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
     );
-  };
+  }, [activePersona?._id, dynamicColors, isLight, spaceId, revealedBurnMsgs, handleOpenProfile, handleStartRevealBurn, handleForceBurnNowMobile, setActionModalMessage, setViewImageUrl]);
 
   if (!passcodeUnlocked) {
     return (
@@ -1212,9 +1218,13 @@ export default function ConversationScreen({ route, navigation }) {
           <FlatList
             ref={flatListRef}
             data={messages}
-            keyExtractor={(m, index) => String(m._id || m.id || index) + '_' + index}
+            keyExtractor={(m) => String(m._id || m.id || Math.random())}
             renderItem={renderMessageItem}
             contentContainerStyle={styles.messagesList}
+            initialNumToRender={15}
+            maxToRenderPerBatch={10}
+            windowSize={11}
+            removeClippedSubviews={Platform.OS === 'android'}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           />
         )}

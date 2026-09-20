@@ -301,6 +301,60 @@ export const initSocketServer = (httpServer) => {
       }
     });
 
+    // ============================================================
+    // REAL-TIME WebRTC CALL SIGNALING HANDLERS
+    // ============================================================
+    socket.on('call:initiate', ({ targetPersonaId, roomId, isVideo, callerPersona, callId }) => {
+      if (!targetPersonaId) return;
+      const targetRoom = `persona:${targetPersonaId}`;
+      console.log(`[Call Signaling] Persona ${socket.personaId} initiating ${isVideo ? 'Video' : 'Audio'} call to ${targetPersonaId} (CallId: ${callId})`);
+      io.to(targetRoom).emit('call:incoming', {
+        callId,
+        callerPersona: callerPersona || { _id: socket.personaId, displayName: 'User' },
+        roomId,
+        isVideo: !!isVideo,
+        timestamp: Date.now()
+      });
+    });
+
+    socket.on('call:accept', ({ targetPersonaId, callId }) => {
+      if (!targetPersonaId) return;
+      console.log(`[Call Signaling] Persona ${socket.personaId} accepted call ${callId} from ${targetPersonaId}`);
+      io.to(`persona:${targetPersonaId}`).emit('call:accepted', {
+        callId,
+        responderPersonaId: socket.personaId
+      });
+    });
+
+    socket.on('call:reject', ({ targetPersonaId, callId, reason }) => {
+      if (!targetPersonaId) return;
+      console.log(`[Call Signaling] Persona ${socket.personaId} rejected call ${callId}`);
+      io.to(`persona:${targetPersonaId}`).emit('call:rejected', {
+        callId,
+        reason: reason || 'declined',
+        responderPersonaId: socket.personaId
+      });
+    });
+
+    socket.on('call:signal', ({ targetPersonaId, callId, signal }) => {
+      if (!targetPersonaId || !signal) return;
+      io.to(`persona:${targetPersonaId}`).emit('call:signal', {
+        callId,
+        senderPersonaId: socket.personaId,
+        signal
+      });
+    });
+
+    socket.on('call:end', ({ targetPersonaId, callId }) => {
+      if (!targetPersonaId) return;
+      console.log(`[Call Signaling] Persona ${socket.personaId} ended call ${callId}`);
+      io.to(`persona:${targetPersonaId}`).emit('call:ended', {
+        callId,
+        endedByPersonaId: socket.personaId
+      });
+    });
+
+
     socket.on('disconnect', () => {
       connectedPersonas.delete(socket.id);
       broadcastPresence();

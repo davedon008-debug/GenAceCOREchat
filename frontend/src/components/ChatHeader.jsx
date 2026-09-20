@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
 import {
-  Shield, Zap, Bot, Flame, EyeOff, Lock, Clock, CheckCircle2, ChevronDown, Menu, UserPlus, MoreVertical, Sparkles, ArrowLeft, UserX, Trash2, Users
+  Shield, Zap, Bot, Flame, EyeOff, Lock, Clock, CheckCircle2, ChevronDown, Menu, UserPlus, MoreVertical, Sparkles, ArrowLeft, UserX, Trash2, Users, Phone, Video
 } from 'lucide-react';
 
 export default function ChatHeader({
@@ -25,7 +25,8 @@ export default function ChatHeader({
   onToggleRightPanel,
   showRightPanel = false,
   onToggleLockChat,
-  isChatLocked = false
+  isChatLocked = false,
+  onStartCall
 }) {
   const [showAvatarViewer, setShowAvatarViewer] = useState(false);
   const [showPrivacyDropdown, setShowPrivacyDropdown] = useState(false);
@@ -162,6 +163,26 @@ export default function ChatHeader({
           </button>
         )}
 
+        {/* Audio & Video Call Buttons for Direct Messages */}
+        {!isSpace && onStartCall && (
+          <div className="flex items-center gap-1.5 mr-1">
+            <button
+              onClick={() => onStartCall({ isVideo: false })}
+              className="p-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 transition hover:scale-105"
+              title="Start Voice Call"
+            >
+              <Phone className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => onStartCall({ isVideo: true })}
+              className="p-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 transition hover:scale-105"
+              title="Start Video Call"
+            >
+              <Video className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* AI Toolbar Toggle */}
         <button
           onClick={onToggleAIPanel}
@@ -257,6 +278,26 @@ export default function ChatHeader({
 
       {/* MOBILE ACTION TRIGGER BUTTONS */}
       <div className="flex md:hidden items-center gap-1.5 shrink-0">
+        {/* Quick Call Buttons on Mobile */}
+        {!isSpace && onStartCall && (
+          <>
+            <button
+              onClick={() => onStartCall({ isVideo: false })}
+              className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30 transition"
+              title="Start Voice Call"
+            >
+              <Phone className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => onStartCall({ isVideo: true })}
+              className="p-2 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/30 transition"
+              title="Start Video Call"
+            >
+              <Video className="w-4 h-4" />
+            </button>
+          </>
+        )}
+
         {/* Quick AI Toggle Icon on Mobile */}
         <button
           onClick={onToggleAIPanel}

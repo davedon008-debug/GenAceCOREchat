@@ -7,7 +7,7 @@ import { getSocket } from '../lib/socket';
 const SocketContext = createContext();
 
 export const SocketProvider = ({ children }) => {
-  const { token, activePersona, logout } = useAuth();
+  const { token, activePersona, logout, setActivePersona } = useAuth() || {};
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
   const [onlineUserIds, setOnlineUserIds] = useState([]);
@@ -104,7 +104,7 @@ export const SocketProvider = ({ children }) => {
         }
       };
     }
-  }, [token, activePersona, logout]);
+  }, [token, activePersona, logout, setActivePersona]);
 
   const joinRoom = (roomId) => {
     if (socket && roomId) {

@@ -131,6 +131,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const createNewPersona = async (data) => {
+    const res = await api.post('/personas', data);
+    if (res.data?.success) {
+      setPersonas(prev => [...prev, res.data.persona]);
+      return res.data.persona;
+    }
+  };
+
   const logout = async () => {
     await storage.removeItem('donchat_token');
     await storage.removeItem('donchat_user');
@@ -154,8 +162,10 @@ export const AuthProvider = ({ children }) => {
         register,
         loginDemo,
         switchPersona,
+        createNewPersona,
         logout,
         fetchPersonas,
+        refreshPersonas: fetchPersonas,
         setActivePersona: async (p) => {
           setActivePersona(p);
           await storage.setItem('donchat_persona', JSON.stringify(p));
