@@ -7,7 +7,8 @@ import { getApiBaseUrl } from '../config/api';
 const SocketContext = createContext();
 
 export const SocketProvider = ({ children }) => {
-  const { token, activePersona, logout, setActivePersona } = useAuth();
+  const auth = useAuth() || {};
+  const { token, activePersona, logout } = auth;
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [onlinePersonaIds, setOnlinePersonaIds] = useState([]);
@@ -82,8 +83,8 @@ export const SocketProvider = ({ children }) => {
 
     const onPersonaUpdated = (updatedPersona) => {
       if (updatedPersona && activePersona?._id && String(updatedPersona._id) === String(activePersona._id)) {
-        if (typeof setActivePersona === 'function') {
-          setActivePersona(updatedPersona);
+        if (typeof auth.setActivePersona === 'function') {
+          auth.setActivePersona(updatedPersona);
         }
       }
     };
@@ -112,7 +113,7 @@ export const SocketProvider = ({ children }) => {
       newSocket.disconnect();
       socketRef.current = null;
     };
-  }, [token, activePersona?._id, logout, setActivePersona]);
+  }, [token, activePersona?._id, logout]);
 
   const joinRoom = (roomId) => {
     if (socketRef.current && roomId) {
