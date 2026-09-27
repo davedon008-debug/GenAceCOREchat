@@ -19,7 +19,12 @@ export const connectDB = async () => {
       throw new Error('MONGODB_URI environment variable is required');
     }
 
-    const conn = await mongoose.connect(mongoUri);
+    const conn = await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: 50,
+      retryWrites: true
+    });
     console.log(`[MongoDB] Connected successfully: ${conn.connection.host}`);
   } catch (error) {
     console.error(`[MongoDB] Connection error: ${error.message}`);

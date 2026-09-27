@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { Search, Globe, Users, Zap, Menu, ArrowLeft, LogIn, Check } from 'lucide-react';
-import api, { getMediaUrl, createInitialsAvatar } from '../lib/api';
+import api, { getMediaUrl, createInitialsAvatar, SpaceIcon } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
 
 const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%231e293b'/%3E%3Cpath d='M18 20a6 6 0 0 0-12 0'/%3E%3Ccircle cx='12' cy='10' r='4'/%3E%3C/svg%3E";
@@ -167,7 +167,9 @@ export default function DiscoverView({ allContacts = [], onSelectSpace, onStartD
                   className="p-4 rounded-3xl bg-gradient-to-br from-indigo-600/10 to-blue-600/10 bg-[#0f172a] border border-indigo-500/20 hover:border-indigo-400/40 transition group"
                 >
                   <div className="flex items-start gap-3 mb-3">
-                    <span className="text-2xl shrink-0">{space.icon || '⚡'}</span>
+                    <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-lg shrink-0 overflow-hidden">
+                      <SpaceIcon icon={space.icon} fallback="⚡" className="w-full h-full object-cover rounded-xl" />
+                    </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="text-xs font-bold text-white truncate">{space.title}</p>

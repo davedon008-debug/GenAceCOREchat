@@ -1,16 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import api, { getMediaUrl } from '../lib/api';
-import { X, Search, Plus, Zap, Check, Users, Sparkles, Globe, Lock } from 'lucide-react';
+import api, { getMediaUrl, SpaceIcon, isImageIcon } from '../lib/api';
+import { X, Search, Plus, Zap, Check, Users, Sparkles, Globe, Lock, Upload, Link, Smile, Loader2, Image as ImageIcon } from 'lucide-react';
 
 const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%231e293b'/%3E%3Cpath d='M18 20a6 6 0 0 0-12 0'/%3E%3Ccircle cx='12' cy='10' r='4'/%3E%3C/svg%3E";
-const ICON_OPTIONS = ['⚡', '🚀', '💬', '💼', '🎮', '🎨', '💡', '🛡️', '🌐', '🔒'];
+const ICON_OPTIONS = ['⚡', '🚀', '💬', '💼', '🎮', '🎨', '💡', '🛡️', '🌐', '🔒', '👑', '🔥', '💎', '❤️', '🔮', '🛸'];
 
 export default function CreateSpaceModal({ onClose, onSuccess }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('⚡');
+  const [iconType, setIconType] = useState('preset'); // 'preset' | 'upload' | 'url'
+  const [imageUrl, setImageUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const [visibility, setVisibility] = useState('private');
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -18,6 +21,35 @@ export default function CreateSpaceModal({ onClose, onSuccess }) {
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setErrorMsg('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (res.data.success && res.data.url) {
+        setIcon(res.data.url);
+        setImageUrl(res.data.url);
+      } else {
+        setErrorMsg('Failed to upload image icon');
+      }
+    } catch (err) {
+      console.error('Space icon upload error:', err);
+      setErrorMsg(err.response?.data?.message || 'Failed to upload image file');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleSearch = async (query) => {
     setSearchQuery(query);
@@ -60,7 +92,7 @@ export default function CreateSpaceModal({ onClose, onSuccess }) {
       const res = await api.post('/spaces', {
         title: title.trim(),
         description: description.trim(),
-        icon,
+        icon: icon || '⚡',
         visibility,
         invitedPersonaIds: selectedMembers.map(m => m._id)
       });
@@ -85,8 +117,8 @@ export default function CreateSpaceModal({ onClose, onSuccess }) {
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-white/10">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-cyan-500/20">
-              ⚡
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-cyan-500/20 overflow-hidden">
+              <SpaceIcon icon={icon} fallback="⚡" className="w-full h-full object-cover rounded-xl" />
             </div>
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -113,28 +145,108 @@ export default function CreateSpaceModal({ onClose, onSuccess }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Space Icon Selection */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
-              Choose Space Symbol
-            </label>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              {ICON_OPTIONS.map((ic) => (
+          {/* Space Icon Selection with Image Upload Support */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Space Icon / Image Avatar
+              </label>
+              <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 text-[10px]">
                 <button
-                  key={ic}
                   type="button"
-                  onClick={() => setIcon(ic)}
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition border shrink-0 ${
-                    icon === ic
-                      ? 'bg-cyan-500/20 border-cyan-400 shadow-md shadow-cyan-500/20 scale-105'
-                      : 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
+                  onClick={() => setIconType('preset')}
+                  className={`px-2 py-1 rounded-lg font-medium flex items-center gap-1 transition ${
+                    iconType === 'preset' ? 'bg-cyan-500 text-white font-bold shadow' : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  {ic}
+                  <Smile className="w-3 h-3" /> Emoji
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setIconType('upload')}
+                  className={`px-2 py-1 rounded-lg font-medium flex items-center gap-1 transition ${
+                    iconType === 'upload' ? 'bg-cyan-500 text-white font-bold shadow' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Upload className="w-3 h-3" /> Upload Image
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIconType('url')}
+                  className={`px-2 py-1 rounded-lg font-medium flex items-center gap-1 transition ${
+                    iconType === 'url' ? 'bg-cyan-500 text-white font-bold shadow' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Link className="w-3 h-3" /> Image URL
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Live Preview Box */}
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-blue-600/20 border border-cyan-500/40 flex items-center justify-center text-xl shrink-0 overflow-hidden shadow-lg shadow-cyan-500/10">
+                <SpaceIcon icon={icon} fallback="⚡" className="w-full h-full object-cover rounded-2xl" />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                {iconType === 'preset' && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                    {ICON_OPTIONS.map((ic) => (
+                      <button
+                        key={ic}
+                        type="button"
+                        onClick={() => setIcon(ic)}
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center text-base transition border shrink-0 ${
+                          icon === ic
+                            ? 'bg-cyan-500/20 border-cyan-400 shadow-md shadow-cyan-500/20 scale-105'
+                            : 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
+                        }`}
+                      >
+                        {ic}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {iconType === 'upload' && (
+                  <div className="flex items-center gap-2">
+                    <label className="flex-1 cursor-pointer flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 hover:bg-cyan-500/25 text-cyan-300 text-xs font-semibold transition">
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" /> Uploading image...
+                        </>
+                      ) : (
+                        <>
+                          <ImageIcon className="w-4 h-4" /> Select Image File
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        disabled={isUploading}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {iconType === 'url' && (
+                  <input
+                    type="url"
+                    placeholder="Paste image URL (https://...)"
+                    value={imageUrl}
+                    onChange={(e) => {
+                      setImageUrl(e.target.value);
+                      setIcon(e.target.value || '⚡');
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/60"
+                  />
+                )}
+              </div>
             </div>
           </div>
+
 
           {/* Title & Description */}
           <div className="space-y-3">

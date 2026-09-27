@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Search, ChevronRight, Plus, UserPlus, Upload, Zap, MoreHorizontal, Users, X, UserMinus, ShieldCheck, Trash2 } from 'lucide-react';
-import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar } from '../lib/api';
+import { Search, ChevronRight, Plus, UserPlus, Upload, Zap, MoreHorizontal, Users, X, UserMinus, ShieldCheck, Trash2, Settings, Link, Smile, Loader2, Image as ImageIcon } from 'lucide-react';
+import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar, SpaceIcon, isImageIcon } from '../lib/api';
 import { useSocket } from '../context/SocketContext';
 import AvatarViewerModal from './AvatarViewerModal';
+
+const PRESET_ICONS = ['⚡', '🚀', '💬', '💼', '🎮', '🎨', '💡', '🛡️', '🌐', '🔒', '👑', '🔥', '💎', '❤️', '🔮', '🛸'];
 
 export default function RightMembersPanel({ 
   allContacts = [], 
@@ -20,6 +22,83 @@ export default function RightMembersPanel({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [avatarViewerTarget, setAvatarViewerTarget] = useState({ isOpen: false, avatarUrl: '', name: '', handle: '' });
+
+  // Space Edit State
+  const [showEditSpaceModal, setShowEditSpaceModal] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editIcon, setEditIcon] = useState('⚡');
+  const [editIconType, setEditIconType] = useState('preset'); // 'preset' | 'upload' | 'url'
+  const [editImageUrl, setEditImageUrl] = useState('');
+  const [isUploadingIcon, setIsUploadingIcon] = useState(false);
+  const [isSavingSpace, setIsSavingSpace] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  const handleOpenEditSpace = () => {
+    if (!activeSpace) return;
+    setEditTitle(activeSpace.title || '');
+    setEditDesc(activeSpace.description || '');
+    const currentIcon = activeSpace.icon || '⚡';
+    setEditIcon(currentIcon);
+    if (isImageIcon(currentIcon)) {
+      setEditIconType('url');
+      setEditImageUrl(currentIcon);
+    } else {
+      setEditIconType('preset');
+      setEditImageUrl('');
+    }
+    setEditError('');
+    setShowEditSpaceModal(true);
+  };
+
+  const handleUploadSpaceIcon = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingIcon(true);
+    setEditError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data.success && res.data.url) {
+        setEditIcon(res.data.url);
+        setEditImageUrl(res.data.url);
+      } else {
+        setEditError('Failed to upload icon image');
+      }
+    } catch (err) {
+      console.error('Space icon upload error:', err);
+      setEditError(err.response?.data?.message || 'Failed to upload icon image');
+    } finally {
+      setIsUploadingIcon(false);
+    }
+  };
+
+  const handleSaveSpaceDetails = async (e) => {
+    e.preventDefault();
+    if (!activeSpace || !editTitle.trim()) return;
+    setIsSavingSpace(true);
+    setEditError('');
+    try {
+      const res = await api.patch(`/spaces/${activeSpace._id}`, {
+        title: editTitle.trim(),
+        description: editDesc.trim(),
+        icon: editIcon || '⚡'
+      });
+      if (res.data.success) {
+        setShowEditSpaceModal(false);
+      } else {
+        setEditError(res.data.message || 'Failed to update space settings');
+      }
+    } catch (err) {
+      console.error('Update space details error:', err);
+      setEditError(err.response?.data?.message || 'Failed to update space settings');
+    } finally {
+      setIsSavingSpace(false);
+    }
+  };
 
   const currentPersonaId = activePersona?._id ? String(activePersona._id) : null;
   const currentUserId = activePersona?.userId ? String(activePersona.userId._id || activePersona.userId) : null;
@@ -183,6 +262,17 @@ export default function RightMembersPanel({
             >
               <UserPlus className="w-3.5 h-3.5" />
               <span>+ Add / Invite People</span>
+            </button>
+          )}
+
+          {/* Admin Edit Space Icon & Details Button */}
+          {isSpaceAdmin && (
+            <button
+              onClick={handleOpenEditSpace}
+              className="w-full py-2 px-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5"
+            >
+              <Settings className="w-3.5 h-3.5 text-indigo-400" />
+              <span>⚙️ Edit Space Icon &amp; Settings</span>
             </button>
           )}
 
@@ -519,6 +609,178 @@ export default function RightMembersPanel({
       name={avatarViewerTarget.name}
       handle={avatarViewerTarget.handle}
     />
+
+    {/* Edit Space Settings Modal */}
+    {showEditSpaceModal && (
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="bg-[#101625] border border-[#1d273e] rounded-3xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
+          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg overflow-hidden">
+                <SpaceIcon icon={editIcon} fallback="⚡" className="w-full h-full object-cover rounded-xl" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Edit Space Settings</h3>
+                <p className="text-xs text-gray-400">Update Space Icon, Title &amp; Description</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowEditSpaceModal(false)}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {editError && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+              {editError}
+            </div>
+          )}
+
+          <form onSubmit={handleSaveSpaceDetails} className="space-y-4">
+            {/* Space Icon Selection */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  Space Icon / Image Avatar
+                </label>
+                <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => setEditIconType('preset')}
+                    className={`px-2 py-1 rounded-lg font-medium flex items-center gap-1 transition ${
+                      editIconType === 'preset' ? 'bg-indigo-500 text-white font-bold shadow' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Smile className="w-3 h-3" /> Emoji
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditIconType('upload')}
+                    className={`px-2 py-1 rounded-lg font-medium flex items-center gap-1 transition ${
+                      editIconType === 'upload' ? 'bg-indigo-500 text-white font-bold shadow' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Upload className="w-3 h-3" /> Upload Image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditIconType('url')}
+                    className={`px-2 py-1 rounded-lg font-medium flex items-center gap-1 transition ${
+                      editIconType === 'url' ? 'bg-indigo-500 text-white font-bold shadow' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Link className="w-3 h-3" /> Image URL
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-purple-600/20 border border-indigo-500/40 flex items-center justify-center text-xl shrink-0 overflow-hidden shadow-lg">
+                  <SpaceIcon icon={editIcon} fallback="⚡" className="w-full h-full object-cover rounded-2xl" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  {editIconType === 'preset' && (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                      {PRESET_ICONS.map((ic) => (
+                        <button
+                          key={ic}
+                          type="button"
+                          onClick={() => setEditIcon(ic)}
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm transition border shrink-0 ${
+                            editIcon === ic
+                              ? 'bg-indigo-500/20 border-indigo-400 shadow-md scale-105'
+                              : 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
+                          }`}
+                        >
+                          {ic}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {editIconType === 'upload' && (
+                    <label className="cursor-pointer flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-indigo-500/15 border border-indigo-500/30 hover:bg-indigo-500/25 text-indigo-300 text-xs font-semibold transition">
+                      {isUploadingIcon ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" /> Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <ImageIcon className="w-4 h-4" /> Select Image File
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleUploadSpaceIcon}
+                        disabled={isUploadingIcon}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+
+                  {editIconType === 'url' && (
+                    <input
+                      type="url"
+                      placeholder="Paste image URL (https://...)"
+                      value={editImageUrl}
+                      onChange={(e) => {
+                        setEditImageUrl(e.target.value);
+                        setEditIcon(e.target.value || '⚡');
+                      }}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/60"
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Title & Description */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Space Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setShowEditSpaceModal(false)}
+                className="px-4 py-2 text-xs font-medium text-gray-400 hover:text-white transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingSpace || !editTitle.trim()}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/20 transition disabled:opacity-50"
+              >
+                {isSavingSpace ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
     </>
   );
 }

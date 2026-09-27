@@ -44,7 +44,7 @@ export const broadcastPresence = async () => {
 
     ioServer.emit('presence:update', { onlinePersonaIds, personaStatuses });
   } catch (err) {
-    console.error('[Socket] Presence broadcast error:', err);
+    console.warn('[Socket] Presence broadcast network notice:', err?.message || err);
     const fallbackIds = Array.from(new Set(connectedPersonas.values())).filter(Boolean).map(String);
     const fallbackStatuses = {};
     fallbackIds.forEach(id => { fallbackStatuses[id] = 'online'; });
@@ -96,7 +96,7 @@ const autoJoinUserRooms = async (socket, personaId) => {
 
     console.log(`[Socket] Persona ${pIdStr} auto-joined ${convs.length} conversations & ${spaces.length} spaces`);
   } catch (err) {
-    console.error(`[Socket] autoJoinUserRooms error for persona ${personaId}:`, err);
+    console.warn(`[Socket] autoJoinUserRooms network notice for persona ${personaId}:`, err?.message || err);
   }
 };
 

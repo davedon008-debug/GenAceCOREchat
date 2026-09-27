@@ -95,6 +95,85 @@ export const createOrUpgradeSpace = async (req, res) => {
   }
 };
 
+export const updateSpaceDetails = async (req, res) => {
+  try {
+    const { spaceId } = req.params;
+    const { title, description, icon, visibility } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(spaceId)) {
+      return res.status(400).json({ success: false, message: 'Invalid space ID' });
+    }
+
+    const space = await Space.findById(spaceId);
+    if (!space) {
+      return res.status(404).json({ success: false, message: 'Space not found' });
+    }
+
+    // Check authorization (owner or admin of space)
+    let myPersonaIdStrs = [];
+    if (req.personaId) myPersonaIdStrs.push(req.personaId.toString());
+    if (req.userId) {
+      myPersonaIdStrs.push(req.userId.toString());
+      const myPersonas = await Persona.find({ userId: req.userId }).select('_id');
+      myPersonas.forEach(p => {
+        const idStr = p._id.toString();
+        if (!myPersonaIdStrs.includes(idStr)) myPersonaIdStrs.push(idStr);
+      });
+    }
+
+    const currentUser = await User.findById(req.userId).select('role');
+    const isSystemAdmin = currentUser?.role === 'admin';
+
+    const ownerIdStr = space.ownerPersonaId
+      ? (space.ownerPersonaId._id || space.ownerPersonaId).toString()
+      : (space.members[0]?.personaId ? (space.members[0].personaId._id || space.members[0].personaId).toString() : '');
+
+    const isOwner = myPersonaIdStrs.includes(ownerIdStr);
+    const requesterMember = space.members.find(m => {
+      const mId = m.personaId ? (m.personaId._id || m.personaId).toString() : '';
+      return myPersonaIdStrs.includes(mId);
+    });
+
+    const isAdminRole = requesterMember && ['owner', 'admin'].includes(requesterMember.role);
+    const isOwnerOrAdmin = isOwner || isAdminRole || isSystemAdmin;
+
+    if (!isOwnerOrAdmin) {
+      return res.status(403).json({ success: false, message: 'Only Space Admins or Owners can update space settings' });
+    }
+
+    if (title && title.trim()) space.title = title.trim();
+    if (description !== undefined) space.description = description.trim();
+    if (icon !== undefined && icon.trim()) space.icon = icon.trim();
+    if (visibility && ['public', 'private'].includes(visibility)) space.visibility = visibility;
+
+    await space.save();
+
+    // If title changed, update linked conversation name if present
+    if (title && space.conversationId) {
+      await Conversation.findByIdAndUpdate(space.conversationId, { name: title.trim() });
+    }
+
+    const updatedSpace = await Space.findById(spaceId)
+      .populate('members.personaId', 'username displayName avatar bio status customStatus type')
+      .populate('ownerPersonaId', 'username displayName avatar bio status customStatus type');
+
+    const io = getIO();
+    if (io) {
+      io.to(String(spaceId)).emit('space:updated', updatedSpace);
+      (space.members || []).forEach(m => {
+        const pId = m.personaId?._id || m.personaId;
+        if (pId) io.to(`persona:${pId}`).emit('space:updated', updatedSpace);
+      });
+    }
+
+    res.json({ success: true, space: updatedSpace });
+  } catch (error) {
+    console.error('updateSpaceDetails error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update space details', error: error.message });
+  }
+};
+
+
 export const inviteMembersToSpace = async (req, res) => {
   try {
     const { spaceId } = req.params;

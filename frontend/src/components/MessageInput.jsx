@@ -5,7 +5,7 @@ import { Send, Mic, Paperclip, Plus, Square, Trash2, Reply, X, FileText, Image a
 import api from '../lib/api';
 import AttachmentPickerModal from './AttachmentPickerModal';
 
-export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCancelReply, onFocus }) {
+export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCancelReply, onFocus, onOpenSecretLovers }) {
   const [text, setText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordTime, setRecordTime] = useState(0);
@@ -293,6 +293,7 @@ export default function MessageInput({ onSendMessage, onTyping, replyingTo, onCa
           }
         }}
         onSelectVoice={() => startRecording()}
+        onSelectSecretLovers={onOpenSecretLovers}
       />
 
       {/* Hidden File Inputs for Different Types */}

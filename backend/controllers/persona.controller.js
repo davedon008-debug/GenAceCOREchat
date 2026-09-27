@@ -128,18 +128,30 @@ export const getAllContacts = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Persona not found' });
     }
 
-    const contactIds = persona.contacts || [];
+    const savedContactIds = (persona.contacts || []).map(id => id.toString());
     const blockedIds = (persona.blockedPersonas || []).map(id => id.toString());
 
-    // Filter out blocked personas and self
-    const validContactIds = contactIds
-      .map(id => id.toString())
-      .filter(id => id !== req.personaId.toString() && !blockedIds.includes(id));
+    let filter = { _id: { $ne: req.personaId } };
+    if (blockedIds.length > 0) {
+      filter._id = { $ne: req.personaId, $nin: blockedIds };
+    }
 
-    const contacts = await Persona.find({ _id: { $in: validContactIds } })
+    // Fetch all available personas across system
+    const allSystemPersonas = await Persona.find(filter)
       .select('username displayName avatar status customStatus type bio updatedAt userId')
       .populate('userId', 'role email')
-      .sort({ displayName: 1 });
+      .sort({ updatedAt: -1, displayName: 1 })
+      .limit(100);
+
+    // Prioritize explicitly saved contacts at top of list
+    const contactsSet = new Set(savedContactIds);
+    const contacts = allSystemPersonas.sort((a, b) => {
+      const aSaved = contactsSet.has(String(a._id));
+      const bSaved = contactsSet.has(String(b._id));
+      if (aSaved && !bSaved) return -1;
+      if (!aSaved && bSaved) return 1;
+      return 0;
+    });
 
     res.json({ success: true, contacts });
   } catch (error) {

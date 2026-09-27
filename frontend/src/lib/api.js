@@ -148,5 +148,39 @@ export const getMediaUrl = (url, name = 'User') => {
   return `${serverBase}${clean.startsWith('/') ? '' : '/'}${clean}`;
 };
 
+export const isImageIcon = (icon) => {
+  if (!icon || typeof icon !== 'string') return false;
+  const trimmed = icon.trim();
+  return (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('/uploads/') ||
+    trimmed.startsWith('uploads/') ||
+    trimmed.startsWith('data:image/') ||
+    /\.(png|jpe?g|gif|webp|svg|bmp)(\?.*)?$/i.test(trimmed)
+  );
+};
+
+export const SpaceIcon = ({ icon, fallback = '⚡', className = 'w-full h-full object-cover' }) => {
+  if (isImageIcon(icon)) {
+    return (
+      <img
+        src={getMediaUrl(icon)}
+        alt=""
+        className={className}
+        onError={(e) => {
+          e.currentTarget.onerror = null;
+          e.currentTarget.style.display = 'none';
+          if (e.currentTarget.parentNode) {
+            e.currentTarget.parentNode.textContent = fallback;
+          }
+        }}
+      />
+    );
+  }
+  return <span>{icon || fallback}</span>;
+};
+
 export default api;
+
 

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
+import { getMediaUrl, DEFAULT_AVATAR, SpaceIcon } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
 import {
-  Shield, Zap, Bot, Flame, EyeOff, Lock, Clock, CheckCircle2, ChevronDown, Menu, UserPlus, MoreVertical, Sparkles, ArrowLeft, UserX, Trash2, Users, Phone, Video
+  Shield, Zap, Bot, Flame, EyeOff, Lock, Clock, CheckCircle2, ChevronDown, Menu, UserPlus, MoreVertical, Sparkles, ArrowLeft, UserX, Trash2, Users, Phone, Video, Heart
 } from 'lucide-react';
 
 export default function ChatHeader({
@@ -26,7 +26,8 @@ export default function ChatHeader({
   showRightPanel = false,
   onToggleLockChat,
   isChatLocked = false,
-  onStartCall
+  onStartCall,
+  onOpenSecretLovers
 }) {
   const [showAvatarViewer, setShowAvatarViewer] = useState(false);
   const [showPrivacyDropdown, setShowPrivacyDropdown] = useState(false);
@@ -46,8 +47,9 @@ export default function ChatHeader({
   const currentBadge = privacyBadge[privacyMode] || privacyBadge.normal;
 
   return (
-    <header className="h-16 px-3 md:px-6 bg-[#0f172a] border-b border-[#1e293b] flex items-center justify-between z-20 relative select-none">
-      <div className="flex items-center gap-2 md:gap-3 min-w-0">
+    <header className="h-16 px-3 md:px-6 bg-[#0f172a] border-b border-[#1e293b] flex items-center justify-between gap-2 z-20 relative select-none">
+      {/* Left User/Chat Information - Takes Priority and Never Gets Squished */}
+      <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1 overflow-hidden">
         {/* Back / Deselect Active Chat Button */}
         {onCloseActive && (
           <button
@@ -59,24 +61,15 @@ export default function ChatHeader({
           </button>
         )}
 
-        {/* Hamburger Menu Button (Opens Members Directory) */}
-        <button
-          onClick={onToggleRightPanel || onOpenMobileSidebar}
-          className="p-2 text-gray-300 hover:text-white rounded-xl hover:bg-white/10 shrink-0 transition flex items-center gap-1.5"
-          title="Open Members Directory"
-        >
-          <Menu className="w-5 h-5 text-indigo-400" />
-        </button>
-
-        {isSpace ? (
-          <div
-            onClick={onToggleRightPanel}
-            title="Click to view Space details & members"
-            className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-500 border border-indigo-400/40 flex items-center justify-center font-bold text-lg text-white shadow-md shadow-indigo-500/20 shrink-0 cursor-pointer hover:scale-105 transition-transform"
-          >
-            {icon || '⚡'}
-          </div>
-        ) : (
+          {isSpace ? (
+            <div
+              onClick={onToggleRightPanel}
+              title="Click to view Space details & members"
+              className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-500 border border-indigo-400/40 flex items-center justify-center font-bold text-lg text-white shadow-md shadow-indigo-500/20 shrink-0 cursor-pointer hover:scale-105 transition-transform overflow-hidden"
+            >
+              <SpaceIcon icon={icon} fallback="⚡" className="w-full h-full object-cover rounded-2xl" />
+            </div>
+          ) : (
           <img
             src={getMediaUrl(avatar, title) || DEFAULT_AVATAR}
             alt=""
@@ -86,12 +79,13 @@ export default function ChatHeader({
             title="Click to view full picture"
           />
         )}
+
         <div
-          className={`min-w-0 truncate ${isSpace ? 'cursor-pointer' : ''}`}
+          className={`min-w-0 flex-1 truncate ${isSpace ? 'cursor-pointer' : ''}`}
           onClick={isSpace ? onToggleRightPanel : undefined}
           title={isSpace ? "Click to view Space details & members" : undefined}
         >
-          <h2 className="text-xs md:text-sm font-bold text-white flex items-center gap-1.5 truncate font-outfit">
+          <h2 className="text-sm md:text-base font-bold text-white flex items-center gap-2 truncate font-outfit">
             <span className="truncate">{title}</span>
             {isChatLocked && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center gap-1 font-mono shrink-0">
@@ -100,72 +94,29 @@ export default function ChatHeader({
             )}
             {isSpace && <span className="hidden sm:inline text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-normal shrink-0">Public Space</span>}
           </h2>
-          <p className="text-[10px] md:text-[11px] text-gray-400 truncate">
+          <p className="text-[11px] md:text-xs text-gray-400 truncate">
             {isSpace ? (subtitle || 'Synchronized room canvas') : (subtitle || 'Direct Message')}
           </p>
         </div>
       </div>
 
-      {/* DESKTOP ACTION BAR */}
-      <div className="hidden md:flex items-center gap-2.5">
-        {/* Invite People Button for Space */}
-        {isSpace && (
+      {/* Action Buttons Bar - Compact & Uncluttered */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* Secret Lovers Quick Action */}
+        {!isSpace && onOpenSecretLovers && (
           <button
-            onClick={onOpenInviteModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 text-xs font-semibold transition"
+            onClick={onOpenSecretLovers}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-bold shadow-md transition hover:scale-105"
+            title="Play Secret Lovers Game"
           >
-            <UserPlus className="w-3.5 h-3.5" /> <span>Invite Members</span>
+            <Heart className="w-3.5 h-3.5 fill-white animate-pulse" />
+            <span className="hidden xl:inline">Secret Lovers</span>
           </button>
         )}
 
-        {/* Privacy Selector */}
-        <div className="relative">
-          <button
-            onClick={() => setShowPrivacyDropdown(!showPrivacyDropdown)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition ${currentBadge.color}`}
-          >
-            {currentBadge.icon}
-            <span>{currentBadge.label}</span>
-            <ChevronDown className="w-3.5 h-3.5 opacity-70" />
-          </button>
-
-          {showPrivacyDropdown && (
-            <div className="absolute right-0 top-11 w-56 bg-[#182033] border border-[#2b374e] rounded-2xl p-2 shadow-2xl z-50">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 px-2 py-1">
-                Select Privacy Vector
-              </p>
-              {Object.entries(privacyBadge).map(([modeKey, badge]) => (
-                <button
-                  key={modeKey}
-                  onClick={() => {
-                    onUpdatePrivacy(modeKey);
-                    setShowPrivacyDropdown(false);
-                  }}
-                  className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition ${
-                    privacyMode === modeKey ? 'bg-indigo-600/30 text-white font-medium' : 'hover:bg-white/5 text-gray-300'
-                  }`}
-                >
-                  {badge.icon}
-                  <span>{badge.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Upgrade to Space Button */}
-        {!isSpace && (
-          <button
-            onClick={onUpgradeToSpace}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 transition"
-          >
-            <Zap className="w-3.5 h-3.5" /> <span>Create Space</span>
-          </button>
-        )}
-
-        {/* Audio & Video Call Buttons for Direct Messages */}
+        {/* Audio & Video Call Quick Buttons */}
         {!isSpace && onStartCall && (
-          <div className="flex items-center gap-1.5 mr-1">
+          <>
             <button
               onClick={() => onStartCall({ isVideo: false })}
               className="p-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 transition hover:scale-105"
@@ -180,33 +131,98 @@ export default function ChatHeader({
             >
               <Video className="w-4 h-4" />
             </button>
-          </div>
+          </>
         )}
 
-        {/* AI Toolbar Toggle */}
-        <button
-          onClick={onToggleAIPanel}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition ${
-            showAIPanel
-              ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200 shadow-lg shadow-indigo-500/20'
-              : 'bg-[#1e293b] border-white/10 text-gray-300 hover:bg-[#28354d]'
-          }`}
-        >
-          <Bot className="w-3.5 h-3.5 text-indigo-400" /> <span>AI Context</span>
-        </button>
-
-        {/* Desktop More Options Menu */}
+        {/* Options Dropdown Menu Button */}
         <div className="relative">
           <button
             onClick={() => setShowDesktopOptionsMenu(!showDesktopOptionsMenu)}
-            className="p-2 rounded-xl bg-[#1e293b] border border-white/10 text-gray-300 hover:text-white hover:bg-[#28354d] transition"
-            title="Chat Actions"
+            className="p-2.5 rounded-xl bg-[#1e293b] border border-white/10 text-gray-300 hover:text-white hover:bg-[#28354d] transition flex items-center gap-1"
+            title="Chat Options & Settings"
           >
             <MoreVertical className="w-4 h-4" />
           </button>
 
           {showDesktopOptionsMenu && (
-            <div className="absolute right-0 top-11 w-52 bg-[#182033] border border-[#2b374e] rounded-2xl p-2 shadow-2xl z-50 animate-fadeIn space-y-1">
+            <div className="absolute right-0 top-12 w-60 bg-[#182033] border border-[#2b374e] rounded-2xl p-2 shadow-2xl z-50 animate-fadeIn space-y-1">
+              {/* Privacy Vector Selector Dropdown Section */}
+              <div className="p-1 border-b border-white/10 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1 px-1">
+                  Privacy Mode
+                </span>
+                <button
+                  onClick={() => setShowPrivacyDropdown(!showPrivacyDropdown)}
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl border text-xs font-medium transition ${currentBadge.color}`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    {currentBadge.icon}
+                    <span>{currentBadge.label}</span>
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+                </button>
+
+                {showPrivacyDropdown && (
+                  <div className="mt-1 space-y-1 pl-1 pr-1 py-1 bg-[#101726] border border-[#2b374e] rounded-xl">
+                    {Object.entries(privacyBadge).map(([modeKey, badge]) => (
+                      <button
+                        key={modeKey}
+                        onClick={() => {
+                          onUpdatePrivacy(modeKey);
+                          setShowPrivacyDropdown(false);
+                          setShowDesktopOptionsMenu(false);
+                        }}
+                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition ${
+                          privacyMode === modeKey ? 'bg-indigo-600/30 text-white font-medium' : 'hover:bg-white/5 text-gray-300'
+                        }`}
+                      >
+                        {badge.icon}
+                        <span>{badge.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Create / Upgrade to Space */}
+              {!isSpace ? (
+                <button
+                  onClick={() => {
+                    onUpgradeToSpace();
+                    setShowDesktopOptionsMenu(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 transition shadow-md"
+                >
+                  <Zap className="w-4 h-4 text-amber-300" />
+                  <span>Create / Upgrade Space</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    onOpenInviteModal();
+                    setShowDesktopOptionsMenu(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-indigo-300 bg-indigo-600/20 hover:bg-indigo-600/30 transition"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Invite Members to Space</span>
+                </button>
+              )}
+
+              {/* AI Context Toolbar Toggle */}
+              <button
+                onClick={() => {
+                  onToggleAIPanel();
+                  setShowDesktopOptionsMenu(false);
+                }}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition ${
+                  showAIPanel ? 'bg-indigo-600/30 text-indigo-200 border border-indigo-500/40' : 'text-gray-300 hover:bg-white/5'
+                }`}
+              >
+                <Bot className="w-4 h-4 text-indigo-400" />
+                <span>{showAIPanel ? 'Hide AI Context' : 'Show AI Context'}</span>
+              </button>
+
               {/* Members Panel Toggle */}
               {onToggleRightPanel && (
                 <button
@@ -220,28 +236,12 @@ export default function ChatHeader({
                       : 'text-gray-300 hover:bg-white/5'
                   }`}
                 >
-                  <Users className="w-4 h-4" />
-                  <span>{showRightPanel ? 'Hide Members Panel' : 'Show Members Panel'}</span>
+                  <Users className="w-4 h-4 text-indigo-400" />
+                  <span>{showRightPanel ? 'Hide Members Directory' : 'Members Directory'}</span>
                 </button>
               )}
 
-              {!isSpace && onBlockUser && (
-                <button
-                  onClick={() => {
-                    onBlockUser();
-                    setShowDesktopOptionsMenu(false);
-                  }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition ${
-                    isBlocked
-                      ? 'text-emerald-400 hover:bg-emerald-500/10'
-                      : 'text-rose-400 hover:bg-rose-500/10'
-                  }`}
-                >
-                  <UserX className="w-4 h-4" />
-                  <span>{isBlocked ? 'Unblock User' : 'Block User'}</span>
-                </button>
-              )}
-
+              {/* Lock Chat Toggle */}
               {onToggleLockChat && (
                 <button
                   onClick={() => {
@@ -259,6 +259,25 @@ export default function ChatHeader({
                 </button>
               )}
 
+              {/* Block User */}
+              {!isSpace && onBlockUser && (
+                <button
+                  onClick={() => {
+                    onBlockUser();
+                    setShowDesktopOptionsMenu(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition ${
+                    isBlocked
+                      ? 'text-emerald-400 hover:bg-emerald-500/10'
+                      : 'text-rose-400 hover:bg-rose-500/10'
+                  }`}
+                >
+                  <UserX className="w-4 h-4" />
+                  <span>{isBlocked ? 'Unblock User' : 'Block User'}</span>
+                </button>
+              )}
+
+              {/* Delete Chat */}
               {onDeleteConversation && (
                 <button
                   onClick={() => {
@@ -274,215 +293,6 @@ export default function ChatHeader({
             </div>
           )}
         </div>
-      </div>
-
-      {/* MOBILE ACTION TRIGGER BUTTONS */}
-      <div className="flex md:hidden items-center gap-1.5 shrink-0">
-        {/* Quick Call Buttons on Mobile */}
-        {!isSpace && onStartCall && (
-          <>
-            <button
-              onClick={() => onStartCall({ isVideo: false })}
-              className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30 transition"
-              title="Start Voice Call"
-            >
-              <Phone className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onStartCall({ isVideo: true })}
-              className="p-2 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/30 transition"
-              title="Start Video Call"
-            >
-              <Video className="w-4 h-4" />
-            </button>
-          </>
-        )}
-
-        {/* Quick AI Toggle Icon on Mobile */}
-        <button
-          onClick={onToggleAIPanel}
-          className={`p-2 rounded-xl border transition ${
-            showAIPanel
-              ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-lg shadow-cyan-500/20'
-              : 'bg-white/5 border-white/10 text-cyan-400 hover:bg-white/10'
-          }`}
-          title="Toggle AI Context"
-        >
-          <Bot className="w-4 h-4" />
-        </button>
-
-        {/* Mobile Options Menu Toggle */}
-        <button
-          onClick={() => {
-            setShowMobileActionMenu(!showMobileActionMenu);
-            setShowMobilePrivacyList(false);
-          }}
-          className="p-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:text-white hover:bg-white/10 transition"
-        >
-          <MoreVertical className="w-4 h-4" />
-        </button>
-
-        {/* Mobile Action Dropdown Drawer */}
-        {showMobileActionMenu && (
-          <div className="absolute right-3 top-16 w-64 bg-slate-900/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-3 shadow-2xl z-50 animate-fadeIn space-y-2">
-            <div className="px-1 pb-1 border-b border-white/10 flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-cyan-400" /> Options & Settings
-              </span>
-              <span className="text-[10px] text-cyan-400 font-mono">Mobile</span>
-            </div>
-
-            {/* Members Panel Toggle (mobile) */}
-            {onToggleRightPanel && (
-              <button
-                onClick={() => {
-                  onToggleRightPanel();
-                  setShowMobileActionMenu(false);
-                }}
-                className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-xs font-medium transition ${
-                  showRightPanel
-                    ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-300'
-                    : 'bg-white/5 border-white/10 text-gray-200 hover:bg-white/10'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-indigo-400" />
-                  <span>Members Panel</span>
-                </div>
-                <span className={`text-[10px] px-2 py-0.5 rounded ${showRightPanel ? 'bg-indigo-500/30 text-indigo-300' : 'bg-white/10 text-gray-400'}`}>
-                  {showRightPanel ? 'Visible' : 'Hidden'}
-                </span>
-              </button>
-            )}
-
-            {/* AI Context Button */}
-            <button
-              onClick={() => {
-                onToggleAIPanel();
-                setShowMobileActionMenu(false);
-              }}
-              className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-xs font-medium transition ${
-                showAIPanel
-                  ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
-                  : 'bg-white/5 border-white/10 text-gray-200 hover:bg-white/10'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Bot className="w-4 h-4 text-cyan-400" />
-                <span>AI Context Assistant</span>
-              </div>
-              <span className={`text-[10px] px-2 py-0.5 rounded ${showAIPanel ? 'bg-cyan-500/30 text-cyan-300' : 'bg-white/10 text-gray-400'}`}>
-                {showAIPanel ? 'Active' : 'Off'}
-              </span>
-            </button>
-
-            {/* Upgrade to Space / Invite People */}
-            {isSpace ? (
-              <button
-                onClick={() => {
-                  onOpenInviteModal();
-                  setShowMobileActionMenu(false);
-                }}
-                className="w-full flex items-center gap-2 p-2.5 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-semibold hover:bg-purple-500/30 transition"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>Invite Members to Space</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  onUpgradeToSpace();
-                  setShowMobileActionMenu(false);
-                }}
-                className="w-full flex items-center gap-2 p-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-semibold shadow-lg shadow-purple-500/20 transition"
-              >
-                <Zap className="w-4 h-4" />
-                <span>Upgrade Chat to Space</span>
-              </button>
-            )}
-
-            {/* Privacy Mode Selector */}
-            <div>
-              <button
-                onClick={() => setShowMobilePrivacyList(!showMobilePrivacyList)}
-                className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-xs font-medium transition ${currentBadge.color}`}
-              >
-                <div className="flex items-center gap-2">
-                  {currentBadge.icon}
-                  <span>Privacy: {currentBadge.label}</span>
-                </div>
-                <ChevronDown className="w-3.5 h-3.5 opacity-70" />
-              </button>
-
-              {showMobilePrivacyList && (
-                <div className="mt-1 space-y-1 pl-1 pr-1 py-1 bg-black/40 border border-white/10 rounded-xl">
-                  {Object.entries(privacyBadge).map(([modeKey, badge]) => (
-                    <button
-                      key={modeKey}
-                      onClick={() => {
-                        onUpdatePrivacy(modeKey);
-                        setShowMobilePrivacyList(false);
-                        setShowMobileActionMenu(false);
-                      }}
-                      className={`w-full flex items-center gap-2 p-2 rounded-lg text-xs transition ${
-                        privacyMode === modeKey ? 'bg-white/10 text-white font-semibold' : 'hover:bg-white/5 text-gray-300'
-                      }`}
-                    >
-                      {badge.icon}
-                      <span>{badge.label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Block & Delete Buttons on Mobile */}
-            <div className="pt-2 border-t border-white/10 space-y-1">
-              {!isSpace && onBlockUser && (
-                <button
-                  onClick={() => {
-                    onBlockUser();
-                    setShowMobileActionMenu(false);
-                  }}
-                  className={`w-full flex items-center gap-2 p-2.5 rounded-xl border text-xs font-semibold transition ${
-                    isBlocked
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
-                      : 'bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20'
-                  }`}
-                >
-                  <UserX className={`w-4 h-4 ${isBlocked ? 'text-emerald-400' : 'text-rose-400'}`} />
-                  <span>{isBlocked ? 'Unblock User' : 'Block User'}</span>
-                </button>
-              )}
-
-              {onToggleLockChat && (
-                <button
-                  onClick={() => {
-                    onToggleLockChat();
-                    setShowMobileActionMenu(false);
-                  }}
-                  className="w-full flex items-center gap-2 p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold hover:bg-indigo-500/20 transition"
-                >
-                  <Lock className="w-4 h-4 text-indigo-400" />
-                  <span>{isChatLocked ? 'Unlock This Chat' : 'Lock This Chat 🔒'}</span>
-                </button>
-              )}
-
-              {onDeleteConversation && (
-                <button
-                  onClick={() => {
-                    onDeleteConversation();
-                    setShowMobileActionMenu(false);
-                  }}
-                  className="w-full flex items-center gap-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-semibold hover:bg-red-500/20 transition"
-                >
-                  <Trash2 className="w-4 h-4 text-red-400" />
-                  <span>Delete Chat</span>
-                </button>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       <AvatarViewerModal

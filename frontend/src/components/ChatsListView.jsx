@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Search, Plus, MessageSquare, Zap, Edit3, CheckCheck, Users, Lock } from 'lucide-react';
-import { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar } from '../lib/api';
+import { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar, SpaceIcon } from '../lib/api';
 import { useSocket } from '../context/SocketContext';
 import AvatarViewerModal from './AvatarViewerModal';
 
@@ -181,8 +181,8 @@ export default function ChatsListView({
                   className="p-4 rounded-3xl bg-[#101625] border border-[#1d273e] hover:border-indigo-500/50 flex items-center justify-between cursor-pointer group transition shadow-xl"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500/30 to-purple-600/30 border border-indigo-500/40 flex items-center justify-center text-xl shrink-0">
-                      {s.icon || '⚡'}
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500/30 to-purple-600/30 border border-indigo-500/40 flex items-center justify-center text-xl shrink-0 overflow-hidden">
+                      <SpaceIcon icon={s.icon} fallback="⚡" className="w-full h-full object-cover rounded-2xl" />
                     </div>
                     <div className="min-w-0">
                       <h4 className="text-xs font-bold text-white group-hover:text-indigo-300 transition truncate">{s.title}</h4>

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { SpaceIcon } from '../lib/api';
 import { Search, Plus, Globe, Lock, Check, Menu, ArrowLeft } from 'lucide-react';
 
 export default function SpacesGridView({ spaces = [], onSelectSpace, onOpenCreateSpace, onOpenMobileSidebar, onBack }) {
@@ -133,8 +134,8 @@ export default function SpacesGridView({ spaces = [], onSelectSpace, onOpenCreat
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-[#1e293b] flex items-center justify-center text-xl border border-white/10 group-hover:scale-105 transition">
-                      {item.icon}
+                    <div className="w-10 h-10 rounded-2xl bg-[#1e293b] flex items-center justify-center text-xl border border-white/10 group-hover:scale-105 transition overflow-hidden">
+                      <SpaceIcon icon={item.icon} fallback="⚡" className="w-full h-full object-cover rounded-2xl" />
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-white group-hover:text-indigo-300 transition font-outfit">

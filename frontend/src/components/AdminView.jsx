@@ -5,7 +5,7 @@ import {
   Shield, Users, Key, Trash2, Search, ArrowLeft, RefreshCw, AlertTriangle, 
   Check, Lock, X, Loader2, Sparkles, MessageSquare, Zap, ShieldAlert, Eye, Globe
 } from 'lucide-react';
-import api from '../lib/api';
+import api, { SpaceIcon } from '../lib/api';
 
 export default function AdminView({ onBack, onInspectSpace, onOpenMobileSidebar }) {
   const [activeTab, setActiveTab] = useState('users'); // 'users' | 'resets' | 'spaces'
@@ -542,8 +542,8 @@ export default function AdminView({ onBack, onInspectSpace, onOpenMobileSidebar 
                 >
                   {/* Left side: Space details */}
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-lg text-white shrink-0 shadow">
-                      {space.icon || '⚡'}
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-lg text-white shrink-0 shadow overflow-hidden">
+                      <SpaceIcon icon={space.icon} fallback="⚡" className="w-full h-full object-cover rounded-2xl" />
                     </div>
 
                     <div className="min-w-0">

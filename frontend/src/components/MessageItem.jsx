@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Flame, Smile, Play, Pause, CheckCheck, Trash2, Copy, Reply, Check, X, Plus, FileText, Download, Lock, Clock, Shield, EyeOff, Ghost, Eye } from 'lucide-react';
+import { Flame, Smile, Play, Pause, CheckCheck, Trash2, Copy, Reply, Check, X, Plus, FileText, Download, Lock, Clock, Shield, EyeOff, Ghost, Eye, Heart, Sparkles, Gamepad2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
@@ -164,7 +164,8 @@ export default function MessageItem({
   onReaction,
   onBurnMessage,
   onDeleteMessage,
-  onReplyMessage
+  onReplyMessage,
+  onOpenSecretLovers
 }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showFullEmojiPicker, setShowFullEmojiPicker] = useState(false);
@@ -629,6 +630,44 @@ export default function MessageItem({
                   )}
                 </div>
                 <div className="flex items-center gap-1 justify-end text-[10px] opacity-75 shrink-0 select-none pt-0.5">
+                  <span suppressHydrationWarning>{formattedTime}</span>
+                  {renderTickStatus()}
+                </div>
+              </div>
+            ) : (message.contentType === 'secret_lovers_invite' || message.contentType === 'secret_lovers_summary') ? (
+              /* Secret Lovers Interactive Game Card */
+              <div className="space-y-2.5 min-w-[240px] sm:min-w-[280px] p-3 rounded-2xl bg-gradient-to-b from-[#2a071d] to-[#17030f] border border-rose-500/40 text-white shadow-xl">
+                <div className="flex items-center gap-2 pb-1 border-b border-rose-500/30">
+                  <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-rose-600 to-pink-500 flex items-center justify-center text-white shadow-md">
+                    <Heart className="w-4 h-4 fill-white animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-rose-200 font-outfit">
+                      {message.contentType === 'secret_lovers_invite' ? '❤️ Secret Lovers Invitation' : '🎉 Game Completed!'}
+                    </h4>
+                    <span className="text-[9px] text-rose-300/80 font-mono">Private Couples Game</span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-rose-100 font-medium leading-relaxed">
+                  {message.content}
+                </p>
+
+                {onOpenSecretLovers && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenSecretLovers(message.gameId);
+                    }}
+                    className="w-full py-2 rounded-xl bg-gradient-to-r from-rose-600 via-pink-600 to-rose-500 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-xs shadow-md transition flex items-center justify-center gap-1.5"
+                  >
+                    <Heart className="w-3.5 h-3.5 fill-white" />
+                    <span>{message.contentType === 'secret_lovers_invite' ? 'Join Game & Accept' : 'View Game Results'}</span>
+                  </button>
+                )}
+
+                <div className="flex items-center gap-1 justify-end text-[10px] text-rose-300/60 select-none pt-0.5">
                   <span suppressHydrationWarning>{formattedTime}</span>
                   {renderTickStatus()}
                 </div>

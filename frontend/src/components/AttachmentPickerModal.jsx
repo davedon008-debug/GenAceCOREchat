@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { FileText, Image as ImageIcon, Camera, Mic, X, ChevronRight, RefreshCw, Check, FlipHorizontal, Grid, Timer, Zap, Hexagon } from 'lucide-react';
+import { FileText, Image as ImageIcon, Camera, Mic, X, ChevronRight, RefreshCw, Check, FlipHorizontal, Grid, Timer, Zap, Hexagon, Heart, Gamepad2 } from 'lucide-react';
 
 export default function AttachmentPickerModal({
   isOpen,
@@ -10,7 +10,8 @@ export default function AttachmentPickerModal({
   onSelectDocument,
   onSelectGallery,
   onSelectCameraFile,
-  onSelectVoice
+  onSelectVoice,
+  onSelectSecretLovers
 }) {
   const [mounted, setMounted] = useState(false);
   const [showCameraStream, setShowCameraStream] = useState(false);
@@ -380,6 +381,29 @@ export default function AttachmentPickerModal({
               </div>
               <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition shrink-0" />
             </button>
+
+            {/* Secret Lovers Game */}
+            {onSelectSecretLovers && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onSelectSecretLovers();
+                }}
+                className="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-[#230919] hover:bg-[#340d25] border border-rose-500/40 hover:border-rose-400 transition text-left shadow-lg shadow-rose-950/30"
+              >
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-rose-600 to-pink-500 border border-rose-400/40 flex items-center justify-center shrink-0 group-hover:scale-105 transition shadow-md">
+                  <Heart className="w-5 h-5 text-white fill-white animate-pulse" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <h4 className="text-xs font-black text-white group-hover:text-rose-300 transition font-outfit">❤️ Secret Lovers Game</h4>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-rose-500/20 text-rose-300 font-mono border border-rose-500/30">Couples</span>
+                  </div>
+                  <p className="text-[11px] text-rose-200/80 truncate mt-0.5">Private 2-player secret challenge game</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-rose-400 group-hover:translate-x-0.5 transition shrink-0" />
+              </button>
+            )}
           </div>
 
           {/* Cancel Button */}

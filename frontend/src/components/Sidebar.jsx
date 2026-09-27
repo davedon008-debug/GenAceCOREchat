@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
-import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar } from '../lib/api';
+import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar, SpaceIcon } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
 import Logo from './Logo';
 import { 
@@ -358,8 +358,8 @@ export default function Sidebar({
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-7 h-7 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-xs font-bold text-purple-300 shrink-0">
-                              {s.icon || '⚡'}
+                            <div className="w-7 h-7 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-xs font-bold text-purple-300 shrink-0 overflow-hidden">
+                              <SpaceIcon icon={s.icon} fallback="⚡" className="w-full h-full object-cover rounded-xl" />
                             </div>
                             <div className="min-w-0">
                               <p className="font-bold text-white truncate text-xs">{s.title}</p>

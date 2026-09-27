@@ -31,6 +31,7 @@ import PasscodeModal from '../../components/PasscodeModal';
 import MobileBottomNav from '../../components/MobileBottomNav';
 import CallModal from '../../components/CallModal';
 import IncomingCallModal from '../../components/IncomingCallModal';
+import SecretLoversModal from '../../components/games/SecretLoversModal';
 import { playNotificationSound, playSentSound, getNotifPrefs } from '../../lib/sound';
 import { playCallConnected, playCallEnded, playRingback, stopAllSFX } from '../../lib/callSFX';
 import { enableWebPushNotifications } from '../../lib/pushSubscription';
@@ -46,6 +47,13 @@ export default function ChatPage() {
   const joinRoom = socketContext.joinRoom || (() => {});
   const leaveRoom = socketContext.leaveRoom || (() => {});
   const emitTyping = socketContext.emitTyping || (() => {});
+
+  // Auth Redirect check
+  useEffect(() => {
+    if (!loading && (!token || !activePersona)) {
+      router.push('/login');
+    }
+  }, [loading, token, activePersona, router]);
 
   // State management
   const [conversations, setConversations] = useState([]);
@@ -76,6 +84,13 @@ export default function ChatPage() {
   const [toastAlertConfig, setToastAlertConfig] = useState(null);
   const [dismissedBannerIds, setDismissedBannerIds] = useState([]);
   const [showRightPanel, setShowRightPanel] = useState(false);
+  const [showSecretLoversModal, setShowSecretLoversModal] = useState(false);
+  const [activeSecretLoversGameId, setActiveSecretLoversGameId] = useState(null);
+
+  const handleOpenSecretLovers = (gameId = null) => {
+    setActiveSecretLoversGameId(gameId || null);
+    setShowSecretLoversModal(true);
+  };
 
   // Chat Lock State Management
   const [passcodeStatus, setPasscodeStatus] = useState({ hasPasscode: false, chatLockEnabled: false, lockedConversations: [], lockedSpaces: [] });
@@ -1588,9 +1603,15 @@ export default function ChatPage() {
   if (!token || !activePersona) {
     return (
       <div className="h-[100dvh] w-full flex items-center justify-center bg-[#090c15]">
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-4 text-center px-4">
           <div className="w-10 h-10 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
-          <p className="text-xs text-cyan-400 font-semibold tracking-wider">Authenticating...</p>
+          <p className="text-xs text-cyan-400 font-semibold tracking-wider">Authenticating Workspace...</p>
+          <a
+            href="/login"
+            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-lg"
+          >
+            Go to Login Page
+          </a>
         </div>
       </div>
     );
@@ -1684,6 +1705,7 @@ export default function ChatPage() {
                 onToggleLockChat={activeType === 'conversation' ? handleToggleLockActiveChat : undefined}
                 isChatLocked={passcodeStatus.chatLockEnabled && passcodeStatus.lockedConversations.includes(String(activeId))}
                 onStartCall={handleStartCall}
+                onOpenSecretLovers={activeType === 'conversation' ? () => handleOpenSecretLovers() : undefined}
               />
 
               {/* Fluid Space Canvas / Chat Stream */}
@@ -1713,6 +1735,7 @@ export default function ChatPage() {
                         onBurnMessage={handleBurnMessage}
                         onDeleteMessage={handleDeleteMessage}
                         onReplyMessage={(msg) => setReplyingToMessage(msg)}
+                        onOpenSecretLovers={(gId) => handleOpenSecretLovers(gId)}
                       />
                     ))}
                     {typingUser && (
@@ -1747,6 +1770,7 @@ export default function ChatPage() {
                         onBurnMessage={handleBurnMessage}
                         onDeleteMessage={handleDeleteMessage}
                         onReplyMessage={(msg) => setReplyingToMessage(msg)}
+                        onOpenSecretLovers={(gId) => handleOpenSecretLovers(gId)}
                       />
                     ))}
                     {typingUser && (
@@ -1778,6 +1802,7 @@ export default function ChatPage() {
                   replyingTo={replyingToMessage}
                   onCancelReply={() => setReplyingToMessage(null)}
                   onFocus={() => messageEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                  onOpenSecretLovers={activeType === 'conversation' ? () => handleOpenSecretLovers() : undefined}
                 />
               )}
             </div>
@@ -2173,6 +2198,17 @@ export default function ChatPage() {
           isScreenSharing={isScreenSharing}
         />
       )}
+
+      {/* Secret Lovers Game Modal */}
+      <SecretLoversModal
+        isOpen={showSecretLoversModal}
+        onClose={() => setShowSecretLoversModal(false)}
+        conversationId={activeId}
+        partnerPersona={currentTargetParticipant}
+        activePersona={activePersona}
+        activeGameId={activeSecretLoversGameId}
+        socket={socket}
+      />
     </div>
   );
 }

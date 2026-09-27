@@ -24,22 +24,16 @@ export const AuthProvider = ({ children }) => {
         const savedPersona = localStorage.getItem('donchat_persona');
         const savedUser = localStorage.getItem('donchat_user');
 
-        if (savedToken && savedPersona && savedUser) {
-          try {
-            const parsedPersona = JSON.parse(savedPersona);
-            const parsedUser = JSON.parse(savedUser);
-            if (isMounted) {
-              api.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
-              setToken(savedToken);
-              setActivePersona(parsedPersona);
-              setUser(parsedUser);
-              setLoading(false);
-            }
-            fetchPersonas();
-            return;
-          } catch (e) {
-            console.error('Error parsing stored auth data:', e);
+        if (savedToken) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
+          if (isMounted) setToken(savedToken);
+          if (savedUser && isMounted) {
+            try { setUser(JSON.parse(savedUser)); } catch (e) {}
           }
+          if (savedPersona && isMounted) {
+            try { setActivePersona(JSON.parse(savedPersona)); } catch (e) {}
+          }
+          await fetchPersonas();
         }
       } catch (err) {
         console.error('Failed auth initialization:', err);

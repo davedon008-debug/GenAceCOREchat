@@ -12,7 +12,8 @@ import {
   updateTaskStatus,
   createPoll,
   votePoll,
-  updateSpacePrivacyMode
+  updateSpacePrivacyMode,
+  updateSpaceDetails
 } from '../controllers/space.controller.js';
 import { protect } from '../middleware/auth.middleware.js';
 
@@ -23,6 +24,7 @@ router.use(protect);
 router.post('/', createOrUpgradeSpace);
 router.get('/public', getPublicSpaces);
 router.get('/', getSpaces);
+router.patch('/:spaceId', updateSpaceDetails);
 router.post('/:spaceId/invite', inviteMembersToSpace);
 router.delete('/:spaceId/members/:personaId', removeMemberFromSpace);
 router.delete('/:spaceId', deleteSpace);

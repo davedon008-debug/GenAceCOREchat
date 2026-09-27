@@ -137,7 +137,7 @@ export const getMessages = async (req, res) => {
             });
           }
         }
-      }).catch(err => console.error('[getMessages] markAsRead error:', err));
+      }).catch(err => console.warn('[getMessages] markAsRead notice:', err?.message || err));
     }
 
     res.json({ success: true, messages });
