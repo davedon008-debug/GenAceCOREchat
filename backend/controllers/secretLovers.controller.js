@@ -5,14 +5,43 @@ import Persona from '../models/Persona.js';
 import { getIO } from '../config/socket.js';
 
 /**
+ * Helper to safely extract ID string from primitive or populated Object
+ */
+const getIDString = (val) => {
+  if (!val) return '';
+  if (typeof val === 'string') return val.trim();
+  if (typeof val === 'number') return String(val);
+
+  let target = val;
+  if (typeof target === 'object' && target !== null) {
+    if (target._id && target._id !== target) {
+      target = target._id;
+    } else if (target.id && target.id !== target) {
+      target = target.id;
+    } else if (target.personaId && target.personaId !== target) {
+      target = target.personaId;
+    }
+  }
+
+  if (typeof target === 'string') return target.trim();
+  if (typeof target === 'number') return String(target);
+  if (target && typeof target.toString === 'function') {
+    const str = target.toString();
+    if (str && str !== '[object Object]') return str;
+  }
+  return '';
+};
+
+/**
  * Sanitize game object for client output so unrevealed questions stay secret server-side!
  */
 const sanitizeGameState = (game, requesterPersonaId) => {
   if (!game) return null;
   const gameObj = game.toObject ? game.toObject({ virtuals: true }) : { ...game };
-  const pIdStr = String(requesterPersonaId);
-  const isParticipant = String(gameObj.creatorPersonaId._id || gameObj.creatorPersonaId) === pIdStr ||
-                        String(gameObj.partnerPersonaId._id || gameObj.partnerPersonaId) === pIdStr;
+  const pIdStr = getIDString(requesterPersonaId);
+  const creatorStr = getIDString(gameObj.creatorPersonaId);
+  const partnerStr = getIDString(gameObj.partnerPersonaId);
+  const isParticipant = creatorStr === pIdStr || partnerStr === pIdStr;
 
   if (!isParticipant) return null;
 
@@ -27,6 +56,11 @@ const sanitizeGameState = (game, requesterPersonaId) => {
         number: q.number,
         text: q.text,
         category: q.category || 'General',
+        createdById: q.createdById,
+        answerText: q.answerText || '',
+        answerMediaUrl: q.answerMediaUrl || '',
+        answerMediaType: q.answerMediaType || '',
+        status: q.status || (gameObj.completedNumbers?.includes(q.number) ? 'completed' : gameObj.skippedNumbers?.includes(q.number) ? 'skipped' : 'unrevealed'),
         isRevealed: true
       };
     } else {
@@ -34,6 +68,11 @@ const sanitizeGameState = (game, requesterPersonaId) => {
         number: q.number,
         text: '??? (Secret Content Hidden)',
         category: q.category || 'General',
+        createdById: q.createdById,
+        answerText: '',
+        answerMediaUrl: '',
+        answerMediaType: '',
+        status: 'unrevealed',
         isRevealed: false
       };
     }
@@ -46,7 +85,7 @@ const sanitizeGameState = (game, requesterPersonaId) => {
 export const createGame = async (req, res) => {
   try {
     const creatorPersonaId = req.personaId;
-    const { conversationId, questions, partnerPersonaId } = req.body;
+    const { conversationId, questions, partnerPersonaId, creatorSkipOwnQuestions = true } = req.body;
 
     if (!conversationId || !partnerPersonaId || !Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({ success: false, message: 'Invalid payload. Conversation, partner, and questions required.' });
@@ -75,10 +114,11 @@ export const createGame = async (req, res) => {
       creatorPersonaId,
       partnerPersonaId,
       questions: formattedQuestions,
+      creatorSkipOwnQuestions: creatorSkipOwnQuestions !== false,
       selectedNumbers: [],
       completedNumbers: [],
       skippedNumbers: [],
-      currentTurnPersonaId: creatorPersonaId,
+      currentTurnPersonaId: partnerPersonaId,
       status: 'invited'
     });
 
@@ -142,6 +182,32 @@ export const getGame = async (req, res) => {
   }
 };
 
+// Get active or invited game for a conversation
+export const getActiveGameForConversation = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const personaId = req.personaId;
+
+    const game = await SecretLoversGame.findOne({
+      conversationId,
+      status: { $in: ['invited', 'active'] }
+    })
+      .sort({ createdAt: -1 })
+      .populate('creatorPersonaId', 'displayName username avatar')
+      .populate('partnerPersonaId', 'displayName username avatar');
+
+    if (!game) {
+      return res.json({ success: true, game: null });
+    }
+
+    const sanitized = sanitizeGameState(game, personaId);
+    return res.json({ success: true, game: sanitized });
+  } catch (err) {
+    console.error('Error fetching active conversation game:', err);
+    return res.status(500).json({ success: false, message: 'Server error fetching active game.' });
+  }
+};
+
 // Accept game invitation
 export const acceptGame = async (req, res) => {
   try {
@@ -153,20 +219,27 @@ export const acceptGame = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Game session not found.' });
     }
 
-    if (String(game.partnerPersonaId) !== String(personaId) && String(game.creatorPersonaId) !== String(personaId)) {
+    const partnerIdStr = getIDString(game.partnerPersonaId);
+    const creatorIdStr = getIDString(game.creatorPersonaId);
+    const requesterIdStr = getIDString(personaId);
+
+    if (requesterIdStr !== partnerIdStr && requesterIdStr !== creatorIdStr) {
       return res.status(403).json({ success: false, message: 'Unauthorized action.' });
     }
 
-    game.status = 'active';
-    game.startedAt = new Date();
-    await game.save();
+    if (game.status === 'invited') {
+      game.status = 'active';
+      game.startedAt = new Date();
+      game.currentTurnPersonaId = getIDString(game.partnerPersonaId);
+      await game.save();
+    }
 
     await game.populate('creatorPersonaId', 'displayName username avatar');
     await game.populate('partnerPersonaId', 'displayName username avatar');
 
     const io = getIO();
     if (io) {
-      const sanitized = sanitizeGameState(game, game.creatorPersonaId._id);
+      const sanitized = sanitizeGameState(game, game.creatorPersonaId._id || game.creatorPersonaId);
       io.to(String(game.conversationId)).emit('secret_lovers:updated', { game: sanitized });
     }
 
@@ -188,7 +261,11 @@ export const declineGame = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Game session not found.' });
     }
 
-    if (String(game.partnerPersonaId) !== String(personaId) && String(game.creatorPersonaId) !== String(personaId)) {
+    const partnerIdStr = getIDString(game.partnerPersonaId);
+    const creatorIdStr = getIDString(game.creatorPersonaId);
+    const requesterIdStr = getIDString(personaId);
+
+    if (requesterIdStr !== partnerIdStr && requesterIdStr !== creatorIdStr) {
       return res.status(403).json({ success: false, message: 'Unauthorized action.' });
     }
 
@@ -223,7 +300,9 @@ export const selectNumber = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Game is not active.' });
     }
 
-    if (String(game.currentTurnPersonaId) !== String(personaId)) {
+    const currentTurnStr = getIDString(game.currentTurnPersonaId);
+    const requesterIdStr = getIDString(personaId);
+    if (currentTurnStr !== requesterIdStr) {
       return res.status(403).json({ success: false, message: "It is not your turn!" });
     }
 
@@ -242,7 +321,8 @@ export const selectNumber = async (req, res) => {
       number: tileNum,
       text: questionItem.text,
       category: questionItem.category || 'General',
-      revealedById: personaId,
+      createdById: getIDString(questionItem.createdById || game.creatorPersonaId) || null,
+      revealedById: getIDString(personaId) || null,
       status: 'pending'
     };
 
@@ -259,7 +339,7 @@ export const selectNumber = async (req, res) => {
     return res.json({ success: true, game: sanitizeGameState(game, personaId) });
   } catch (err) {
     console.error('Error selecting tile number:', err);
-    return res.status(500).json({ success: false, message: 'Server error selecting tile.' });
+    return res.status(500).json({ success: false, message: err.message || 'Server error selecting tile.' });
   }
 };
 
@@ -267,7 +347,7 @@ export const selectNumber = async (req, res) => {
 export const actionTurn = async (req, res) => {
   try {
     const { gameId } = req.params;
-    const { action } = req.body; // 'done' | 'skip'
+    const { action, answerText, answerMediaUrl, answerMediaType } = req.body; // 'done' | 'skip' | 'pass'
     const personaId = req.personaId;
 
     const game = await SecretLoversGame.findById(gameId);
@@ -279,7 +359,9 @@ export const actionTurn = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Game is not active.' });
     }
 
-    if (String(game.currentTurnPersonaId) !== String(personaId)) {
+    const currentTurnStr = getIDString(game.currentTurnPersonaId);
+    const requesterIdStr = getIDString(personaId);
+    if (currentTurnStr !== requesterIdStr) {
       return res.status(403).json({ success: false, message: "It is not your turn!" });
     }
 
@@ -288,12 +370,41 @@ export const actionTurn = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No tile is currently selected.' });
     }
 
+    const answerStr = String(answerText || '').trim();
+    const mediaUrlStr = String(answerMediaUrl || '').trim();
+    const mediaTypeStr = String(answerMediaType || '').trim();
+
+    game.currentRevealedTile.answerText = answerStr;
+    game.currentRevealedTile.answerMediaUrl = mediaUrlStr;
+    game.currentRevealedTile.answerMediaType = mediaTypeStr;
+
+    // Find question item in questions array and record answer & status
+    const qIndex = game.questions.findIndex(q => q.number === tileNum);
+
     if (action === 'done') {
       if (!game.completedNumbers.includes(tileNum)) game.completedNumbers.push(tileNum);
       game.currentRevealedTile.status = 'completed';
+      if (qIndex !== -1) {
+        game.questions[qIndex].status = 'completed';
+        if (answerStr) game.questions[qIndex].answerText = answerStr;
+        if (mediaUrlStr) game.questions[qIndex].answerMediaUrl = mediaUrlStr;
+        if (mediaTypeStr) game.questions[qIndex].answerMediaType = mediaTypeStr;
+      }
+    } else if (action === 'pass') {
+      if (!game.completedNumbers.includes(tileNum)) game.completedNumbers.push(tileNum);
+      game.currentRevealedTile.status = 'passed';
+      if (qIndex !== -1) {
+        game.questions[qIndex].status = 'passed';
+        if (answerStr) game.questions[qIndex].answerText = answerStr;
+        if (mediaUrlStr) game.questions[qIndex].answerMediaUrl = mediaUrlStr;
+        if (mediaTypeStr) game.questions[qIndex].answerMediaType = mediaTypeStr;
+      }
     } else {
       if (!game.skippedNumbers.includes(tileNum)) game.skippedNumbers.push(tileNum);
       game.currentRevealedTile.status = 'skipped';
+      if (qIndex !== -1) {
+        game.questions[qIndex].status = 'skipped';
+      }
     }
 
     // Check if all questions have been attempted
@@ -321,13 +432,27 @@ export const actionTurn = async (req, res) => {
         io.to(String(game.conversationId)).emit('message:new', msgObj);
       }
     } else {
-      // Switch turn to opponent persona
-      const nextTurnId = String(game.currentTurnPersonaId) === String(game.creatorPersonaId)
-        ? game.partnerPersonaId
-        : game.creatorPersonaId;
+      // Determine turn for next question:
+      // If creatorSkipOwnQuestions is enabled (or creator wrote the secrets for partner to answer),
+      // keep turn on partner so partner answers all questions while creator spectates live!
+      if (game.creatorSkipOwnQuestions !== false) {
+        game.currentTurnPersonaId = getIDString(game.partnerPersonaId);
+      } else {
+        const nextTurnId = getIDString(game.currentTurnPersonaId) === getIDString(game.creatorPersonaId)
+          ? getIDString(game.partnerPersonaId)
+          : getIDString(game.creatorPersonaId);
+        game.currentTurnPersonaId = nextTurnId;
+      }
 
-      game.currentTurnPersonaId = nextTurnId;
-      game.currentRevealedTile = { number: null, text: '', category: '', revealedById: null, status: 'pending' };
+      game.currentRevealedTile = {
+        number: null,
+        text: '',
+        category: '',
+        createdById: null,
+        revealedById: null,
+        answerText: '',
+        status: 'pending'
+      };
     }
 
     await game.save();

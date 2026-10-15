@@ -175,6 +175,19 @@ export default function ConversationScreen({ route, navigation }) {
   useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
   useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
 
+  const iceServersRef = useRef(null);
+  const loadIceServers = async () => {
+    if (iceServersRef.current) return iceServersRef.current;
+    try {
+      const res = await api.get('/ice-servers');
+      if (res?.data?.iceServers?.length) iceServersRef.current = res.data.iceServers;
+    } catch (e) {
+      console.warn('[Mobile WebRTC] Failed to load ICE servers:', e?.message);
+    }
+    return iceServersRef.current;
+  };
+  useEffect(() => { loadIceServers(); }, []);
+
   const cleanupCall = () => {
     stopAllSFX();
     pendingCandidatesRef.current = [];
@@ -236,37 +249,19 @@ export default function ConversationScreen({ route, navigation }) {
     }
 
     const pc = new RTCPeerConnectionClass({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun.services.mozilla.com' },
-        { urls: 'stun:openrelay.metered.ca:80' },
-        {
-          urls: 'turn:openrelay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        }
-      ],
-      iceCandidatePoolSize: 10
+      iceServers: iceServersRef.current || [{ urls: 'stun:stun.l.google.com:19302' }],
+      iceCandidatePoolSize: 4
     });
 
-    pc.oniceconnectionstatechange = () => {
+    pc.oniceconnectionstatechange = async () => {
       console.log('[Mobile WebRTC] ICE Connection State:', pc.iceConnectionState);
-      if (pc.iceConnectionState === 'failed') {
-        console.warn('[Mobile WebRTC] ICE Connection failed. Restarting ICE candidate search...');
-        if (typeof pc.restartIce === 'function') {
-          pc.restartIce();
+      if (pc.iceConnectionState === 'failed' && activeCallRef.current?.isCaller && pc.signalingState === 'stable') {
+        try {
+          const offer = await pc.createOffer({ iceRestart: true });
+          await pc.setLocalDescription(offer);
+          socket?.emit('call:signal', { targetPersonaId, callId, signal: offer });
+        } catch (e) {
+          console.warn('[Mobile WebRTC] ICE restart failed:', e);
         }
       }
     };
@@ -420,6 +415,7 @@ export default function ConversationScreen({ route, navigation }) {
     const targetPersonaId = String(partnerId);
 
     try {
+      await loadIceServers();
       const mediaDevicesObj = global.navigator?.mediaDevices || window.navigator?.mediaDevices;
       let stream = null;
       if (mediaDevicesObj && typeof mediaDevicesObj.getUserMedia === 'function') {
@@ -463,6 +459,7 @@ export default function ConversationScreen({ route, navigation }) {
     const { callId, callerPersona, isVideo, roomId } = incomingCall;
 
     try {
+      await loadIceServers();
       const mediaDevicesObj = global.navigator?.mediaDevices || window.navigator?.mediaDevices;
       let stream = null;
       if (mediaDevicesObj && typeof mediaDevicesObj.getUserMedia === 'function') {

@@ -10,7 +10,11 @@ const SecretLoversGameSchema = new mongoose.Schema({
     number: { type: Number, required: true }, // Tile number 1..N
     text: { type: String, required: true },   // Custom question typed by user
     category: { type: String, default: 'General' }, // Optional category
-    createdById: { type: mongoose.Schema.Types.ObjectId, ref: 'Persona' }
+    createdById: { type: mongoose.Schema.Types.ObjectId, ref: 'Persona' },
+    answerText: { type: String, default: '' },
+    answerMediaUrl: { type: String, default: '' },
+    answerMediaType: { type: String, default: '' },
+    status: { type: String, enum: ['unrevealed', 'completed', 'skipped', 'passed'], default: 'unrevealed' }
   }],
 
   // Gameplay state tracking
@@ -18,13 +22,19 @@ const SecretLoversGameSchema = new mongoose.Schema({
   completedNumbers: [{ type: Number }], // Numbers completed with 'Done'
   skippedNumbers: [{ type: Number }],   // Numbers skipped
 
+  creatorSkipOwnQuestions: { type: Boolean, default: true },
+
   currentTurnPersonaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Persona', required: true },
   currentRevealedTile: {
     number: { type: Number, default: null },
     text: { type: String, default: '' },
     category: { type: String, default: '' },
+    createdById: { type: mongoose.Schema.Types.ObjectId, ref: 'Persona', default: null },
     revealedById: { type: mongoose.Schema.Types.ObjectId, ref: 'Persona', default: null },
-    status: { type: String, enum: ['pending', 'completed', 'skipped'], default: 'pending' }
+    answerText: { type: String, default: '' },
+    answerMediaUrl: { type: String, default: '' },
+    answerMediaType: { type: String, default: '' },
+    status: { type: String, enum: ['pending', 'completed', 'skipped', 'passed'], default: 'pending' }
   },
 
   status: {

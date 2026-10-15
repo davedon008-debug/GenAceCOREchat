@@ -643,14 +643,18 @@ export default function MessageItem({
                   </div>
                   <div>
                     <h4 className="text-xs font-black text-rose-200 font-outfit">
-                      {message.contentType === 'secret_lovers_invite' ? '❤️ Secret Lovers Invitation' : '🎉 Game Completed!'}
+                      {message.contentType === 'secret_lovers_invite'
+                        ? (isMe ? '❤️ Secret Lovers Game Sent' : '❤️ Secret Lovers Invitation')
+                        : '🎉 Game Completed!'}
                     </h4>
                     <span className="text-[9px] text-rose-300/80 font-mono">Private Couples Game</span>
                   </div>
                 </div>
 
                 <p className="text-xs text-rose-100 font-medium leading-relaxed">
-                  {message.content}
+                  {message.contentType === 'secret_lovers_invite' && isMe
+                    ? '❤️ You created game secrets and sent them! Tap below to open board or spectate.'
+                    : message.content}
                 </p>
 
                 {onOpenSecretLovers && (
@@ -663,7 +667,11 @@ export default function MessageItem({
                     className="w-full py-2 rounded-xl bg-gradient-to-r from-rose-600 via-pink-600 to-rose-500 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-xs shadow-md transition flex items-center justify-center gap-1.5"
                   >
                     <Heart className="w-3.5 h-3.5 fill-white" />
-                    <span>{message.contentType === 'secret_lovers_invite' ? 'Join Game & Accept' : 'View Game Results'}</span>
+                    <span>
+                      {message.contentType === 'secret_lovers_invite'
+                        ? (isMe ? 'Open Board / Spectate' : 'Accept & Answer Secrets')
+                        : 'View Game Results'}
+                    </span>
                   </button>
                 )}
 

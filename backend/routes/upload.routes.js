@@ -88,20 +88,19 @@ router.post('/', protect, (req, res) => {
         let extension = 'bin';
 
         if (fileData.startsWith('data:')) {
-          const matches = fileData.match(/^data:([A-Za-z0-9-+\/]+);base64,(.+)$/);
-          if (matches && matches.length === 3) {
-            const mime = matches[1];
+          const matches = fileData.match(/^data:([^;]+)(?:;[^;]+)*;base64,(.+)$/);
+          if (matches) {
+            const rawMime = matches[1].split(';')[0].toLowerCase();
             base64Data = matches[2];
-            const mimeParts = mime.split('/');
-            if (mimeParts[1]) {
-              extension = mimeParts[1].split('+')[0];
+            if (rawMime.includes('/')) {
+              extension = rawMime.split('/')[1].split('+')[0];
             }
           }
         }
 
         if (fileName && fileName.includes('.')) {
-          const ext = fileName.split('.').pop();
-          if (ext && ext.length < 5) {
+          const ext = fileName.split('.').pop().toLowerCase().trim();
+          if (ext && ext.length <= 5 && /^[a-z0-9]+$/.test(ext)) {
             extension = ext;
           }
         }

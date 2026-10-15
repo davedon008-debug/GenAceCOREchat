@@ -8,6 +8,21 @@ const nextConfig = {
       { protocol: 'https', hostname: 'ui-avatars.com' }
     ]
   },
+  webpack: (config) => {
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: [
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/DumpStack.log.tmp',
+        '**/hiberfil.sys',
+        '**/pagefile.sys',
+        '**/swapfile.sys',
+        '**/System Volume Information/**'
+      ]
+    };
+    return config;
+  },
   async headers() {
     return [
       {

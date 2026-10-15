@@ -110,25 +110,21 @@ export const loginUser = async (req, res) => {
       await user.save();
     }
 
-    let userPersonas = (user.personas || []).filter(Boolean);
+    let userPersonas = await Persona.find({ userId: user._id });
     if (!userPersonas.length) {
-      userPersonas = await Persona.find({ userId: user._id });
-    }
-
-    let defaultPersona = userPersonas.find(p => p.username === cleanInput) || userPersonas.find(p => p.isDefault) || userPersonas[0];
-
-    if (!defaultPersona) {
-      const fallbackHandle = (user.email ? user.email.split('@')[0] : 'user') + '_' + Math.random().toString(36).substring(2, 6);
-      defaultPersona = await Persona.create({
+      const fallbackHandle = (user.email ? user.email.split(/[@\s]/)[0] : 'user') + '_' + Math.random().toString(36).substring(2, 6);
+      const newP = await Persona.create({
         userId: user._id,
-        username: fallbackHandle,
+        username: fallbackHandle.toLowerCase().replace(/[^a-z0-9_]/g, ''),
         displayName: user.masterName || 'User',
         type: 'personal',
         isDefault: true
       });
-      await User.findByIdAndUpdate(user._id, { $push: { personas: defaultPersona._id } });
-      userPersonas = [defaultPersona];
+      await User.findByIdAndUpdate(user._id, { $addToSet: { personas: newP._id } });
+      userPersonas = [newP];
     }
+
+    let defaultPersona = userPersonas.find(p => p.username === cleanInput) || userPersonas.find(p => p.isDefault) || userPersonas[0];
 
     const token = jwt.sign(
       { userId: user._id, personaId: defaultPersona._id },
@@ -208,9 +204,17 @@ export const demoLogin = async (req, res) => {
       }
     }
 
-    let userPersonas = (user.personas || []).filter(Boolean);
+    let userPersonas = await Persona.find({ userId: user._id });
     if (!userPersonas.length) {
-      userPersonas = await Persona.find({ userId: user._id });
+      const demoHandle = 'demo_' + Math.random().toString(36).substring(2, 6);
+      const newP = await Persona.create({
+        userId: user._id,
+        username: demoHandle,
+        displayName: 'Demo Guest',
+        type: 'personal',
+        isDefault: true
+      });
+      userPersonas = [newP];
     }
 
     const defaultPersona = userPersonas.find(p => p.isDefault) || userPersonas[0];

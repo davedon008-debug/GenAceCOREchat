@@ -125,6 +125,24 @@ export default function ChatPage() {
   useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
   useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
 
+  // ICE servers (STUN + TURN relay) fetched from backend so calls work across different networks
+  const iceServersRef = useRef(null);
+  const loadIceServers = async () => {
+    if (iceServersRef.current) return iceServersRef.current;
+    try {
+      const res = await api.get('/ice-servers');
+      if (res?.data?.iceServers?.length) {
+        iceServersRef.current = res.data.iceServers;
+        const hasTurn = res.data.iceServers.some(s => [].concat(s.urls).some(u => String(u).startsWith('turn')));
+        if (!hasTurn) console.warn('[WebRTC] No TURN server configured on backend - cross-network calls may fail.');
+      }
+    } catch (e) {
+      console.warn('[WebRTC] Failed to load ICE servers:', e?.message);
+    }
+    return iceServersRef.current || [{ urls: 'stun:stun.l.google.com:19302' }];
+  };
+  useEffect(() => { if (token) loadIceServers(); }, [token]);
+
   const cleanupCall = () => {
     stopAllSFX();
     pendingCandidatesRef.current = [];
@@ -194,39 +212,25 @@ export default function ChatPage() {
     if (peerConnectionRef.current) return peerConnectionRef.current;
 
     const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun.services.mozilla.com' },
-        { urls: 'stun:openrelay.metered.ca:80' },
-        {
-          urls: 'turn:openrelay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        }
-      ],
-      iceCandidatePoolSize: 10
+      iceServers: iceServersRef.current || [{ urls: 'stun:stun.l.google.com:19302' }],
+      iceCandidatePoolSize: 4
     });
 
-    pc.oniceconnectionstatechange = () => {
+    pc.oniceconnectionstatechange = async () => {
       console.log('[WebRTC] ICE Connection State:', pc.iceConnectionState);
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         setIsCallConnected(true);
       } else if (pc.iceConnectionState === 'failed') {
-        console.warn('[WebRTC] ICE Connection failed. Restarting ICE candidate search...');
-        if (typeof pc.restartIce === 'function') {
-          pc.restartIce();
+        console.warn('[WebRTC] ICE failed. Performing ICE restart...');
+        // Only the caller renegotiates, to avoid offer glare
+        if (activeCallRef.current?.isCaller && pc.signalingState === 'stable') {
+          try {
+            const offer = await pc.createOffer({ iceRestart: true });
+            await pc.setLocalDescription(offer);
+            socket?.emit('call:signal', { targetPersonaId, callId, signal: offer });
+          } catch (e) {
+            console.warn('[WebRTC] ICE restart failed:', e);
+          }
         }
       }
     };
@@ -399,6 +403,7 @@ export default function ChatPage() {
     const targetPersonaId = String(peer._id || peer.id || peer);
 
     try {
+      await loadIceServers();
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -446,6 +451,7 @@ export default function ChatPage() {
     const { callId, callerPersona, isVideo, roomId } = incomingCall;
 
     try {
+      await loadIceServers();
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -2204,7 +2210,7 @@ export default function ChatPage() {
         isOpen={showSecretLoversModal}
         onClose={() => setShowSecretLoversModal(false)}
         conversationId={activeId}
-        partnerPersona={currentTargetParticipant}
+        partnerPersona={activeType === 'conversation' ? (activeObject?.participants || []).find(p => String(p._id || p.id || p) !== String(activePersona?._id)) : null}
         activePersona={activePersona}
         activeGameId={activeSecretLoversGameId}
         socket={socket}

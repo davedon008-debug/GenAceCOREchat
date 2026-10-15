@@ -19,6 +19,7 @@ import aiRoutes from './routes/ai.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import secretLoversRoutes from './routes/secretLovers.routes.js';
+import iceRoutes from './routes/ice.routes.js';
 
 // Enforce JWT secret verification
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.includes('super_secure')) {
@@ -116,6 +117,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/games/secret-lovers', secretLoversRoutes);
+app.use('/api/ice-servers', iceRoutes);
 
 app.get(['/', '/api'], (req, res) => {
   res.json({

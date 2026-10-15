@@ -4,9 +4,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Heart, X, Plus, Trash2, Edit3, Check, Eye, Play, Sparkles,
-  Flame, Lock, Shield, ArrowRight, RefreshCw, Trophy, Clock, ChevronRight, Zap
+  Flame, Lock, Shield, ArrowRight, RefreshCw, Trophy, Clock, ChevronRight, Zap,
+  Mic, Camera, Square, Image as ImageIcon, Volume2
 } from 'lucide-react';
-import api, { getMediaUrl, DEFAULT_AVATAR } from '../../lib/api';
+import api, { getMediaUrl, DEFAULT_AVATAR, isImageIcon, isAudioMedia } from '../../lib/api';
 import {
   playTileFlipSFX,
   playSecretRevealSFX,
@@ -35,6 +36,31 @@ const PRESET_INSPIRATIONS = [
   { category: 'Questions', text: 'What is one habit of mine that you find adorable?' }
 ];
 
+const getIDStr = (val) => {
+  if (!val) return '';
+  if (typeof val === 'string') return val.trim();
+  if (typeof val === 'number') return String(val);
+
+  let target = val;
+  if (typeof target === 'object' && target !== null) {
+    if (target._id && target._id !== target) {
+      target = target._id;
+    } else if (target.id && target.id !== target) {
+      target = target.id;
+    } else if (target.personaId && target.personaId !== target) {
+      target = target.personaId;
+    }
+  }
+
+  if (typeof target === 'string') return target.trim();
+  if (typeof target === 'number') return String(target);
+  if (target && typeof target.toString === 'function') {
+    const str = target.toString();
+    if (str && str !== '[object Object]') return str;
+  }
+  return '';
+};
+
 export default function SecretLoversModal({
   isOpen,
   onClose,
@@ -49,9 +75,10 @@ export default function SecretLoversModal({
   const [game, setGame] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [isCreatingNewGame, setIsCreatingNewGame] = useState(false);
 
-  // Question Creator State
   const [questionCount, setQuestionCount] = useState(10);
+  const [creatorSkipOwnQuestions, setCreatorSkipOwnQuestions] = useState(true);
   const [customQuestions, setCustomQuestions] = useState([
     { text: 'What was your first impression of me?', category: 'Romantic' },
     { text: 'Tell me something you secretly appreciate about me.', category: 'Romantic' },
@@ -64,33 +91,65 @@ export default function SecretLoversModal({
   // Active Game State
   const [selectedTile, setSelectedTile] = useState(null);
   const [isFlipping, setIsFlipping] = useState(false);
+  const [userAnswerInput, setUserAnswerInput] = useState('');
+  const [answerMediaUrl, setAnswerMediaUrl] = useState('');
+  const [answerMediaType, setAnswerMediaType] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [inspectedTile, setInspectedTile] = useState(null);
+
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
+  const imageInputRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   // Fetch or refresh game state when activeGameId changes or modal opens
-  const fetchGameState = async (id) => {
-    if (!id) return;
+  const fetchGameState = async (id = null) => {
+    if (isCreatingNewGame && !id) return;
     try {
       setLoading(true);
-      const res = await api.get(`/games/secret-lovers/${id}`);
+      setErrorMsg(null);
+      const url = id
+        ? `/games/secret-lovers/${id}`
+        : conversationId
+        ? `/games/secret-lovers/conversation/${conversationId}`
+        : null;
+
+      if (!url) {
+        setCurrentStep('creator');
+        setGame(null);
+        return;
+      }
+
+      const res = await api.get(url);
       if (res.data?.success && res.data?.game) {
         const fetchedGame = res.data.game;
         setGame(fetchedGame);
 
         if (fetchedGame.status === 'invited') {
-          const isCreator = String(fetchedGame.creatorPersonaId?._id || fetchedGame.creatorPersonaId) === String(activePersona?._id);
-          setCurrentStep(isCreator ? 'waiting' : 'board');
+          const isCreatorCheck = getIDStr(fetchedGame.creatorPersonaId) === getIDStr(activePersona);
+          if (isCreatorCheck) {
+            setCurrentStep('waiting');
+          } else {
+            // Invited partner automatically accepts invitation on join so game becomes active!
+            await handleAcceptInvite(fetchedGame._id, fetchedGame);
+          }
         } else if (fetchedGame.status === 'active') {
           setCurrentStep('board');
         } else if (fetchedGame.status === 'completed') {
           setCurrentStep('completed');
         }
+      } else {
+        setCurrentStep('creator');
+        setGame(null);
       }
     } catch (err) {
       console.error('Error fetching game state:', err);
-      setErrorMsg('Failed to load game session.');
     } finally {
       setLoading(false);
     }
@@ -99,13 +158,13 @@ export default function SecretLoversModal({
   useEffect(() => {
     if (isOpen) {
       if (activeGameId) {
+        setIsCreatingNewGame(false);
         fetchGameState(activeGameId);
-      } else {
-        setCurrentStep('creator');
-        setGame(null);
+      } else if (!isCreatingNewGame) {
+        fetchGameState(null);
       }
     }
-  }, [isOpen, activeGameId]);
+  }, [isOpen, activeGameId, conversationId]);
 
   // Socket listener for real-time game updates
   useEffect(() => {
@@ -198,7 +257,10 @@ export default function SecretLoversModal({
 
   // Submit & Create Game
   const handleStartGameSession = async () => {
-    if (!conversationId || !partnerPersona?._id) {
+    const targetPartner = partnerPersona || (game ? (getIDStr(game.creatorPersonaId) === getIDStr(activePersona) ? game.partnerPersonaId : game.creatorPersonaId) : null);
+    const targetPartnerId = getIDStr(targetPartner);
+
+    if (!conversationId || !targetPartnerId) {
       setErrorMsg('Missing conversation or partner info.');
       return;
     }
@@ -215,11 +277,13 @@ export default function SecretLoversModal({
 
       const res = await api.post('/games/secret-lovers/create', {
         conversationId,
-        partnerPersonaId: partnerPersona._id,
-        questions: validQuestions
+        partnerPersonaId: targetPartnerId,
+        questions: validQuestions,
+        creatorSkipOwnQuestions
       });
 
       if (res.data?.success && res.data?.game) {
+        setIsCreatingNewGame(false);
         setGame(res.data.game);
         setCurrentStep('waiting');
       }
@@ -232,36 +296,55 @@ export default function SecretLoversModal({
   };
 
   // Accept Game Invitation
-  const handleAcceptInvite = async () => {
-    if (!game?._id) return;
+  const handleAcceptInvite = async (gId = null, gameData = null) => {
+    const targetId = gId || game?._id;
+    const currentGameData = gameData || game;
+    const isCreatorCheck = currentGameData ? getIDStr(currentGameData.creatorPersonaId) === getIDStr(activePersona) : false;
+    if (!targetId || isCreatorCheck) return null;
     try {
       setLoading(true);
-      const res = await api.post(`/games/secret-lovers/${game._id}/accept`);
+      const res = await api.post(`/games/secret-lovers/${targetId}/accept`);
       if (res.data?.success && res.data?.game) {
         setGame(res.data.game);
         setCurrentStep('board');
+        return res.data.game;
       }
     } catch (err) {
       console.error('Error accepting invitation:', err);
-      setErrorMsg('Failed to accept game invitation.');
+      if (!isCreatorCheck) {
+        setErrorMsg('Failed to accept game invitation.');
+      }
     } finally {
       setLoading(false);
     }
+    return null;
   };
 
   // Select Number Tile on Turn
   const handleSelectTile = async (tileNum) => {
     if (!game?._id) return;
-    const isMyTurn = String(game.currentTurnPersonaId) === String(activePersona?._id);
-    if (!isMyTurn || game.status !== 'active') return;
+    let currentGame = game;
+    const isCreatorCheck = getIDStr(currentGame.creatorPersonaId) === getIDStr(activePersona);
 
-    if (game.selectedNumbers.includes(tileNum)) return;
+    if (currentGame.status === 'invited') {
+      if (isCreatorCheck) {
+        setErrorMsg(`Waiting for ${partnerName} to accept the invitation before tiles can be chosen.`);
+        return;
+      }
+      const acceptedGame = await handleAcceptInvite(currentGame._id);
+      if (acceptedGame) currentGame = acceptedGame;
+    }
+
+    const isMyTurnCheck = getIDStr(currentGame.currentTurnPersonaId) === getIDStr(activePersona);
+    if (!isMyTurnCheck || currentGame.status !== 'active') return;
+
+    if ((currentGame.selectedNumbers || []).includes(tileNum)) return;
 
     playTileFlipSFX();
     setIsFlipping(true);
 
     try {
-      const res = await api.post(`/games/secret-lovers/${game._id}/select-number`, { number: tileNum });
+      const res = await api.post(`/games/secret-lovers/${currentGame._id}/select-number`, { number: tileNum });
       if (res.data?.success && res.data?.game) {
         setGame(res.data.game);
         playSecretRevealSFX();
@@ -274,18 +357,107 @@ export default function SecretLoversModal({
     }
   };
 
+  // Handle Image Answer Upload
+  const handleImageAnswerUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploadingMedia(true);
+      setErrorMsg(null);
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post('/upload', formData);
+      if (res.data?.success && (res.data?.fileUrl || res.data?.url)) {
+        setAnswerMediaUrl(res.data.fileUrl || res.data.url);
+        setAnswerMediaType('image');
+      }
+    } catch (err) {
+      console.error('Image upload error:', err);
+      setErrorMsg('Failed to upload image response.');
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  // Handle Voice Note Recording
+  const startVoiceRecording = async () => {
+    try {
+      setErrorMsg(null);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const base64data = reader.result;
+          try {
+            setUploadingMedia(true);
+            const res = await api.post('/upload', { fileData: base64data, fileName: 'voice_answer.webm' });
+            if (res.data?.success && (res.data?.fileUrl || res.data?.url)) {
+              setAnswerMediaUrl(res.data.fileUrl || res.data.url);
+              setAnswerMediaType('voice');
+            } else {
+              setAnswerMediaUrl(base64data);
+              setAnswerMediaType('voice');
+            }
+          } catch {
+            setAnswerMediaUrl(base64data);
+            setAnswerMediaType('voice');
+          } finally {
+            setUploadingMedia(false);
+          }
+        };
+        stream.getTracks().forEach(t => t.stop());
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Microphone error:', err);
+      setErrorMsg('Microphone access denied. Please allow mic permissions.');
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    }
+  };
+
   // Complete or Skip Turn
   const handleActionTurn = async (action) => {
     if (!game?._id) return;
-    const isMyTurn = String(game.currentTurnPersonaId) === String(activePersona?._id);
-    if (!isMyTurn) return;
+    const isMyTurnCheck = getIDStr(game.currentTurnPersonaId) === getIDStr(activePersona);
+    if (!isMyTurnCheck) return;
 
     try {
       setLoading(true);
       if (action === 'done') playCompletedSFX();
-      const res = await api.post(`/games/secret-lovers/${game._id}/action-turn`, { action });
+      const res = await api.post(`/games/secret-lovers/${game._id}/action-turn`, {
+        action,
+        answerText: userAnswerInput,
+        answerMediaUrl,
+        answerMediaType
+      });
       if (res.data?.success && res.data?.game) {
         setGame(res.data.game);
+        setUserAnswerInput('');
+        setAnswerMediaUrl('');
+        setAnswerMediaType('');
       }
     } catch (err) {
       console.error('Error completing turn action:', err);
@@ -297,9 +469,15 @@ export default function SecretLoversModal({
 
   if (!isOpen || !mounted) return null;
 
-  const isMyTurn = game ? String(game.currentTurnPersonaId) === String(activePersona?._id) : true;
-  const isCreator = game ? String(game.creatorPersonaId?._id || game.creatorPersonaId) === String(activePersona?._id) : true;
-  const partnerName = partnerPersona?.displayName || partnerPersona?.username || 'Partner';
+  const resolvedPartner = partnerPersona || (
+    game
+      ? (getIDStr(game.creatorPersonaId) === getIDStr(activePersona) ? game.partnerPersonaId : game.creatorPersonaId)
+      : null
+  );
+  const isMyTurn = game ? getIDStr(game.currentTurnPersonaId) === getIDStr(activePersona) : true;
+  const isCreator = game ? getIDStr(game.creatorPersonaId) === getIDStr(activePersona) : true;
+  const partnerName = resolvedPartner?.displayName || resolvedPartner?.username || 'Partner';
+  const partnerHandle = resolvedPartner?.username ? `@${resolvedPartner.username}` : partnerName;
   const revealedTile = game?.currentRevealedTile;
 
   const modalContent = (
@@ -326,17 +504,34 @@ export default function SecretLoversModal({
                 Secret Lovers <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono">Couples Game</span>
               </h2>
               <p className="text-[11px] text-rose-300/80 font-medium">
-                {partnerName ? `Playing with @${partnerPersona?.username || partnerName}` : 'Private Couples Game'}
+                {partnerName ? `Playing with ${partnerHandle}` : 'Private Couples Game'}
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-2xl bg-white/5 hover:bg-rose-500/20 text-gray-300 hover:text-white border border-white/10 transition"
-            title="Close Game"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {currentStep !== 'creator' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreatingNewGame(true);
+                  setGame(null);
+                  setCurrentStep('creator');
+                  setErrorMsg(null);
+                }}
+                className="px-2.5 py-1 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs font-bold border border-rose-500/40 transition flex items-center gap-1"
+                title="Create a new Secret Lovers game"
+              >
+                <Plus className="w-3.5 h-3.5 text-rose-400" /> New Game
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 rounded-2xl bg-white/5 hover:bg-rose-500/20 text-gray-300 hover:text-white border border-white/10 transition"
+              title="Close Game"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Error Alert Banner */}
@@ -368,6 +563,27 @@ export default function SecretLoversModal({
               <p className="text-xs text-rose-200/80 leading-relaxed">
                 Type the secret questions or challenges that will be hidden behind the mystery tiles. Your partner won't see them until they pick a tile!
               </p>
+            </div>
+
+            {/* Question Creator Setting Toggle */}
+            <div className="p-3.5 rounded-2xl bg-rose-950/40 border border-rose-500/30 flex items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  🛡️ Creator Rule: Skip Own Questions
+                </span>
+                <p className="text-[11px] text-rose-200/70 leading-normal">
+                  If enabled, you don't have to answer questions you created (Pass to partner or skip).
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={creatorSkipOwnQuestions}
+                  onChange={(e) => setCreatorSkipOwnQuestions(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-white/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-500"></div>
+              </label>
             </div>
 
             {/* Question Count Selector Chips */}
@@ -489,18 +705,8 @@ export default function SecretLoversModal({
             <div className="space-y-2 max-w-sm">
               <h3 className="text-lg font-extrabold text-white">Invitation Sent!</h3>
               <p className="text-xs text-rose-200/80 leading-relaxed">
-                Waiting for <span className="text-white font-bold">{partnerName}</span> to accept your Secret Lovers invitation in the chat...
+                Waiting for <span className="text-white font-bold">{partnerName}</span> to open the game in chat... As soon as {partnerName} opens it, you can spectate live!
               </p>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setCurrentStep('board')}
-                className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition"
-              >
-                Open Board Anyway
-              </button>
             </div>
           </div>
         )}
@@ -524,7 +730,7 @@ export default function SecretLoversModal({
                 </div>
                 <div>
                   <p className="text-xs font-black text-white flex items-center gap-1.5">
-                    {isMyTurn ? "❤️ Your Turn! Pick a mystery tile" : `⏳ Waiting for ${partnerName}'s turn...`}
+                    {isMyTurn ? "❤️ Your Turn! Pick & answer a mystery secret tile" : `👀 Watching ${partnerName}'s turn (Live Spectator Mode)`}
                   </p>
                   <p className="text-[11px] text-rose-300">
                     {game.completedNumbers?.length || 0} completed • {game.questions?.length - (game.selectedNumbers?.length || 0)} tiles remaining
@@ -534,7 +740,7 @@ export default function SecretLoversModal({
 
               {!isMyTurn && (
                 <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-mono font-bold animate-pulse">
-                  Partner Thinking...
+                  Spectating...
                 </span>
               )}
             </div>
@@ -559,27 +765,187 @@ export default function SecretLoversModal({
                 </div>
 
                 {isMyTurn ? (
-                  <div className="flex items-center gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => handleActionTurn('skip')}
-                      disabled={loading}
-                      className="flex-1 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition border border-white/20"
-                    >
-                      Skip Secret
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleActionTurn('done')}
-                      disabled={loading}
-                      className="flex-[2] py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 transition flex items-center justify-center gap-1.5"
-                    >
-                      <Check className="w-4 h-4 stroke-[3]" /> Challenge Completed!
-                    </button>
+                  <div className="space-y-3 pt-2">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-rose-300 block">Your Answer / Secret Response (Optional Text, Photo or Voice Note):</label>
+                      <textarea
+                        rows={2}
+                        value={userAnswerInput}
+                        onChange={(e) => setUserAnswerInput(e.target.value)}
+                        placeholder="Type your answer or response here..."
+                        className="w-full bg-[#1b0813] border border-rose-500/30 rounded-xl p-2.5 text-xs text-white placeholder-rose-300/40 focus:outline-none focus:border-rose-500 transition resize-none"
+                      />
+                    </div>
+
+                    {/* Media Attachments Bar (Photo or Voice Note) */}
+                    <div className="space-y-2">
+                      <input
+                        type="file"
+                        ref={imageInputRef}
+                        accept="image/*"
+                        onChange={handleImageAnswerUpload}
+                        className="hidden"
+                      />
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => imageInputRef.current?.click()}
+                          disabled={uploadingMedia || isRecording}
+                          className="flex-1 py-2 px-3 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/30 text-rose-200 text-xs font-bold transition flex items-center justify-center gap-1.5"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5 text-rose-400" />
+                          <span>{uploadingMedia ? 'Uploading...' : 'Attach Photo'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                          disabled={uploadingMedia}
+                          className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                            isRecording
+                              ? 'bg-rose-600 text-white border-rose-400 animate-pulse'
+                              : 'bg-rose-950/60 hover:bg-rose-900/80 border-rose-500/30 text-rose-200'
+                          }`}
+                        >
+                          {isRecording ? (
+                            <>
+                              <Square className="w-3.5 h-3.5 fill-white" />
+                              <span>Stop ({recordingTime}s)</span>
+                            </>
+                          ) : (
+                            <>
+                              <Mic className="w-3.5 h-3.5 text-rose-400" />
+                              <span>Record Voice</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Display attached image or voice note preview */}
+                      {answerMediaUrl && (
+                        <div className="p-2.5 rounded-xl bg-black/50 border border-rose-500/40 relative flex items-center justify-between gap-2">
+                          {isAudioMedia(answerMediaUrl, answerMediaType) ? (
+                            <div className="flex-1">
+                              <span className="text-[11px] font-bold text-rose-300 block mb-1">🎤 Voice Note Attached:</span>
+                              <audio controls src={getMediaUrl(answerMediaUrl)} className="w-full h-8" />
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <img
+                                src={getMediaUrl(answerMediaUrl)}
+                                alt="Answer photo"
+                                className="w-14 h-14 object-cover rounded-lg border border-rose-400/50"
+                              />
+                              <span className="text-xs font-semibold text-rose-200 truncate">Photo Attached</span>
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAnswerMediaUrl('');
+                              setAnswerMediaType('');
+                            }}
+                            className="p-1 rounded-lg bg-white/10 hover:bg-rose-500/30 text-rose-300 hover:text-white transition"
+                            title="Remove attachment"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleActionTurn('skip')}
+                        disabled={loading}
+                        className="flex-1 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition border border-white/20"
+                      >
+                        Skip Secret
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleActionTurn('done')}
+                        disabled={loading || uploadingMedia}
+                        className="flex-[2] py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 transition flex items-center justify-center gap-1.5"
+                      >
+                        <Check className="w-4 h-4 stroke-[3]" /> Submit Answer & Complete
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="p-2 text-center rounded-xl bg-black/40 text-xs text-rose-200 font-medium">
-                    Waiting for {partnerName} to answer...
+                  <div className="p-4 rounded-2xl bg-black/50 border border-rose-500/30 text-center space-y-2">
+                    <div className="flex items-center justify-center gap-1.5 text-xs text-rose-300 font-bold">
+                      <Eye className="w-4 h-4 text-rose-400 animate-pulse" />
+                      <span>Live Spectator Mode: Waiting for {partnerName}'s answer...</span>
+                    </div>
+                    {revealedTile.answerText && (
+                      <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-100 italic">
+                        "{revealedTile.answerText}"
+                      </div>
+                    )}
+                    {revealedTile.answerMediaUrl && (
+                      <div className="pt-2">
+                        {isAudioMedia(revealedTile.answerMediaUrl, revealedTile.answerMediaType) ? (
+                          <audio controls src={getMediaUrl(revealedTile.answerMediaUrl)} className="w-full h-10 rounded-lg mx-auto" />
+                        ) : (
+                          <img
+                            src={getMediaUrl(revealedTile.answerMediaUrl)}
+                            alt="Answer photo"
+                            className="max-h-48 mx-auto rounded-xl border border-rose-500/40 object-cover shadow-lg"
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Inspected Tile Answer Viewer Card */}
+            {inspectedTile && (
+              <div className="p-4 rounded-2xl bg-gradient-to-b from-purple-950/90 to-rose-950/90 border border-purple-500/50 text-white space-y-2.5 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between border-b border-purple-500/30 pb-2">
+                  <span className="text-xs font-black text-purple-300 font-mono">
+                    🔐 SECRET #{inspectedTile.number} ({inspectedTile.category || 'Romantic'})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setInspectedTile(null)}
+                    className="text-gray-400 hover:text-white text-xs font-bold px-2 py-0.5 rounded-lg bg-white/10"
+                  >
+                    Close
+                  </button>
+                </div>
+                <p className="text-xs font-bold text-white leading-relaxed">
+                  "{inspectedTile.text}"
+                </p>
+                {inspectedTile.answerText && (
+                  <div className="p-3 rounded-xl bg-black/40 border border-emerald-500/30 text-xs text-emerald-300 font-medium">
+                    💬 <span className="font-bold text-gray-200">Answer:</span> "{inspectedTile.answerText}"
+                  </div>
+                )}
+                {inspectedTile.answerMediaUrl && (
+                  <div className="p-3 rounded-xl bg-black/40 border border-emerald-500/30 space-y-1.5">
+                    <span className="text-[11px] font-bold text-emerald-300 block">
+                      {isAudioMedia(inspectedTile.answerMediaUrl, inspectedTile.answerMediaType) ? '🎤 Attached Voice Note:' : '📷 Attached Photo:'}
+                    </span>
+                    {isAudioMedia(inspectedTile.answerMediaUrl, inspectedTile.answerMediaType) ? (
+                      <audio controls src={getMediaUrl(inspectedTile.answerMediaUrl)} className="w-full h-10" />
+                    ) : (
+                      <img
+                        src={getMediaUrl(inspectedTile.answerMediaUrl)}
+                        alt="Submitted Answer"
+                        className="max-h-52 max-w-full rounded-xl object-cover border border-emerald-500/40 shadow-md"
+                      />
+                    )}
+                  </div>
+                )}
+                {!inspectedTile.answerText && !inspectedTile.answerMediaUrl && (
+                  <div className="p-2.5 rounded-xl bg-black/40 text-[11px] text-gray-400 italic">
+                    Completed challenge without written response or media.
                   </div>
                 )}
               </div>
@@ -588,7 +954,7 @@ export default function SecretLoversModal({
             {/* Dynamic Numbered Tiles Grid */}
             <div className="space-y-2">
               <h4 className="text-xs font-extrabold uppercase tracking-wider text-rose-300 font-mono px-1">
-                Mystery Secret Board ({game.questions?.length || 0} Tiles)
+                Mystery Secret Board ({game.questions?.length || 0} Tiles - Click completed to view answers)
               </h4>
 
               <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2.5">
@@ -602,15 +968,21 @@ export default function SecretLoversModal({
                     <button
                       key={tileNum}
                       type="button"
-                      disabled={!isMyTurn || isSelected}
-                      onClick={() => handleSelectTile(tileNum)}
+                      disabled={!isMyTurn && !isSelected}
+                      onClick={() => {
+                        if (isSelected) {
+                          setInspectedTile(q);
+                        } else if (isMyTurn) {
+                          handleSelectTile(tileNum);
+                        }
+                      }}
                       className={`aspect-square rounded-2xl flex flex-col items-center justify-center font-mono font-black text-base transition-all duration-200 relative group overflow-hidden ${
                         isSelected
                           ? isCompleted
-                            ? 'bg-emerald-950/60 border border-emerald-500/50 text-emerald-400'
+                            ? 'bg-emerald-950/60 border border-emerald-500/50 text-emerald-400 cursor-pointer hover:scale-105'
                             : isSkipped
-                            ? 'bg-amber-950/60 border border-amber-500/50 text-amber-400'
-                            : 'bg-purple-950/60 border border-purple-500/50 text-purple-300'
+                            ? 'bg-amber-950/60 border border-amber-500/50 text-amber-400 cursor-pointer hover:scale-105'
+                            : 'bg-purple-950/60 border border-purple-500/50 text-purple-300 cursor-pointer hover:scale-105'
                           : isMyTurn
                           ? 'bg-gradient-to-b from-rose-900/80 to-[#2c0819] border border-rose-500/40 text-white hover:scale-105 hover:border-rose-400 hover:shadow-xl hover:shadow-rose-600/30 active:scale-95'
                           : 'bg-[#180611] border border-rose-500/20 text-rose-300/50 opacity-60 cursor-not-allowed'

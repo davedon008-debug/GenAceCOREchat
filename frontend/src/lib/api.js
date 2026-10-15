@@ -35,14 +35,22 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      const msg = error.response.data?.message || '';
-      if (msg.includes('Account no longer exists') || msg.includes('terminated')) {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('donchat_token');
-          localStorage.removeItem('donchat_user');
-          localStorage.removeItem('donchat_persona');
-          localStorage.removeItem('donchat_active_id');
-          localStorage.removeItem('donchat_active_type');
+      const msg = (error.response.data?.message || '').toLowerCase();
+      const isAuthFail = 
+        msg.includes('token verification failed') ||
+        msg.includes('jwt expired') ||
+        msg.includes('account no longer exists') ||
+        msg.includes('terminated') ||
+        msg.includes('not authorized') ||
+        msg.includes('invalid token');
+
+      if (isAuthFail && typeof window !== 'undefined') {
+        localStorage.removeItem('donchat_token');
+        localStorage.removeItem('donchat_user');
+        localStorage.removeItem('donchat_persona');
+        localStorage.removeItem('donchat_active_id');
+        localStorage.removeItem('donchat_active_type');
+        if (!window.location.pathname.includes('/login')) {
           window.location.href = '/login';
         }
       }
@@ -148,17 +156,32 @@ export const getMediaUrl = (url, name = 'User') => {
   return `${serverBase}${clean.startsWith('/') ? '' : '/'}${clean}`;
 };
 
-export const isImageIcon = (icon) => {
+export const isAudioMedia = (url, mediaType = '') => {
+  if (mediaType === 'voice' || mediaType === 'audio') return true;
+  if (mediaType === 'image') return false;
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim().toLowerCase();
+  if (trimmed.startsWith('data:audio/')) return true;
+  return /\.(webm|mp3|wav|ogg|m4a|aac|amr|3gpp|opus)(\?.*)?$/i.test(trimmed);
+};
+
+export const isImageIcon = (icon, mediaType = '') => {
+  if (mediaType === 'voice' || mediaType === 'audio') return false;
+  if (mediaType === 'image') return true;
   if (!icon || typeof icon !== 'string') return false;
-  const trimmed = icon.trim();
-  return (
-    trimmed.startsWith('http://') ||
-    trimmed.startsWith('https://') ||
-    trimmed.startsWith('/uploads/') ||
-    trimmed.startsWith('uploads/') ||
-    trimmed.startsWith('data:image/') ||
-    /\.(png|jpe?g|gif|webp|svg|bmp)(\?.*)?$/i.test(trimmed)
-  );
+  const trimmed = icon.trim().toLowerCase();
+  if (trimmed.startsWith('data:image/')) return true;
+  if (trimmed.startsWith('data:audio/') || trimmed.startsWith('data:video/')) return false;
+  if (/\.(webm|mp3|wav|ogg|m4a|aac|amr|3gpp|opus|mp4|mov|avi|pdf|doc|docx|zip)(\?.*)?$/i.test(trimmed)) {
+    return false;
+  }
+  if (/\.(png|jpe?g|gif|webp|svg|bmp|heic|heif)(\?.*)?$/i.test(trimmed)) {
+    return true;
+  }
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/')) {
+    return true;
+  }
+  return false;
 };
 
 export const SpaceIcon = ({ icon, fallback = '⚡', className = 'w-full h-full object-cover' }) => {
