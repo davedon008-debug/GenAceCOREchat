@@ -304,6 +304,13 @@ export const initSocketServer = (httpServer) => {
     // ============================================================
     // REAL-TIME WebRTC CALL SIGNALING HANDLERS
     // ============================================================
+    // Route to a specific device socket when known, otherwise to all of the persona's devices.
+    // Without this, a user logged in on 2 devices/tabs answers the offer twice and the call breaks.
+    const callTarget = (targetPersonaId, targetSocketId) =>
+      targetSocketId && io.sockets.sockets.get(targetSocketId)
+        ? io.to(targetSocketId)
+        : io.to(`persona:${targetPersonaId}`);
+
     socket.on('call:initiate', ({ targetPersonaId, roomId, isVideo, callerPersona, callId }) => {
       if (!targetPersonaId) return;
       const targetRoom = `persona:${targetPersonaId}`;
@@ -311,36 +318,41 @@ export const initSocketServer = (httpServer) => {
       io.to(targetRoom).emit('call:incoming', {
         callId,
         callerPersona: callerPersona || { _id: socket.personaId, displayName: 'User' },
+        callerSocketId: socket.id,
         roomId,
         isVideo: !!isVideo,
         timestamp: Date.now()
       });
     });
 
-    socket.on('call:accept', ({ targetPersonaId, callId }) => {
+    socket.on('call:accept', ({ targetPersonaId, targetSocketId, callId }) => {
       if (!targetPersonaId) return;
       console.log(`[Call Signaling] Persona ${socket.personaId} accepted call ${callId} from ${targetPersonaId}`);
-      io.to(`persona:${targetPersonaId}`).emit('call:accepted', {
+      callTarget(targetPersonaId, targetSocketId).emit('call:accepted', {
         callId,
-        responderPersonaId: socket.personaId
+        responderPersonaId: socket.personaId,
+        responderSocketId: socket.id
       });
+      // Dismiss the ringing on the responder's other devices
+      socket.to(`persona:${socket.personaId}`).emit('call:answered-elsewhere', { callId });
     });
 
-    socket.on('call:reject', ({ targetPersonaId, callId, reason }) => {
+    socket.on('call:reject', ({ targetPersonaId, targetSocketId, callId, reason }) => {
       if (!targetPersonaId) return;
       console.log(`[Call Signaling] Persona ${socket.personaId} rejected call ${callId}`);
-      io.to(`persona:${targetPersonaId}`).emit('call:rejected', {
+      callTarget(targetPersonaId, targetSocketId).emit('call:rejected', {
         callId,
         reason: reason || 'declined',
         responderPersonaId: socket.personaId
       });
     });
 
-    socket.on('call:signal', ({ targetPersonaId, callId, signal }) => {
+    socket.on('call:signal', ({ targetPersonaId, targetSocketId, callId, signal }) => {
       if (!targetPersonaId || !signal) return;
-      io.to(`persona:${targetPersonaId}`).emit('call:signal', {
+      callTarget(targetPersonaId, targetSocketId).emit('call:signal', {
         callId,
         senderPersonaId: socket.personaId,
+        senderSocketId: socket.id,
         signal
       });
     });

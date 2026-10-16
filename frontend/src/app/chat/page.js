@@ -120,6 +120,7 @@ export default function ChatPage() {
   const incomingCallRef = useRef(incomingCall);
   const localStreamRef = useRef(localStream);
   const pendingCandidatesRef = useRef([]);
+  const peerSocketIdRef = useRef(null); // exact device of the other party
 
   useEffect(() => { activeCallRef.current = activeCall; }, [activeCall]);
   useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
@@ -146,6 +147,9 @@ export default function ChatPage() {
   const cleanupCall = () => {
     stopAllSFX();
     pendingCandidatesRef.current = [];
+    peerSocketIdRef.current = null;
+    activeCallRef.current = null;
+    incomingCallRef.current = null;
     if (peerConnectionRef.current) {
       try {
         peerConnectionRef.current.close();
@@ -227,7 +231,7 @@ export default function ChatPage() {
           try {
             const offer = await pc.createOffer({ iceRestart: true });
             await pc.setLocalDescription(offer);
-            socket?.emit('call:signal', { targetPersonaId, callId, signal: offer });
+            socket?.emit('call:signal', { targetPersonaId, targetSocketId: peerSocketIdRef.current, callId, signal: offer });
           } catch (e) {
             console.warn('[WebRTC] ICE restart failed:', e);
           }
@@ -240,6 +244,7 @@ export default function ChatPage() {
         const candJSON = typeof event.candidate.toJSON === 'function' ? event.candidate.toJSON() : event.candidate;
         socket.emit('call:signal', {
           targetPersonaId,
+          targetSocketId: peerSocketIdRef.current,
           callId,
           signal: { candidate: candJSON }
         });
@@ -282,6 +287,9 @@ export default function ChatPage() {
 
     const handleCallAccepted = async (data) => {
       console.log('[Call] Call accepted by peer:', data);
+      if (!activeCallRef.current || activeCallRef.current.callId !== data.callId) return;
+      if (data.responderSocketId) peerSocketIdRef.current = data.responderSocketId;
+      stopAllSFX();
       playCallConnected();
       setIsCallConnected(true);
 
@@ -301,6 +309,7 @@ export default function ChatPage() {
           await pc.setLocalDescription(offer);
           socket.emit('call:signal', {
             targetPersonaId: data.responderPersonaId,
+            targetSocketId: peerSocketIdRef.current,
             callId: data.callId,
             signal: offer
           });
@@ -318,11 +327,11 @@ export default function ChatPage() {
     };
 
     const handleCallSignal = async (data) => {
-      const { signal, senderPersonaId, callId } = data;
-      let pc = peerConnectionRef.current;
-      if (!pc && (activeCallRef.current || incomingCallRef.current)) {
-        pc = createPeerConnection(senderPersonaId, callId);
-      }
+      const { signal, senderPersonaId, callId, senderSocketId } = data;
+      // Only handle signals for the call we are actually in (accepted / placed)
+      if (!activeCallRef.current || activeCallRef.current.callId !== callId) return;
+      if (senderSocketId && !peerSocketIdRef.current) peerSocketIdRef.current = senderSocketId;
+      let pc = peerConnectionRef.current || createPeerConnection(senderPersonaId, callId);
       if (!pc) return;
 
       try {
@@ -342,6 +351,7 @@ export default function ChatPage() {
           await pc.setLocalDescription(answer);
           socket.emit('call:signal', {
             targetPersonaId: senderPersonaId,
+            targetSocketId: peerSocketIdRef.current,
             callId,
             signal: answer
           });
@@ -365,8 +375,18 @@ export default function ChatPage() {
       }
     };
 
+    const handleAnsweredElsewhere = (data) => {
+      if (incomingCallRef.current?.callId === data?.callId) {
+        stopAllSFX();
+        incomingCallRef.current = null;
+        setIncomingCall(null);
+      }
+    };
+
     const handleCallEnded = (data) => {
       console.log('[Call] Call ended by peer:', data);
+      const current = activeCallRef.current || incomingCallRef.current;
+      if (current && data?.callId && current.callId !== data.callId) return;
       playCallEnded();
       cleanupCall();
       showToast('Call ended', 'info');
@@ -377,6 +397,7 @@ export default function ChatPage() {
     socket.on('call:rejected', handleCallRejected);
     socket.on('call:signal', handleCallSignal);
     socket.on('call:ended', handleCallEnded);
+    socket.on('call:answered-elsewhere', handleAnsweredElsewhere);
 
     return () => {
       socket.off('call:incoming', handleIncomingCall);
@@ -384,6 +405,7 @@ export default function ChatPage() {
       socket.off('call:rejected', handleCallRejected);
       socket.off('call:signal', handleCallSignal);
       socket.off('call:ended', handleCallEnded);
+      socket.off('call:answered-elsewhere', handleAnsweredElsewhere);
     };
   }, [socket, activePersona]);
 
@@ -416,13 +438,16 @@ export default function ChatPage() {
       localStreamRef.current = stream;
 
       const callId = 'call_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-      setActiveCall({
+      const newCall = {
         callId,
         peerPersona: peer,
         isVideo,
         isCaller: true,
         roomId: activeId
-      });
+      };
+      activeCallRef.current = newCall; // set synchronously so socket handlers see it immediately
+      peerSocketIdRef.current = null;
+      setActiveCall(newCall);
 
       const pc = createPeerConnection(targetPersonaId, callId);
       if (pc) {
@@ -448,7 +473,7 @@ export default function ChatPage() {
 
   const handleAcceptCall = async () => {
     if (!incomingCall) return;
-    const { callId, callerPersona, isVideo, roomId } = incomingCall;
+    const { callId, callerPersona, isVideo, roomId, callerSocketId } = incomingCall;
 
     try {
       await loadIceServers();
@@ -463,26 +488,34 @@ export default function ChatPage() {
       setLocalStream(stream);
       localStreamRef.current = stream;
 
-      setActiveCall({
+      const newCall = {
         callId,
         peerPersona: callerPersona,
         isVideo,
         isCaller: false,
         roomId
-      });
+      };
+      // Set refs synchronously: the caller's offer can arrive before React re-renders
+      activeCallRef.current = newCall;
+      incomingCallRef.current = null;
+      peerSocketIdRef.current = callerSocketId || null;
+      setActiveCall(newCall);
       setIncomingCall(null);
+      stopAllSFX();
       setIsCallConnected(true);
       playCallConnected();
+
+      // Create PC with mic tracks BEFORE accepting, so the answer always carries our audio
+      const pc = createPeerConnection(String(callerPersona._id), callId);
+      addLocalTracksToPC(pc, stream);
 
       if (socket) {
         socket.emit('call:accept', {
           targetPersonaId: String(callerPersona._id),
+          targetSocketId: callerSocketId,
           callId
         });
       }
-
-      const pc = createPeerConnection(String(callerPersona._id), callId);
-      addLocalTracksToPC(pc, stream);
     } catch (err) {
       console.error('[Call] Error accepting call:', err);
       showToast('Could not access microphone/camera to accept call.', 'error');
@@ -494,6 +527,7 @@ export default function ChatPage() {
     if (incomingCall && socket) {
       socket.emit('call:reject', {
         targetPersonaId: String(incomingCall.callerPersona._id),
+        targetSocketId: incomingCall.callerSocketId,
         callId: incomingCall.callId,
         reason: 'declined'
       });

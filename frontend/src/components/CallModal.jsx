@@ -43,61 +43,41 @@ export default function CallModal({
         .catch(err => console.log('[Audio Resume Error]', err));
     }
     if (remoteVideoRef.current && isVideo) {
-      remoteVideoRef.current.muted = false;
-      remoteVideoRef.current.play()
-        .then(() => setAudioBlocked(false))
-        .catch(err => console.log('[Video Audio Resume Error]', err));
+      remoteVideoRef.current.play().catch(() => {});
     }
   };
 
-  // Attach remote media stream to dedicated audio or video element depending on call type
+  // Remote AUDIO always plays through the persistent <audio> element (survives minimize).
+  // Remote VIDEO element is muted and only renders picture.
   useEffect(() => {
-    if (remoteStream) {
-      console.log('[VOICE] Remote stream received in CallModal:', remoteStream);
-      console.log('[VOICE] Remote audio tracks:', remoteStream?.getAudioTracks());
+    if (!remoteStream) return;
+    console.log('[VOICE] Remote audio tracks:', remoteStream.getAudioTracks());
+    remoteStream.getAudioTracks().forEach(track => { track.enabled = true; });
 
-      remoteStream.getAudioTracks().forEach(track => {
-        track.enabled = true;
-      });
+    const audioEl = remoteAudioRef.current;
+    if (audioEl) {
+      if (audioEl.srcObject !== remoteStream) audioEl.srcObject = remoteStream;
+      audioEl.muted = false;
+      audioEl.volume = 1.0;
+      audioEl.play()
+        .then(() => setAudioBlocked(false))
+        .catch(err => {
+          console.log('[Audio Playback Deferred by Browser Autoplay Policy]', err);
+          setAudioBlocked(true);
+        });
+    }
 
+    const videoEl = remoteVideoRef.current;
+    if (videoEl) {
       if (isVideo) {
-        // Video Call: Video tag handles both video & audio playback
-        if (remoteVideoRef.current) {
-          if (remoteVideoRef.current.srcObject !== remoteStream) {
-            remoteVideoRef.current.srcObject = remoteStream;
-          }
-          remoteVideoRef.current.muted = false;
-          remoteVideoRef.current.play()
-            .then(() => setAudioBlocked(false))
-            .catch(err => {
-              console.log('[Video Playback Deferred by Browser]', err);
-              setAudioBlocked(true);
-            });
-        }
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = null;
-        }
+        if (videoEl.srcObject !== remoteStream) videoEl.srcObject = remoteStream;
+        videoEl.muted = true;
+        videoEl.play().catch(() => {});
       } else {
-        // Voice Call: Dedicated audio element handles voice playback exclusively
-        if (remoteAudioRef.current) {
-          if (remoteAudioRef.current.srcObject !== remoteStream) {
-            remoteAudioRef.current.srcObject = remoteStream;
-          }
-          remoteAudioRef.current.muted = false;
-          remoteAudioRef.current.volume = 1.0;
-          remoteAudioRef.current.play()
-            .then(() => setAudioBlocked(false))
-            .catch(err => {
-              console.log('[Audio Playback Deferred by Browser Autoplay Policy]', err);
-              setAudioBlocked(true);
-            });
-        }
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = null;
-        }
+        videoEl.srcObject = null;
       }
     }
-  }, [remoteStream, isVideo]);
+  }, [remoteStream, isVideo, isMinimized]);
 
   // Call timer counter
   useEffect(() => {
@@ -128,7 +108,8 @@ export default function CallModal({
   // Render Minimized Floating Call Bar
   if (isMinimized) {
     return (
-      <div className="fixed bottom-6 right-6 z-[100] bg-[#101625] border border-indigo-500/40 rounded-2xl p-3 shadow-2xl flex items-center gap-4 animate-bounce">
+      <div onClick={handleResumeAudio} className="fixed bottom-6 right-6 z-[100] bg-[#101625] border border-indigo-500/40 rounded-2xl p-3 shadow-2xl flex items-center gap-4 animate-bounce">
+        <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
         <div className="relative">
           <img
             src={peerAvatar}
@@ -215,6 +196,7 @@ export default function CallModal({
             ref={remoteVideoRef}
             autoPlay
             playsInline
+            muted
             style={
               isVideo
                 ? { width: '100%', height: '100%', objectFit: 'cover' }
