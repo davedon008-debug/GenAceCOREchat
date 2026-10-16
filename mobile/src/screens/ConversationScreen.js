@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   FlatList, Image, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Linking, AppState
@@ -155,6 +155,9 @@ export default function ConversationScreen({ route, navigation }) {
   const [replyingTo, setReplyingTo] = useState(null);
   const [privacyMode, setPrivacyMode] = useState('normal');
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
+  const [currentIsLocked, setCurrentIsLocked] = useState(!!isLocked);
+  const [passcodeUnlocked, setPasscodeUnlocked] = useState(!isLocked);
+  const [partnerPersona, setPartnerPersona] = useState(null);
 
   // Real-time WebRTC Calling State & Ref Tracking
   const [activeCall, setActiveCall] = useState(null);
@@ -170,6 +173,8 @@ export default function ConversationScreen({ route, navigation }) {
   const incomingCallRef = useRef(incomingCall);
   const localStreamRef = useRef(localStream);
   const pendingCandidatesRef = useRef([]);
+  const peerSocketIdRef = useRef(null); // exact device of the other party
+  const hasWarnedWebRTCRef = useRef(false);
 
   useEffect(() => { activeCallRef.current = activeCall; }, [activeCall]);
   useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
@@ -191,6 +196,9 @@ export default function ConversationScreen({ route, navigation }) {
   const cleanupCall = () => {
     stopAllSFX();
     pendingCandidatesRef.current = [];
+    peerSocketIdRef.current = null;
+    activeCallRef.current = null;
+    incomingCallRef.current = null;
     if (peerConnectionRef.current) {
       try { peerConnectionRef.current.close(); } catch (e) {}
       peerConnectionRef.current = null;
@@ -213,9 +221,11 @@ export default function ConversationScreen({ route, navigation }) {
     if (pc && pc.remoteDescription && pendingCandidatesRef.current.length > 0) {
       const candidates = [...pendingCandidatesRef.current];
       pendingCandidatesRef.current = [];
+      const RTCIceCandidateClass = global.RTCIceCandidate || window.RTCIceCandidate;
       for (const cand of candidates) {
         try {
-          await pc.addIceCandidate(cand);
+          const candObj = (RTCIceCandidateClass && cand && typeof cand === 'object' && !(cand instanceof RTCIceCandidateClass)) ? new RTCIceCandidateClass(cand) : cand;
+          await pc.addIceCandidate(candObj);
         } catch (e) {
           console.warn('[Mobile WebRTC] Pending ICE candidate error:', e);
         }
@@ -244,7 +254,6 @@ export default function ConversationScreen({ route, navigation }) {
 
     const RTCPeerConnectionClass = global.RTCPeerConnection || window.RTCPeerConnection;
     if (!RTCPeerConnectionClass) {
-      console.warn('[Mobile WebRTC] RTCPeerConnection unavailable in current runtime');
       return null;
     }
 
@@ -255,14 +264,24 @@ export default function ConversationScreen({ route, navigation }) {
 
     pc.oniceconnectionstatechange = async () => {
       console.log('[Mobile WebRTC] ICE Connection State:', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        setIsCallConnected(true);
+      }
       if (pc.iceConnectionState === 'failed' && activeCallRef.current?.isCaller && pc.signalingState === 'stable') {
         try {
           const offer = await pc.createOffer({ iceRestart: true });
           await pc.setLocalDescription(offer);
-          socket?.emit('call:signal', { targetPersonaId, callId, signal: offer });
+          socket?.emit('call:signal', { targetPersonaId, targetSocketId: peerSocketIdRef.current, callId, signal: offer });
         } catch (e) {
           console.warn('[Mobile WebRTC] ICE restart failed:', e);
         }
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log('[Mobile WebRTC] Connection State:', pc.connectionState);
+      if (pc.connectionState === 'connected') {
+        setIsCallConnected(true);
       }
     };
 
@@ -271,6 +290,7 @@ export default function ConversationScreen({ route, navigation }) {
         const candJSON = typeof event.candidate.toJSON === 'function' ? event.candidate.toJSON() : event.candidate;
         socket.emit('call:signal', {
           targetPersonaId,
+          targetSocketId: peerSocketIdRef.current,
           callId,
           signal: { candidate: candJSON }
         });
@@ -278,6 +298,7 @@ export default function ConversationScreen({ route, navigation }) {
     };
 
     pc.ontrack = (event) => {
+      setIsCallConnected(true);
       if (event.streams && event.streams[0]) {
         event.streams[0].getAudioTracks().forEach(t => { t.enabled = true; });
         setRemoteStream(event.streams[0]);
@@ -308,6 +329,9 @@ export default function ConversationScreen({ route, navigation }) {
     };
 
     const handleCallAccepted = async (data) => {
+      if (!activeCallRef.current || activeCallRef.current.callId !== data.callId) return;
+      if (data.responderSocketId) peerSocketIdRef.current = data.responderSocketId;
+      stopAllSFX();
       playCallConnected();
       setIsCallConnected(true);
 
@@ -323,6 +347,7 @@ export default function ConversationScreen({ route, navigation }) {
             await pc.setLocalDescription(offer);
             socket.emit('call:signal', {
               targetPersonaId: data.responderPersonaId,
+              targetSocketId: peerSocketIdRef.current,
               callId: data.callId,
               signal: offer
             });
@@ -340,16 +365,19 @@ export default function ConversationScreen({ route, navigation }) {
     };
 
     const handleCallSignal = async (data) => {
-      const { signal, senderPersonaId, callId } = data;
-      let pc = peerConnectionRef.current;
-      if (!pc && (activeCallRef.current || incomingCallRef.current)) {
-        pc = createPeerConnection(senderPersonaId, callId);
-      }
+      const { signal, senderPersonaId, callId, senderSocketId } = data;
+      if (!activeCallRef.current || activeCallRef.current.callId !== callId) return;
+      if (senderSocketId && !peerSocketIdRef.current) peerSocketIdRef.current = senderSocketId;
+      let pc = peerConnectionRef.current || createPeerConnection(senderPersonaId, callId);
       if (!pc) return;
 
       try {
+        const RTCSessionDescriptionClass = global.RTCSessionDescription || window.RTCSessionDescription;
+        const RTCIceCandidateClass = global.RTCIceCandidate || window.RTCIceCandidate;
+
         if (signal.type === 'offer') {
-          await pc.setRemoteDescription(signal);
+          const desc = (RTCSessionDescriptionClass && !(signal instanceof RTCSessionDescriptionClass)) ? new RTCSessionDescriptionClass(signal) : signal;
+          await pc.setRemoteDescription(desc);
           addLocalTracksToPC(pc, localStreamRef.current);
           await processPendingCandidates(pc);
 
@@ -360,17 +388,23 @@ export default function ConversationScreen({ route, navigation }) {
           await pc.setLocalDescription(answer);
           socket.emit('call:signal', {
             targetPersonaId: senderPersonaId,
+            targetSocketId: peerSocketIdRef.current,
             callId,
             signal: answer
           });
         } else if (signal.type === 'answer') {
-          await pc.setRemoteDescription(signal);
+          const desc = (RTCSessionDescriptionClass && !(signal instanceof RTCSessionDescriptionClass)) ? new RTCSessionDescriptionClass(signal) : signal;
+          await pc.setRemoteDescription(desc);
           await processPendingCandidates(pc);
+          setIsCallConnected(true);
         } else if (signal.candidate) {
           if (pc.remoteDescription && pc.remoteDescription.type) {
             try {
-              await pc.addIceCandidate(signal.candidate);
-            } catch (e) {}
+              const candObj = (RTCIceCandidateClass && signal.candidate && typeof signal.candidate === 'object' && !(signal.candidate instanceof RTCIceCandidateClass)) ? new RTCIceCandidateClass(signal.candidate) : signal.candidate;
+              await pc.addIceCandidate(candObj);
+            } catch (e) {
+              console.warn('[Mobile WebRTC] Direct ICE candidate error:', e);
+            }
           } else {
             pendingCandidatesRef.current.push(signal.candidate);
           }
@@ -380,7 +414,17 @@ export default function ConversationScreen({ route, navigation }) {
       }
     };
 
+    const handleAnsweredElsewhere = (data) => {
+      if (incomingCallRef.current?.callId === data?.callId) {
+        stopAllSFX();
+        incomingCallRef.current = null;
+        setIncomingCall(null);
+      }
+    };
+
     const handleCallEnded = (data) => {
+      const current = activeCallRef.current || incomingCallRef.current;
+      if (current && data?.callId && current.callId !== data.callId) return;
       playCallEnded();
       cleanupCall();
     };
@@ -390,6 +434,7 @@ export default function ConversationScreen({ route, navigation }) {
     socket.on('call:rejected', handleCallRejected);
     socket.on('call:signal', handleCallSignal);
     socket.on('call:ended', handleCallEnded);
+    socket.on('call:answered-elsewhere', handleAnsweredElsewhere);
 
     return () => {
       socket.off('call:incoming', handleIncomingCall);
@@ -397,6 +442,7 @@ export default function ConversationScreen({ route, navigation }) {
       socket.off('call:rejected', handleCallRejected);
       socket.off('call:signal', handleCallSignal);
       socket.off('call:ended', handleCallEnded);
+      socket.off('call:answered-elsewhere', handleAnsweredElsewhere);
     };
   }, [socket, activePersona]);
 
@@ -406,13 +452,23 @@ export default function ConversationScreen({ route, navigation }) {
       return;
     }
 
-    const partnerId = targetPartnerId || otherPersonaId;
+    const partnerId = otherPersonaId || partnerPersona?._id || route.params?.otherPersonaId;
     if (!partnerId) {
       Alert.alert('Notice', 'Recipient persona details unavailable.');
       return;
     }
 
     const targetPersonaId = String(partnerId);
+
+    const RTCPeerConnectionClass = global.RTCPeerConnection || window.RTCPeerConnection;
+    if (!RTCPeerConnectionClass) {
+      Alert.alert(
+        'Calling Unavailable in Expo Go',
+        'Direct WebRTC voice and video calls require native WebRTC drivers. To place calls, please use the Web version or an EAS native development build.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
 
     try {
       await loadIceServers();
@@ -429,13 +485,16 @@ export default function ConversationScreen({ route, navigation }) {
       localStreamRef.current = stream;
 
       const callId = 'call_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-      setActiveCall({
+      const newCall = {
         callId,
         peerPersona: { _id: targetPersonaId, displayName: title || 'User', avatarUrl: avatar },
         isVideo,
         isCaller: true,
         roomId: conversationId
-      });
+      };
+      activeCallRef.current = newCall;
+      peerSocketIdRef.current = null;
+      setActiveCall(newCall);
 
       playRingback();
 
@@ -454,9 +513,21 @@ export default function ConversationScreen({ route, navigation }) {
     }
   };
 
-  const handleAcceptCall = async () => {
-    if (!incomingCall) return;
-    const { callId, callerPersona, isVideo, roomId } = incomingCall;
+  const handleAcceptCall = async (callDataOverride = null) => {
+    const callToAccept = callDataOverride || incomingCall;
+    if (!callToAccept) return;
+    const { callId, callerPersona, isVideo, roomId, callerSocketId } = callToAccept;
+
+    const RTCPeerConnectionClass = global.RTCPeerConnection || window.RTCPeerConnection;
+    if (!RTCPeerConnectionClass) {
+      Alert.alert(
+        'Calling Unavailable in Expo Go',
+        'Direct WebRTC voice and video calls require native WebRTC drivers. Please use the Web version or an EAS native development build.',
+        [{ text: 'OK' }]
+      );
+      handleDeclineCall();
+      return;
+    }
 
     try {
       await loadIceServers();
@@ -472,26 +543,33 @@ export default function ConversationScreen({ route, navigation }) {
       setLocalStream(stream);
       localStreamRef.current = stream;
 
-      setActiveCall({
+      const newCall = {
         callId,
         peerPersona: callerPersona,
         isVideo,
         isCaller: false,
         roomId
-      });
+      };
+      activeCallRef.current = newCall;
+      incomingCallRef.current = null;
+      peerSocketIdRef.current = callerSocketId || null;
+      setActiveCall(newCall);
       setIncomingCall(null);
       setIsCallConnected(true);
+      stopAllSFX();
       playCallConnected();
+
+      // Create PC with mic tracks BEFORE accepting
+      const pc = createPeerConnection(String(callerPersona._id), callId);
+      if (pc) addLocalTracksToPC(pc, stream);
 
       if (socket) {
         socket.emit('call:accept', {
           targetPersonaId: String(callerPersona._id),
+          targetSocketId: callerSocketId,
           callId
         });
       }
-
-      const pc = createPeerConnection(String(callerPersona._id), callId);
-      if (pc) addLocalTracksToPC(pc, stream);
     } catch (err) {
       console.error('[Mobile Call] Accept error:', err);
       handleDeclineCall();
@@ -502,6 +580,7 @@ export default function ConversationScreen({ route, navigation }) {
     if (incomingCall && socket) {
       socket.emit('call:reject', {
         targetPersonaId: String(incomingCall.callerPersona._id),
+        targetSocketId: incomingCall.callerSocketId,
         callId: incomingCall.callId,
         reason: 'declined'
       });
@@ -515,12 +594,21 @@ export default function ConversationScreen({ route, navigation }) {
       const targetPersonaId = String(activeCall.peerPersona?._id || activeCall.peerPersona?.id || activeCall.peerPersona);
       socket.emit('call:end', {
         targetPersonaId,
+        targetSocketId: peerSocketIdRef.current,
         callId: activeCall.callId
       });
     }
     playCallEnded();
     cleanupCall();
   };
+
+  useEffect(() => {
+    if (route.params?.autoAcceptCall) {
+      const callData = route.params.autoAcceptCall;
+      navigation.setParams({ autoAcceptCall: null });
+      handleAcceptCall(callData);
+    }
+  }, [route.params?.autoAcceptCall]);
 
   const handleToggleMic = () => {
     if (localStreamRef.current) {
@@ -764,6 +852,15 @@ export default function ConversationScreen({ route, navigation }) {
         if (isMounted && res.data?.success) {
           const conv = res.data.conversation;
           if (conv) {
+            if (conv.participants && Array.isArray(conv.participants)) {
+              const other = conv.participants.find(p => {
+                const pId = typeof p === 'object' ? String(p._id || p.id) : String(p);
+                return pId !== String(activePersona?._id);
+              });
+              if (other && typeof other === 'object') {
+                setPartnerPersona(other);
+              }
+            }
             if (conv.privacyMode) {
               setPrivacyMode(conv.privacyMode);
             }
@@ -1283,7 +1380,7 @@ export default function ConversationScreen({ route, navigation }) {
     }
   };
 
-  const renderMessageItem = useCallback(({ item }) => {
+  const renderMessageItem = ({ item }) => {
     if (item.isBurned) {
       return (
         <View style={{ width: '100%', alignItems: 'center', marginVertical: 6 }}>
@@ -1468,7 +1565,7 @@ export default function ConversationScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
     );
-  }, [activePersona?._id, dynamicColors, isLight, spaceId, revealedBurnMsgs, handleOpenProfile, handleStartRevealBurn, handleForceBurnNowMobile, setActionModalMessage, setViewImageUrl]);
+  };
 
   if (!passcodeUnlocked) {
     return (

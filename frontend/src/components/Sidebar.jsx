@@ -421,6 +421,38 @@ export default function Sidebar({
                       const isLocked = lockedConversations.includes(String(c._id));
                       const isSelected = activeType === 'conversation' && String(activeId) === String(c._id);
 
+                      const lastMsg = typeof c.lastMessage === 'object' ? c.lastMessage : null;
+                      let lastMsgSnippet = partner?.username ? `@${partner.username}` : 'Direct Message';
+                      let msgTime = '';
+
+                      if (isLocked) {
+                        lastMsgSnippet = '🔒 Passcode locked';
+                      } else if (lastMsg) {
+                        const isMe = String(lastMsg.senderPersonaId?._id || lastMsg.senderPersonaId) === String(activePersona?._id);
+                        const prefix = isMe ? 'You: ' : '';
+                        if (lastMsg.privacyMode === 'burn') {
+                          lastMsgSnippet = `${prefix}🔥 Burn message`;
+                        } else if (lastMsg.contentType === 'voice') {
+                          lastMsgSnippet = `${prefix}🎙️ Voice note`;
+                        } else if (lastMsg.contentType === 'image') {
+                          lastMsgSnippet = `${prefix}📷 Photo`;
+                        } else if (lastMsg.contentType === 'video') {
+                          lastMsgSnippet = `${prefix}📹 Video`;
+                        } else if (lastMsg.contentType === 'file') {
+                          lastMsgSnippet = `${prefix}📎 Attachment`;
+                        } else if (lastMsg.content) {
+                          lastMsgSnippet = `${prefix}${lastMsg.content}`;
+                        }
+
+                        if (lastMsg.createdAt || c.updatedAt) {
+                          const d = new Date(lastMsg.createdAt || c.updatedAt);
+                          const now = new Date();
+                          msgTime = d.toDateString() === now.toDateString()
+                            ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase()
+                            : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                        }
+                      }
+
                       return (
                         <button
                           key={c._id}
@@ -431,7 +463,7 @@ export default function Sidebar({
                               : 'text-gray-300 hover:bg-white/5 hover:text-white border border-transparent'
                           }`}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
                             <div className="relative shrink-0">
                               <img 
                                 src={avatar} 
@@ -442,12 +474,19 @@ export default function Sidebar({
                               <span className={`w-2.5 h-2.5 rounded-full absolute -bottom-0.5 -right-0.5 border border-[#090d18] ${getStatusDotClass(partnerId)}`} />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center justify-between gap-1">
                                 <span className="truncate font-bold text-white text-xs">{name}</span>
-                                {isLocked && <Lock className="w-3 h-3 text-amber-400 shrink-0" />}
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {isLocked && <Lock className="w-3 h-3 text-amber-400 shrink-0" />}
+                                  {msgTime && (
+                                    <span suppressHydrationWarning className="text-[9px] text-gray-500 font-mono">
+                                      {msgTime}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                              <p className="text-[10px] text-gray-400 truncate">
-                                {partner?.username ? `@${partner.username}` : 'Direct Message'}
+                              <p className={`text-[10px] truncate ${c.unreadCount > 0 ? 'text-indigo-300 font-semibold' : 'text-gray-400'}`}>
+                                {lastMsgSnippet}
                               </p>
                             </div>
                           </div>

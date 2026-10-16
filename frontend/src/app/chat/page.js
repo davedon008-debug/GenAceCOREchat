@@ -240,6 +240,13 @@ export default function ChatPage() {
       }
     };
 
+    pc.onconnectionstatechange = () => {
+      console.log('[WebRTC] Connection State:', pc.connectionState);
+      if (pc.connectionState === 'connected') {
+        setIsCallConnected(true);
+      }
+    };
+
     pc.onicecandidate = (event) => {
       if (event.candidate && socket) {
         const candJSON = typeof event.candidate.toJSON === 'function' ? event.candidate.toJSON() : event.candidate;
@@ -254,6 +261,7 @@ export default function ChatPage() {
 
     pc.ontrack = (event) => {
       console.log('[VOICE DEBUG] ontrack fired:', event.track?.kind, event.track?.id);
+      setIsCallConnected(true);
       if (event.streams && event.streams[0]) {
         event.streams[0].getTracks().forEach(t => { t.enabled = true; });
         setRemoteStream(event.streams[0]);
@@ -291,6 +299,7 @@ export default function ChatPage() {
       if (data.responderSocketId) peerSocketIdRef.current = data.responderSocketId;
       stopAllSFX();
       playCallConnected();
+      setIsCallConnected(true);
 
       if (activeCallRef.current && activeCallRef.current.isCaller) {
         try {
@@ -357,6 +366,7 @@ export default function ChatPage() {
         } else if (signal.type === 'answer') {
           await pc.setRemoteDescription(new RTCSessionDescription(signal));
           await processPendingCandidates(pc);
+          setIsCallConnected(true);
         } else if (signal.candidate) {
           if (pc.remoteDescription && pc.remoteDescription.type) {
             try {
@@ -500,6 +510,7 @@ export default function ChatPage() {
       peerSocketIdRef.current = callerSocketId || null;
       setActiveCall(newCall);
       setIncomingCall(null);
+      setIsCallConnected(true);
       stopAllSFX();
       playCallConnected();
 
@@ -965,10 +976,61 @@ export default function ChatPage() {
         triggerNotification(senderName, senderAvatar, contentStr, targetId, targetType, !!msgSpaceId, pMode);
       }
 
+      // Optimistically update conversation snippet, timestamp, and position in Recent Chats
+      if (msgConvId) {
+        setConversations(prev => {
+          const list = Array.isArray(prev) ? prev : [];
+          const index = list.findIndex(c => String(c._id) === String(msgConvId));
+          if (index !== -1) {
+            const copy = [...list];
+            const target = { ...copy[index] };
+            target.lastMessage = newMsg;
+            target.updatedAt = newMsg.createdAt || new Date().toISOString();
+            if (!isFromMe && !isForCurrentConv) {
+              target.unreadCount = (target.unreadCount || 0) + 1;
+            }
+            copy.splice(index, 1);
+            return [target, ...copy];
+          }
+          return list;
+        });
+      }
+
       fetchConversations();
       if (msgSpaceId) {
         fetchSpaces();
       }
+    };
+
+    const handleConversationNew = (newConv) => {
+      if (!newConv || !newConv._id) return;
+      setConversations(prev => {
+        const list = Array.isArray(prev) ? prev : [];
+        if (list.some(c => String(c._id) === String(newConv._id))) return prev;
+        return [newConv, ...list];
+      });
+      fetchConversations();
+      fetchContacts();
+      if (socket && newConv._id) {
+        socket.emit('join:room', { roomId: newConv._id });
+      }
+    };
+
+    const handleConversationUpdated = (updatedConv) => {
+      if (!updatedConv || !updatedConv._id) return;
+      setConversations(prev => {
+        const list = Array.isArray(prev) ? prev : [];
+        const index = list.findIndex(c => String(c._id) === String(updatedConv._id));
+        if (index !== -1) {
+          const copy = [...list];
+          copy[index] = { ...copy[index], ...updatedConv };
+          const [item] = copy.splice(index, 1);
+          return [item, ...copy];
+        } else {
+          return [updatedConv, ...list];
+        }
+      });
+      fetchConversations();
     };
 
     const handleTypingStart = ({ personaName }) => {
@@ -1055,6 +1117,8 @@ export default function ChatPage() {
     };
 
     socket.on('message:new', handleNewMessage);
+    socket.on('conversation:new', handleConversationNew);
+    socket.on('conversation:updated', handleConversationUpdated);
     socket.on('typing:start', handleTypingStart);
     socket.on('typing:stop', handleTypingStop);
     socket.on('reaction:update', handleReactionUpdate);
@@ -1070,6 +1134,8 @@ export default function ChatPage() {
     return () => {
       if (activeId) leaveRoom(activeId);
       socket.off('message:new', handleNewMessage);
+      socket.off('conversation:new', handleConversationNew);
+      socket.off('conversation:updated', handleConversationUpdated);
       socket.off('typing:start', handleTypingStart);
       socket.off('typing:stop', handleTypingStop);
       socket.off('reaction:update', handleReactionUpdate);

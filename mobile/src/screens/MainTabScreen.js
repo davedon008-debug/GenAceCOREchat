@@ -22,6 +22,8 @@ import MembersDrawerModal from '../components/MembersDrawerModal';
 import SpaceDetailsModal from '../components/SpaceDetailsModal';
 import SetPasscodeModal from '../components/SetPasscodeModal';
 import AvatarViewerModal from '../components/AvatarViewerModal';
+import IncomingCallModal from '../components/IncomingCallModal';
+import { playIncomingRingtone, stopAllSFX } from '../lib/callSFX';
 import Logo from '../components/Logo';
 import {
   Menu, Search, MessageSquare, Zap, Users, Settings, Compass,
@@ -75,6 +77,7 @@ export default function MainTabScreen({ navigation }) {
   const [previewSpaceId, setPreviewSpaceId] = useState(null);
   const [setPasscodeVisible, setSetPasscodeVisible] = useState(false);
   const [avatarViewerTarget, setAvatarViewerTarget] = useState({ visible: false, avatarUrl: '', name: '', handle: '', bio: '', customStatus: '' });
+  const [incomingCall, setIncomingCall] = useState(null);
 
   // Rich Web Settings states
   const [settingsSection, setSettingsSection] = useState('profile'); // 'profile' | 'appearance' | 'privacy'
@@ -176,18 +179,66 @@ export default function MainTabScreen({ navigation }) {
       fetchData(true);
     };
 
+    const handleIncomingCall = (data) => {
+      console.log('[MainTabScreen] Incoming call received:', data);
+      playIncomingRingtone();
+      setIncomingCall(data);
+    };
+
+    const handleCallEnded = (data) => {
+      stopAllSFX();
+      setIncomingCall(prev => (prev?.callId === data?.callId ? null : prev));
+    };
+
+    const handleAnsweredElsewhere = (data) => {
+      stopAllSFX();
+      setIncomingCall(prev => (prev?.callId === data?.callId ? null : prev));
+    };
+
     socket.on('message:new', handleRealtimeUpdate);
     socket.on('conversation:new', handleRealtimeUpdate);
     socket.on('space:created', handleRealtimeUpdate);
     socket.on('space:updated', handleRealtimeUpdate);
+    socket.on('call:incoming', handleIncomingCall);
+    socket.on('call:ended', handleCallEnded);
+    socket.on('call:answered-elsewhere', handleAnsweredElsewhere);
 
     return () => {
       socket.off('message:new', handleRealtimeUpdate);
       socket.off('conversation:new', handleRealtimeUpdate);
       socket.off('space:created', handleRealtimeUpdate);
       socket.off('space:updated', handleRealtimeUpdate);
+      socket.off('call:incoming', handleIncomingCall);
+      socket.off('call:ended', handleCallEnded);
+      socket.off('call:answered-elsewhere', handleAnsweredElsewhere);
     };
   }, [socket, activePersona]);
+
+  const handleAcceptIncomingCall = (callData) => {
+    stopAllSFX();
+    setIncomingCall(null);
+    if (!callData) return;
+    navigation.navigate('Conversation', {
+      conversationId: callData.roomId,
+      autoAcceptCall: callData,
+      title: callData.callerPersona?.displayName || callData.callerPersona?.username || 'User',
+      avatar: callData.callerPersona?.avatarUrl || callData.callerPersona?.avatar,
+      otherPersonaId: callData.callerPersona?._id
+    });
+  };
+
+  const handleDeclineIncomingCall = (callData) => {
+    stopAllSFX();
+    if (socket && callData) {
+      socket.emit('call:reject', {
+        targetPersonaId: String(callData.callerPersona?._id),
+        targetSocketId: callData.callerSocketId,
+        callId: callData.callId,
+        reason: 'declined'
+      });
+    }
+    setIncomingCall(null);
+  };
 
   const handleSearchUsers = async (text = '') => {
     setSearchQuery(text);
@@ -1904,6 +1955,12 @@ export default function MainTabScreen({ navigation }) {
         handle={avatarViewerTarget.handle}
         bio={avatarViewerTarget.bio}
         customStatus={avatarViewerTarget.customStatus}
+      />
+
+      <IncomingCallModal
+        call={incomingCall}
+        onAcceptCall={() => handleAcceptIncomingCall(incomingCall)}
+        onDeclineCall={() => handleDeclineIncomingCall(incomingCall)}
       />
     </SafeAreaView>
   );

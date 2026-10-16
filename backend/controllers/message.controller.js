@@ -299,6 +299,7 @@ export const sendMessage = async (req, res) => {
       ]),
       conversationId ? Conversation.findByIdAndUpdate(conversationId, {
         lastMessage: messageDoc._id,
+        $pull: { deletedBy: { $in: recipientPersonaIds } },
         updatedAt: Date.now()
       }) : Promise.resolve()
     ]);
@@ -319,6 +320,27 @@ export const sendMessage = async (req, res) => {
             io.to(`persona:${pId}`).emit('message:new', msgObject);
           }
         });
+
+        if (conversationId) {
+          Conversation.findById(conversationId)
+            .populate({
+              path: 'participants',
+              select: 'username displayName avatar bio status customStatus type userId'
+            })
+            .populate({
+              path: 'lastMessage',
+              populate: { path: 'senderPersonaId', select: 'username displayName' }
+            })
+            .lean()
+            .then(freshConv => {
+              if (freshConv) {
+                recipientPersonaIds.forEach(pId => {
+                  if (pId) io.to(`persona:${pId}`).emit('conversation:updated', freshConv);
+                });
+              }
+            })
+            .catch(() => {});
+        }
       } catch (socketErr) {
         console.error('[sendMessage Controller] Socket dispatch error:', socketErr);
       }

@@ -79,10 +79,12 @@ export default function CallModal({
     }
   }, [remoteStream, isVideo, isMinimized]);
 
+  const isConnected = isCallConnected || !!remoteStream;
+
   // Call timer counter
   useEffect(() => {
     let timer = null;
-    if (isCallConnected) {
+    if (isConnected) {
       timer = setInterval(() => {
         setDuration(prev => prev + 1);
       }, 1000);
@@ -92,7 +94,7 @@ export default function CallModal({
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isCallConnected]);
+  }, [isConnected]);
 
   if (!call) return null;
 
@@ -122,7 +124,7 @@ export default function CallModal({
         <div>
           <h4 className="text-xs font-bold text-white truncate max-w-[120px]">{peerName}</h4>
           <p className="text-[10px] text-emerald-400 font-mono">
-            {isCallConnected ? formatDuration(duration) : 'Connecting...'}
+            {isConnected ? formatDuration(duration) : (call?.isCaller ? 'Ringing...' : 'Connecting...')}
           </p>
         </div>
         <div className="flex items-center gap-1.5 ml-2">
@@ -173,7 +175,7 @@ export default function CallModal({
             <div>
               <h3 className="text-xs font-bold text-white truncate max-w-[160px] font-outfit">{peerName}</h3>
               <p className="text-[10px] text-emerald-400 font-mono">
-                {isCallConnected ? formatDuration(duration) : 'Ringing...'}
+                {isConnected ? formatDuration(duration) : (call?.isCaller ? 'Ringing...' : 'Connecting...')}
               </p>
             </div>
           </div>
@@ -221,11 +223,11 @@ export default function CallModal({
 
               <h2 className="text-2xl font-bold text-white font-outfit">{peerName}</h2>
               <p className="text-xs text-indigo-300 mt-1 font-mono">
-                {isCallConnected ? (isVideo ? 'Video Connected' : 'Voice Connected') : 'Calling...'}
+                {isConnected ? (isVideo ? 'Video Connected' : 'Voice Connected') : (call?.isCaller ? 'Ringing...' : 'Connecting...')}
               </p>
 
               {/* Animated Audio Equalizer Bars */}
-              {isCallConnected && (
+              {isConnected && (
                 <div className="flex items-center gap-1.5 mt-6 h-8">
                   <span className="w-1.5 h-6 bg-indigo-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
                   <span className="w-1.5 h-8 bg-cyan-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />

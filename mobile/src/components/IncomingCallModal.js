@@ -5,9 +5,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
-  SafeAreaView
+  Image
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Phone, PhoneOff, Video } from 'lucide-react-native';
 import { getMediaUrl } from '../config/api';
 

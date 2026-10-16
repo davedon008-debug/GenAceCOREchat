@@ -63,7 +63,26 @@ export default function ChatsListView({
     const username = otherParticipant?.username || 'user';
     const name = otherParticipant?.displayName || (otherParticipant?.username ? `@${otherParticipant.username}` : 'User');
     const avatar = getMediaUrl(otherParticipant?.avatar, name) || DEFAULT_AVATAR;
-    const rawLastMsgContent = c.lastMessage?.content || (c.lastMessage?.contentType === 'voice' ? '🎙️ Voice note' : c.lastMessage?.contentType === 'image' ? '📷 Photo' : 'No messages yet');
+
+    const lastMsg = typeof c.lastMessage === 'object' ? c.lastMessage : null;
+    let rawLastMsgContent = 'No messages yet';
+    if (lastMsg) {
+      const isMe = String(lastMsg.senderPersonaId?._id || lastMsg.senderPersonaId) === String(activePersona?._id);
+      const prefix = isMe ? 'You: ' : '';
+      if (lastMsg.privacyMode === 'burn') {
+        rawLastMsgContent = `${prefix}🔥 Burn on read message`;
+      } else if (lastMsg.contentType === 'voice') {
+        rawLastMsgContent = `${prefix}🎙️ Voice note`;
+      } else if (lastMsg.contentType === 'image') {
+        rawLastMsgContent = `${prefix}📷 Photo`;
+      } else if (lastMsg.contentType === 'video') {
+        rawLastMsgContent = `${prefix}📹 Video`;
+      } else if (lastMsg.contentType === 'file') {
+        rawLastMsgContent = `${prefix}📎 Attachment`;
+      } else if (lastMsg.content) {
+        rawLastMsgContent = `${prefix}${lastMsg.content}`;
+      }
+    }
     const lastMsgContent = isLocked ? '🔒 Chat is locked' : rawLastMsgContent;
 
     return {
@@ -76,14 +95,21 @@ export default function ChatsListView({
       time: formatTimestamp(c.lastMessage?.createdAt || c.updatedAt),
       unread: c.unreadCount || 0,
       privacyMode: c.privacyMode,
-      targetPersonaId: otherParticipant?._id,
+      targetPersonaId: otherParticipant?._id || partnerIdStr,
       isLocked,
       isRealConv: true
     };
   });
 
   const contactOnlyList = (allContacts || [])
-    .filter(contact => String(contact._id) !== String(activePersona?._id) && !conversations.some(c => c.participants?.some(p => String(p._id) === String(contact._id))))
+    .filter(contact => {
+      const contactId = String(contact._id);
+      if (contactId === String(activePersona?._id)) return false;
+      return !conversations.some(c => (c.participants || []).some(p => {
+        const pId = typeof p === 'object' && p ? (p._id || p.id) : p;
+        return pId && String(pId) === contactId;
+      }));
+    })
     .map(contact => ({
       _id: contact._id,
       convId: null,

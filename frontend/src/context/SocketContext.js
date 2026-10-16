@@ -78,9 +78,74 @@ export const SocketProvider = ({ children }) => {
         }
       };
 
+      const handleOnline = () => {
+        if (!s.connected) {
+          s.connect();
+        } else {
+          onConnect();
+        }
+      };
+
       if (typeof window !== 'undefined') {
         window.addEventListener('focus', handleVisibilityOrFocus);
+        window.addEventListener('online', handleOnline);
         document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+      }
+
+      // Background Keep-Alive Worker: prevents browser from throttling heartbeats in background tabs
+      let keepAliveWorker = null;
+      let fallbackInterval = null;
+
+      try {
+        if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
+          const workerBlob = new Blob([
+            `let timer = null;
+             self.onmessage = function(e) {
+               if (e.data === 'start') {
+                 if (!timer) {
+                   timer = setInterval(function() {
+                     self.postMessage('heartbeat');
+                   }, 15000);
+                 }
+               } else if (e.data === 'stop') {
+                 if (timer) {
+                   clearInterval(timer);
+                   timer = null;
+                 }
+               }
+             };`
+          ], { type: 'application/javascript' });
+          const workerUrl = URL.createObjectURL(workerBlob);
+          keepAliveWorker = new Worker(workerUrl);
+
+          keepAliveWorker.onmessage = (e) => {
+            if (e.data === 'heartbeat') {
+              if (!s.connected) {
+                s.connect();
+              } else if (activePersona?._id) {
+                s.emit('presence:heartbeat', { personaId: activePersona._id });
+              }
+            }
+          };
+
+          keepAliveWorker.postMessage('start');
+        } else {
+          fallbackInterval = setInterval(() => {
+            if (!s.connected) {
+              s.connect();
+            } else if (activePersona?._id) {
+              s.emit('presence:heartbeat', { personaId: activePersona._id });
+            }
+          }, 15000);
+        }
+      } catch (err) {
+        fallbackInterval = setInterval(() => {
+          if (!s.connected) {
+            s.connect();
+          } else if (activePersona?._id) {
+            s.emit('presence:heartbeat', { personaId: activePersona._id });
+          }
+        }, 15000);
       }
 
       if (s.connected) {
@@ -100,7 +165,17 @@ export const SocketProvider = ({ children }) => {
         s.off('persona:updated', onPersonaUpdated);
         if (typeof window !== 'undefined') {
           window.removeEventListener('focus', handleVisibilityOrFocus);
+          window.removeEventListener('online', handleOnline);
           document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+        }
+        if (keepAliveWorker) {
+          try {
+            keepAliveWorker.postMessage('stop');
+            keepAliveWorker.terminate();
+          } catch (e) {}
+        }
+        if (fallbackInterval) {
+          clearInterval(fallbackInterval);
         }
       };
     }

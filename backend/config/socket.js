@@ -13,13 +13,17 @@ if (!JWT_SECRET) {
 
 let ioServer = null;
 const connectedPersonas = new Map();
+const pendingDisconnectTimers = new Map();
+const PRESENCE_GRACE_PERIOD_MS = 3 * 60 * 1000; // 3-minute grace period before marking offline
 
 export const getIO = () => ioServer;
 
 export const broadcastPresence = async () => {
   if (!ioServer) return;
   try {
-    const rawIds = Array.from(new Set(connectedPersonas.values())).filter(Boolean).map(String);
+    const activeIds = Array.from(connectedPersonas.values()).filter(Boolean).map(String);
+    const pendingIds = Array.from(pendingDisconnectTimers.keys()).filter(Boolean).map(String);
+    const rawIds = Array.from(new Set([...activeIds, ...pendingIds]));
     const validIds = rawIds.filter(id => mongoose.Types.ObjectId.isValid(id));
     if (validIds.length === 0) {
       ioServer.emit('presence:update', { onlinePersonaIds: [], personaStatuses: {} });
@@ -45,7 +49,10 @@ export const broadcastPresence = async () => {
     ioServer.emit('presence:update', { onlinePersonaIds, personaStatuses });
   } catch (err) {
     console.warn('[Socket] Presence broadcast network notice:', err?.message || err);
-    const fallbackIds = Array.from(new Set(connectedPersonas.values())).filter(Boolean).map(String);
+    const fallbackIds = Array.from(new Set([
+      ...Array.from(connectedPersonas.values()),
+      ...Array.from(pendingDisconnectTimers.keys())
+    ])).filter(Boolean).map(String);
     const fallbackStatuses = {};
     fallbackIds.forEach(id => { fallbackStatuses[id] = 'online'; });
     ioServer.emit('presence:update', { onlinePersonaIds: fallbackIds, personaStatuses: fallbackStatuses });
@@ -61,7 +68,13 @@ export const evictUserSockets = async (userIds = [], personaIds = []) => {
     if (uId) ioServer.to(`user:${uId}`).emit('account:terminated', { message: 'Your account was deleted by an administrator.' });
   });
   pIds.forEach(pId => {
-    if (pId) ioServer.to(`persona:${pId}`).emit('account:terminated', { message: 'Your account was deleted by an administrator.' });
+    if (pId) {
+      if (pendingDisconnectTimers.has(pId)) {
+        clearTimeout(pendingDisconnectTimers.get(pId));
+        pendingDisconnectTimers.delete(pId);
+      }
+      ioServer.to(`persona:${pId}`).emit('account:terminated', { message: 'Your account was deleted by an administrator.' });
+    }
   });
 
   if (ioServer.sockets?.sockets) {
@@ -106,8 +119,8 @@ export const initSocketServer = (httpServer) => {
       origin: '*',
       methods: ['GET', 'POST']
     },
-    pingInterval: 10000,
-    pingTimeout: 5000,
+    pingInterval: 25000,
+    pingTimeout: 30000,
     maxHttpBufferSize: 2 * 1024 * 1024 // 2MB frame buffer for real-time chat metadata and events
   });
 
@@ -133,8 +146,19 @@ export const initSocketServer = (httpServer) => {
   io.on('connection', async (socket) => {
     console.log(`[Socket] Connected: PersonaId ${socket.personaId} (Socket: ${socket.id})`);
     
+    const clearPendingTimer = (pId) => {
+      if (!pId) return;
+      const pIdStr = String(pId);
+      if (pendingDisconnectTimers.has(pIdStr)) {
+        clearTimeout(pendingDisconnectTimers.get(pIdStr));
+        pendingDisconnectTimers.delete(pIdStr);
+      }
+    };
+
     if (socket.personaId) {
-      connectedPersonas.set(socket.id, String(socket.personaId));
+      const pIdStr = String(socket.personaId);
+      clearPendingTimer(pIdStr);
+      connectedPersonas.set(socket.id, pIdStr);
       if (socket.userId) {
         socket.join(`user:${socket.userId}`);
       }
@@ -145,12 +169,35 @@ export const initSocketServer = (httpServer) => {
     socket.on('presence:announce', async (data) => {
       const targetId = data?.personaId || socket.personaId;
       if (targetId) {
-        socket.personaId = String(targetId);
-        connectedPersonas.set(socket.id, String(targetId));
+        const pIdStr = String(targetId);
+        clearPendingTimer(pIdStr);
+        socket.personaId = pIdStr;
+        connectedPersonas.set(socket.id, pIdStr);
         if (socket.userId) {
           socket.join(`user:${socket.userId}`);
         }
         await autoJoinUserRooms(socket, targetId);
+        broadcastPresence();
+      }
+    });
+
+    socket.on('presence:heartbeat', (data) => {
+      const targetId = data?.personaId || socket.personaId;
+      if (targetId) {
+        const pIdStr = String(targetId);
+        clearPendingTimer(pIdStr);
+        connectedPersonas.set(socket.id, pIdStr);
+      }
+    });
+
+    socket.on('presence:leave', () => {
+      const targetId = socket.personaId || connectedPersonas.get(socket.id);
+      if (targetId) {
+        const pIdStr = String(targetId);
+        clearPendingTimer(pIdStr);
+        for (const [sId, pId] of connectedPersonas.entries()) {
+          if (pId === pIdStr) connectedPersonas.delete(sId);
+        }
         broadcastPresence();
       }
     });
@@ -367,10 +414,26 @@ export const initSocketServer = (httpServer) => {
     });
 
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
+      const pId = connectedPersonas.get(socket.id) || socket.personaId;
       connectedPersonas.delete(socket.id);
+      console.log(`[Socket] Disconnected: PersonaId ${pId} (Reason: ${reason})`);
+
+      if (pId) {
+        const pIdStr = String(pId);
+        const hasOtherSockets = Array.from(connectedPersonas.values()).some(id => id === pIdStr);
+        if (!hasOtherSockets) {
+          if (!pendingDisconnectTimers.has(pIdStr)) {
+            const timer = setTimeout(() => {
+              pendingDisconnectTimers.delete(pIdStr);
+              broadcastPresence();
+              console.log(`[Socket] Grace period expired for PersonaId ${pIdStr} -> marked offline`);
+            }, PRESENCE_GRACE_PERIOD_MS);
+            pendingDisconnectTimers.set(pIdStr, timer);
+          }
+        }
+      }
       broadcastPresence();
-      console.log(`[Socket] Disconnected: PersonaId ${socket.personaId}`);
     });
   });
 

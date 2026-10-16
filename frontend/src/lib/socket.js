@@ -34,7 +34,7 @@ export const getSocket = () => {
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 15000
+      timeout: 30000
     });
   } else {
     if (socket.auth?.token !== token) {
@@ -51,6 +51,11 @@ export const getSocket = () => {
 
 export const disconnectSocket = () => {
   if (socket) {
+    try {
+      if (socket.connected) {
+        socket.emit('presence:leave');
+      }
+    } catch (e) {}
     socket.disconnect();
     socket = null;
   }
