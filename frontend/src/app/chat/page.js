@@ -226,6 +226,7 @@ export default function ChatPage() {
         setIsCallConnected(true);
       } else if (pc.iceConnectionState === 'failed') {
         console.warn('[WebRTC] ICE failed. Performing ICE restart...');
+        showToast('Call could not connect audio (network blocked). A TURN relay server is required.', 'error');
         // Only the caller renegotiates, to avoid offer glare
         if (activeCallRef.current?.isCaller && pc.signalingState === 'stable') {
           try {
@@ -253,7 +254,6 @@ export default function ChatPage() {
 
     pc.ontrack = (event) => {
       console.log('[VOICE DEBUG] ontrack fired:', event.track?.kind, event.track?.id);
-      setIsCallConnected(true);
       if (event.streams && event.streams[0]) {
         event.streams[0].getTracks().forEach(t => { t.enabled = true; });
         setRemoteStream(event.streams[0]);
@@ -291,7 +291,6 @@ export default function ChatPage() {
       if (data.responderSocketId) peerSocketIdRef.current = data.responderSocketId;
       stopAllSFX();
       playCallConnected();
-      setIsCallConnected(true);
 
       if (activeCallRef.current && activeCallRef.current.isCaller) {
         try {
@@ -502,7 +501,6 @@ export default function ChatPage() {
       setActiveCall(newCall);
       setIncomingCall(null);
       stopAllSFX();
-      setIsCallConnected(true);
       playCallConnected();
 
       // Create PC with mic tracks BEFORE accepting, so the answer always carries our audio
