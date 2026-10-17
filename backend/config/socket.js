@@ -17,6 +17,63 @@ const connectedPersonas = new Map();
 const pendingDisconnectTimers = new Map();
 const PRESENCE_GRACE_PERIOD_MS = 3 * 60 * 1000; // 3-minute grace period before marking offline
 
+// Active ringing calls registry: callId -> { callId, callerPersona, callerSocketId, targetPersonaId, roomId, isVideo, timestamp, timeoutTimer }
+export const activeRingingCalls = new Map();
+
+export const getPendingCallForPersona = (personaId) => {
+  if (!personaId) return null;
+  const pIdStr = String(personaId);
+  for (const [callId, callInfo] of activeRingingCalls.entries()) {
+    if (String(callInfo.targetPersonaId) === pIdStr) {
+      if (Date.now() - callInfo.timestamp < 45000) {
+        return {
+          callId: callInfo.callId,
+          callerPersona: callInfo.callerPersona,
+          callerSocketId: callInfo.callerSocketId,
+          roomId: callInfo.roomId,
+          isVideo: callInfo.isVideo,
+          timestamp: callInfo.timestamp
+        };
+      }
+    }
+  }
+  return null;
+};
+
+export const checkAndEmitPendingCall = (socket, personaId) => {
+  if (!socket || !personaId) return;
+  const pending = getPendingCallForPersona(personaId);
+  if (pending) {
+    console.log(`[Call Signaling] Re-emitting active ringing call ${pending.callId} to persona ${personaId}`);
+    socket.emit('call:incoming', pending);
+  }
+};
+
+export const rejectRingingCall = (callId, reason = 'declined', responderPersonaId = null) => {
+  if (!callId || !activeRingingCalls.has(callId)) return false;
+  const callInfo = activeRingingCalls.get(callId);
+  clearTimeout(callInfo.timeoutTimer);
+  activeRingingCalls.delete(callId);
+
+  if (ioServer) {
+    const callerTarget = callInfo.callerSocketId && ioServer.sockets.sockets.get(callInfo.callerSocketId)
+      ? ioServer.to(callInfo.callerSocketId)
+      : ioServer.to(`persona:${callInfo.callerPersona?._id}`);
+
+    callerTarget.emit('call:rejected', {
+      callId,
+      reason,
+      responderPersonaId: responderPersonaId || callInfo.targetPersonaId
+    });
+
+    ioServer.to(`persona:${callInfo.targetPersonaId}`).emit('call:ended', {
+      callId,
+      reason
+    });
+  }
+  return true;
+};
+
 export const getIO = () => ioServer;
 
 export const broadcastPresence = async () => {
@@ -109,6 +166,7 @@ const autoJoinUserRooms = async (socket, personaId) => {
     });
 
     console.log(`[Socket] Persona ${pIdStr} auto-joined ${convs.length} conversations & ${spaces.length} spaces`);
+    checkAndEmitPendingCall(socket, pIdStr);
   } catch (err) {
     console.warn(`[Socket] autoJoinUserRooms network notice for persona ${personaId}:`, err?.message || err);
   }
@@ -373,6 +431,27 @@ export const initSocketServer = (httpServer) => {
         timestamp: Date.now()
       };
 
+      // Register call in active ringing map with 45s auto-expire timer
+      if (activeRingingCalls.has(callId)) {
+        clearTimeout(activeRingingCalls.get(callId).timeoutTimer);
+      }
+      const timeoutTimer = setTimeout(() => {
+        if (activeRingingCalls.has(callId)) {
+          console.log(`[Call Signaling] Call ${callId} timed out after 45s of ringing.`);
+          activeRingingCalls.delete(callId);
+          callTarget(targetPersonaId).emit('call:ended', { callId, reason: 'timeout' });
+          if (socket.connected) {
+            socket.emit('call:ended', { callId, reason: 'timeout' });
+          }
+        }
+      }, 45000);
+
+      activeRingingCalls.set(callId, {
+        ...payload,
+        targetPersonaId: String(targetPersonaId),
+        timeoutTimer
+      });
+
       io.to(targetRoom).emit('call:incoming', payload);
 
       // Dispatch Web Push Notification so device receives call alert in background/locked screen
@@ -388,7 +467,8 @@ export const initSocketServer = (httpServer) => {
           roomId,
           isVideo: !!isVideo,
           callerName,
-          callerPersonaId: socket.personaId
+          callerPersonaId: socket.personaId,
+          callerPersona: callerPersona || { _id: socket.personaId, displayName: callerName }
         }
       ).catch(pushErr => console.warn('[Call Push Dispatch Warning]:', pushErr?.message || pushErr));
     });
@@ -396,6 +476,10 @@ export const initSocketServer = (httpServer) => {
     socket.on('call:accept', ({ targetPersonaId, targetSocketId, callId }) => {
       if (!targetPersonaId) return;
       console.log(`[Call Signaling] Persona ${socket.personaId} accepted call ${callId} from ${targetPersonaId}`);
+      if (activeRingingCalls.has(callId)) {
+        clearTimeout(activeRingingCalls.get(callId).timeoutTimer);
+        activeRingingCalls.delete(callId);
+      }
       callTarget(targetPersonaId, targetSocketId).emit('call:accepted', {
         callId,
         responderPersonaId: socket.personaId,
@@ -408,6 +492,10 @@ export const initSocketServer = (httpServer) => {
     socket.on('call:reject', ({ targetPersonaId, targetSocketId, callId, reason }) => {
       if (!targetPersonaId) return;
       console.log(`[Call Signaling] Persona ${socket.personaId} rejected call ${callId}`);
+      if (activeRingingCalls.has(callId)) {
+        clearTimeout(activeRingingCalls.get(callId).timeoutTimer);
+        activeRingingCalls.delete(callId);
+      }
       callTarget(targetPersonaId, targetSocketId).emit('call:rejected', {
         callId,
         reason: reason || 'declined',
@@ -428,10 +516,22 @@ export const initSocketServer = (httpServer) => {
     socket.on('call:end', ({ targetPersonaId, callId }) => {
       if (!targetPersonaId) return;
       console.log(`[Call Signaling] Persona ${socket.personaId} ended call ${callId}`);
+      if (activeRingingCalls.has(callId)) {
+        clearTimeout(activeRingingCalls.get(callId).timeoutTimer);
+        activeRingingCalls.delete(callId);
+      }
       io.to(`persona:${targetPersonaId}`).emit('call:ended', {
         callId,
         endedByPersonaId: socket.personaId
       });
+    });
+
+    // Query pending calls for this client persona
+    socket.on('call:query-pending', () => {
+      const pId = socket.personaId || connectedPersonas.get(socket.id);
+      if (pId) {
+        checkAndEmitPendingCall(socket, pId);
+      }
     });
 
 
@@ -439,6 +539,18 @@ export const initSocketServer = (httpServer) => {
       const pId = connectedPersonas.get(socket.id) || socket.personaId;
       connectedPersonas.delete(socket.id);
       console.log(`[Socket] Disconnected: PersonaId ${pId} (Reason: ${reason})`);
+
+      // If caller disconnected while call was still ringing, notify target
+      for (const [cId, callInfo] of activeRingingCalls.entries()) {
+        if (callInfo.callerSocketId === socket.id) {
+          clearTimeout(callInfo.timeoutTimer);
+          activeRingingCalls.delete(cId);
+          io.to(`persona:${callInfo.targetPersonaId}`).emit('call:ended', {
+            callId: cId,
+            reason: 'caller_disconnected'
+          });
+        }
+      }
 
       if (pId) {
         const pIdStr = String(pId);

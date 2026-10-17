@@ -33,7 +33,7 @@ import CallModal from '../../components/CallModal';
 import IncomingCallModal from '../../components/IncomingCallModal';
 import SecretLoversModal from '../../components/games/SecretLoversModal';
 import { playNotificationSound, playSentSound, getNotifPrefs } from '../../lib/sound';
-import { playCallConnected, playCallEnded, playRingback, stopAllSFX } from '../../lib/callSFX';
+import { playCallConnected, playCallEnded, playRingback, playIncomingRingtone, stopAllSFX } from '../../lib/callSFX';
 import { enableWebPushNotifications } from '../../lib/pushSubscription';
 import MessageSkeleton from '../../components/MessageSkeleton';
 import {
@@ -305,6 +305,7 @@ export default function ChatPage() {
       if (activeCallRef.current || incomingCallRef.current) return;
       console.log('[Call] Incoming call received:', data);
       setIncomingCall(data);
+      playIncomingRingtone();
 
       const callerName = data?.callerPersona?.displayName || data?.callerPersona?.username || 'Someone';
       const callTypeStr = data?.isVideo ? 'Video' : 'Voice';
@@ -606,6 +607,83 @@ export default function ChatPage() {
     playCallEnded();
     cleanupCall();
   };
+
+  // Service Worker background notification message listener
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    const handleSWMessage = (event) => {
+      const msg = event.data;
+      if (!msg) return;
+
+      if (msg.type === 'GENACE_CALL_DISMISSED') {
+        if (incomingCallRef.current?.callId === msg.callId) {
+          stopAllSFX();
+          incomingCallRef.current = null;
+          setIncomingCall(null);
+        }
+      } else if (msg.type === 'GENACE_NOTIFICATION_CLICK') {
+        const notifData = msg.data;
+        if (notifData?.type === 'call') {
+          console.log('[SW Message] Call notification clicked:', msg.action, notifData);
+          if (msg.action === 'answer' && incomingCallRef.current) {
+            handleAcceptCall();
+          } else if (!incomingCallRef.current && socket) {
+            socket.emit('call:query-pending');
+          }
+        }
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+    };
+  }, [socket, incomingCall]);
+
+  // Pending call recovery on mount, socket reconnect, and tab visibility change
+  useEffect(() => {
+    if (!activePersona?._id) return;
+
+    const recoverPendingCall = async () => {
+      if (activeCallRef.current || incomingCallRef.current) return;
+      try {
+        const res = await api.get('/calls/pending', {
+          params: { personaId: activePersona._id }
+        });
+        if (res.data?.success && res.data?.pendingCall) {
+          const call = res.data.pendingCall;
+          console.log('[Call Recovery] Restored pending call on load:', call);
+          setIncomingCall(call);
+          playIncomingRingtone();
+
+          if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('action') === 'answer' || urlParams.get('callAction') === 'answer') {
+              setTimeout(() => {
+                handleAcceptCall();
+              }, 400);
+            }
+          }
+        }
+      } catch (err) {
+        if (socket) socket.emit('call:query-pending');
+      }
+    };
+
+    recoverPendingCall();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !activeCallRef.current && !incomingCallRef.current) {
+        recoverPendingCall();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [activePersona, socket]);
 
   const handleToggleMic = () => {
     if (localStreamRef.current) {
@@ -1497,6 +1575,20 @@ export default function ChatPage() {
       return false;
     }
   };
+
+  // Handle URL query parameters (?conversationId=... or ?spaceId=...) on initial load
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const convId = params.get('conversationId');
+    const spId = params.get('spaceId');
+
+    if (convId && (!activeId || activeId !== convId)) {
+      selectConversation(convId);
+    } else if (spId && (!activeId || activeId !== spId)) {
+      selectSpace(spId);
+    }
+  }, [conversations, spaces]);
 
   const handleSendMessage = async ({ content, contentType, mediaUrl, voiceDuration, replyTo }) => {
     if (!activeId || (!content && !mediaUrl)) return;
