@@ -123,7 +123,10 @@ export const searchPersonas = async (req, res) => {
 
 export const getAllContacts = async (req, res) => {
   try {
-    const persona = await Persona.findById(req.personaId);
+    const persona = await Persona.findById(req.personaId)
+      .select('contacts blockedPersonas')
+      .lean();
+
     if (!persona) {
       return res.status(404).json({ success: false, message: 'Persona not found' });
     }
@@ -136,12 +139,13 @@ export const getAllContacts = async (req, res) => {
       filter._id = { $ne: req.personaId, $nin: blockedIds };
     }
 
-    // Fetch all available personas across system
+    // Fetch available personas across system with lean projection
     const allSystemPersonas = await Persona.find(filter)
       .select('username displayName avatar status customStatus type bio updatedAt userId')
       .populate('userId', 'role email')
-      .sort({ updatedAt: -1, displayName: 1 })
-      .limit(100);
+      .sort({ updatedAt: -1 })
+      .limit(60)
+      .lean();
 
     // Prioritize explicitly saved contacts at top of list
     const contactsSet = new Set(savedContactIds);

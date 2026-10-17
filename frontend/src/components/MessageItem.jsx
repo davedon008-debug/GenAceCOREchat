@@ -42,7 +42,7 @@ const EMOJI_CATEGORIES = [
   }
 ];
 
-function VoicePlayer({ src, duration }) {
+function VoicePlayer({ src, duration, onEnded }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(duration || 0);
@@ -89,6 +89,7 @@ function VoicePlayer({ src, duration }) {
   const handleEnded = () => {
     setIsPlaying(false);
     setCurrentTime(0);
+    if (onEnded) onEnded();
   };
 
   const handleSeek = (e) => {
@@ -178,6 +179,8 @@ export default function MessageItem({
   const [imgLoadError, setImgLoadError] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
+  const [isLocallyBurned, setIsLocallyBurned] = useState(false);
+  const [voiceBurnStarted, setVoiceBurnStarted] = useState(false);
   const [burnCountdown, setBurnCountdown] = useState(10);
   const touchTimerRef = useRef(null);
   const burnIntervalRef = useRef(null);
@@ -188,17 +191,28 @@ export default function MessageItem({
     };
   }, []);
 
+  const triggerBurn = () => {
+    if (burnIntervalRef.current) clearInterval(burnIntervalRef.current);
+    setIsLocallyBurned(true);
+    if (onBurnMessage) onBurnMessage(message._id);
+  };
+
   const handleStartReveal = (e) => {
     e.stopPropagation();
     setIsRevealed(true);
-    setBurnCountdown(10);
 
+    // If it's a voice note, do NOT start countdown now — it will burn after listening completes
+    if (message.contentType === 'voice') {
+      return;
+    }
+
+    setBurnCountdown(10);
     if (burnIntervalRef.current) clearInterval(burnIntervalRef.current);
     burnIntervalRef.current = setInterval(() => {
       setBurnCountdown(prev => {
         if (prev <= 1) {
           clearInterval(burnIntervalRef.current);
-          if (onBurnMessage) onBurnMessage(message._id);
+          triggerBurn();
           return 0;
         }
         return prev - 1;
@@ -206,10 +220,27 @@ export default function MessageItem({
     }, 1000);
   };
 
+  const handleVoiceEnded = () => {
+    if (message.privacyMode === 'burn' && !isMe && !isLocallyBurned && !message.isBurned) {
+      setVoiceBurnStarted(true);
+      setBurnCountdown(5); // 5-second countdown after user finishes listening
+      if (burnIntervalRef.current) clearInterval(burnIntervalRef.current);
+      burnIntervalRef.current = setInterval(() => {
+        setBurnCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(burnIntervalRef.current);
+            triggerBurn();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+  };
+
   const handleForceBurnNow = (e) => {
     e.stopPropagation();
-    if (burnIntervalRef.current) clearInterval(burnIntervalRef.current);
-    if (onBurnMessage) onBurnMessage(message._id);
+    triggerBurn();
   };
 
   const { activePersona: contextPersona } = useAuth();
@@ -329,7 +360,7 @@ export default function MessageItem({
     return acc;
   }, {});
 
-  if (message.isBurned) {
+  if (message.isBurned || isLocallyBurned) {
     return (
       <div className="flex justify-center my-2 w-full">
         <div className="px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 italic">
@@ -464,26 +495,36 @@ export default function MessageItem({
                   onClick={handleStartReveal}
                   className="w-full py-1.5 px-3 rounded-lg bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-semibold text-xs shadow-md transition flex items-center justify-center gap-1.5"
                 >
-                  <Eye className="w-3.5 h-3.5" /> Tap to Reveal Message
+                  <Eye className="w-3.5 h-3.5" /> {message.contentType === 'voice' ? 'Tap to Reveal Voice Note' : 'Tap to Reveal Message'}
                 </button>
               </div>
             ) : message.contentType === 'voice' ? (
               <div className="space-y-1">
                 {message.privacyMode === 'burn' && !isMe && isRevealed && (
                   <div className="mb-2 p-1.5 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-between text-[11px] text-rose-200 select-none">
-                    <span className="flex items-center gap-1 font-medium">
-                      <Flame className="w-3.5 h-3.5 text-rose-400 animate-pulse" /> Burning in {burnCountdown}s...
-                    </span>
+                    {voiceBurnStarted ? (
+                      <span className="flex items-center gap-1 font-medium">
+                        <Flame className="w-3.5 h-3.5 text-rose-400 animate-pulse" /> Finished listening • Burning in {burnCountdown}s...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 font-medium">
+                        <Flame className="w-3.5 h-3.5 text-rose-400" /> Burns automatically after playback ends
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={handleForceBurnNow}
-                      className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[10px] transition"
+                      className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[10px] transition shrink-0 ml-2"
                     >
                       Burn Now
                     </button>
                   </div>
                 )}
-                <VoicePlayer src={resolvedMediaUrl} duration={message.voiceDuration} />
+                <VoicePlayer 
+                  src={resolvedMediaUrl} 
+                  duration={message.voiceDuration} 
+                  onEnded={handleVoiceEnded}
+                />
                 <div className="flex items-center gap-1 justify-end text-[10px] text-gray-300 pt-0.5">
                   <span suppressHydrationWarning>{formattedTime}</span>
                   {renderTickStatus()}

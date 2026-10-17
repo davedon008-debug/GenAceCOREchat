@@ -438,16 +438,35 @@ export const burnMessage = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Message not found' });
     }
 
-    // Verify user authorization for target chat
-    let isAuthorized = (message.conversationId && await Conversation.exists({ _id: message.conversationId, participants: req.personaId }));
-    if (!isAuthorized && message.spaceId) {
-      const spaceObj = await Space.findById(message.spaceId);
-      if (spaceObj) {
-        isAuthorized = spaceObj.visibility === 'public' || !spaceObj.visibility ||
-                       spaceObj.members?.some(m => m.personaId?.toString() === req.personaId.toString()) ||
-                       spaceObj.ownerPersonaId?.toString() === req.personaId.toString();
+    // Idempotent: If already burned, return success immediately
+    if (message.isBurned) {
+      return res.json({ success: true, message });
+    }
+
+    const personaIdStr = String(req.personaId);
+
+    // Verify user authorization for target chat and gather all participant persona IDs
+    let isAuthorized = false;
+    let recipientPersonaIds = [];
+
+    if (message.conversationId) {
+      const conv = await Conversation.findById(message.conversationId).select('participants').lean();
+      if (conv) {
+        recipientPersonaIds = (conv.participants || []).map(p => p.toString());
+        isAuthorized = recipientPersonaIds.includes(personaIdStr);
       }
     }
+
+    if (!isAuthorized && message.spaceId) {
+      const spaceObj = await Space.findById(message.spaceId).select('visibility members ownerPersonaId').lean();
+      if (spaceObj) {
+        recipientPersonaIds = (spaceObj.members || []).map(m => (m.personaId?._id || m.personaId)?.toString()).filter(Boolean);
+        if (spaceObj.ownerPersonaId) recipientPersonaIds.push(spaceObj.ownerPersonaId.toString());
+        isAuthorized = spaceObj.visibility === 'public' || !spaceObj.visibility ||
+                       recipientPersonaIds.includes(personaIdStr);
+      }
+    }
+
     if (!isAuthorized) {
       return res.status(403).json({ success: false, message: 'Not authorized to burn messages in this chat' });
     }
@@ -461,18 +480,34 @@ export const burnMessage = async (req, res) => {
     message.mediaUrl = '';
     await message.save();
 
+    // Populate sender info so returned message has full metadata for frontend
+    await message.populate([
+      { path: 'senderPersonaId', select: 'username displayName avatar bio status customStatus type' },
+      { path: 'spaceId', select: 'title icon description' },
+      { path: 'reactions.personaId', select: 'username displayName' }
+    ]);
+
     const io = getIO();
     if (io) {
       const targetRoom = message.spaceId || message.conversationId;
+      const burnPayload = {
+        messageId: message._id,
+        conversationId: message.conversationId,
+        spaceId: message.spaceId,
+        content: message.content,
+        isBurned: true
+      };
+
       if (targetRoom) {
-        io.to(String(targetRoom)).emit('message:burned', {
-          messageId: message._id,
-          conversationId: message.conversationId,
-          spaceId: message.spaceId,
-          content: message.content,
-          isBurned: true
-        });
+        io.to(String(targetRoom)).emit('message:burned', burnPayload);
       }
+
+      // Also broadcast directly to persona rooms to guarantee delivery across clients/mobile
+      recipientPersonaIds.forEach(pId => {
+        if (pId) {
+          io.to(`persona:${pId}`).emit('message:burned', burnPayload);
+        }
+      });
     }
 
     res.json({ success: true, message });

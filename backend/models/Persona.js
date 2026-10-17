@@ -27,5 +27,8 @@ const PersonaSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 PersonaSchema.index({ userId: 1 });
+PersonaSchema.index({ blockedPersonas: 1 });
+PersonaSchema.index({ contacts: 1 });
+PersonaSchema.index({ updatedAt: -1 });
 
 export default mongoose.models.Persona || mongoose.model('Persona', PersonaSchema);

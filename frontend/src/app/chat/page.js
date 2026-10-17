@@ -648,6 +648,11 @@ export default function ChatPage() {
       const res = await api.get('/conversations');
       if (res?.data?.success) {
         setConversations(res.data.conversations);
+        if (activePersona?._id && typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(`donchat_convs_${activePersona._id}`, JSON.stringify(res.data.conversations));
+          } catch (e) {}
+        }
       }
     } catch (err) {
       console.error('Failed to fetch conversations:', err);
@@ -659,6 +664,11 @@ export default function ChatPage() {
       const res = await api.get('/spaces');
       if (res?.data?.success) {
         setSpaces(res.data.spaces);
+        if (activePersona?._id && typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(`donchat_spaces_${activePersona._id}`, JSON.stringify(res.data.spaces));
+          } catch (e) {}
+        }
       }
     } catch (err) {
       console.error('Failed to fetch spaces:', err);
@@ -670,6 +680,11 @@ export default function ChatPage() {
       const res = await api.get('/personas/all');
       if (res?.data?.success) {
         setAllContacts(res.data.contacts);
+        if (activePersona?._id && typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(`donchat_contacts_${activePersona._id}`, JSON.stringify(res.data.contacts));
+          } catch (e) {}
+        }
       }
     } catch (err) {
       console.error('Failed to fetch contacts:', err);
@@ -689,7 +704,36 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    if (activePersona) {
+    if (activePersona?._id) {
+      // 1. Instant Cache Hydration: Render immediately from localStorage (0ms load time)
+      if (typeof window !== 'undefined') {
+        const personaId = String(activePersona._id);
+        try {
+          const cachedConvs = localStorage.getItem(`donchat_convs_${personaId}`);
+          if (cachedConvs) {
+            const parsed = JSON.parse(cachedConvs);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setConversations(parsed);
+            }
+          }
+          const cachedSpaces = localStorage.getItem(`donchat_spaces_${personaId}`);
+          if (cachedSpaces) {
+            const parsed = JSON.parse(cachedSpaces);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setSpaces(parsed);
+            }
+          }
+          const cachedContacts = localStorage.getItem(`donchat_contacts_${personaId}`);
+          if (cachedContacts) {
+            const parsed = JSON.parse(cachedContacts);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setAllContacts(parsed);
+            }
+          }
+        } catch (e) {}
+      }
+
+      // 2. Fresh background revalidation
       fetchConversations();
       fetchSpaces();
       fetchContacts();
@@ -1533,11 +1577,24 @@ export default function ChatPage() {
   };
 
   const handleBurnMessage = async (messageId) => {
+    if (!messageId) return;
+    const idStr = String(messageId);
+
+    // 1. Instant Optimistic Burn: Destroy in local state & cache immediately so it never appears again
+    const burnedUpdate = {
+      isBurned: true,
+      content: '🔥 This message has been burned and destroyed.',
+      mediaUrl: ''
+    };
+
+    setMessages(prev => prev.map(m => String(m._id || m.id) === idStr ? { ...m, ...burnedUpdate } : m));
+    updateMessageInAllCaches(idStr, burnedUpdate);
+
     try {
-      const res = await api.post(`/messages/${messageId}/burn`);
-      if (res.data.success) {
-        setMessages(prev => prev.map(m => m._id === messageId ? res.data.message : m));
-        updateMessageInCache(getCacheKey(activeId, activeType), messageId, res.data.message);
+      const res = await api.post(`/messages/${idStr}/burn`);
+      if (res.data?.success && res.data.message) {
+        setMessages(prev => prev.map(m => String(m._id || m.id) === idStr ? { ...m, ...res.data.message, isBurned: true } : m));
+        updateMessageInAllCaches(idStr, { ...res.data.message, isBurned: true });
       }
     } catch (err) {
       console.error('Failed to burn message:', err);

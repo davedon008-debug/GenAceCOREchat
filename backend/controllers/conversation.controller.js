@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Conversation from '../models/Conversation.js';
 import Persona from '../models/Persona.js';
 import Message from '../models/Message.js';
@@ -6,35 +7,41 @@ import { getIO } from '../config/socket.js';
 
 export const getConversations = async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select('lockedConversations chatLockEnabled');
+    const personaObjId = mongoose.Types.ObjectId.isValid(req.personaId)
+      ? new mongoose.Types.ObjectId(req.personaId)
+      : req.personaId;
+
+    // Fetch user lock info, blocked list, and conversations concurrently
+    const [user, mePersona, personasWhoBlockedMe, rawConversations] = await Promise.all([
+      User.findById(req.userId).select('lockedConversations chatLockEnabled').lean(),
+      Persona.findById(req.personaId).select('blockedPersonas').lean(),
+      Persona.find({ blockedPersonas: req.personaId }).select('_id').lean(),
+      Conversation.find({
+        participants: req.personaId,
+        deletedBy: { $ne: req.personaId },
+        $or: [
+          { spaceId: { $exists: false } },
+          { spaceId: null }
+        ]
+      })
+        .populate({
+          path: 'participants',
+          select: 'username displayName avatar bio status customStatus type userId',
+          populate: { path: 'userId', select: 'role email' }
+        })
+        .populate({
+          path: 'lastMessage',
+          populate: { path: 'senderPersonaId', select: 'username displayName' }
+        })
+        .populate('spaceId')
+        .sort({ updatedAt: -1 })
+        .lean()
+    ]);
+
     const lockedSet = new Set((user?.lockedConversations || []).map(id => String(id)));
-
-    // Fetch block lists to exclude blocked personas from direct conversations
-    const mePersona = await Persona.findById(req.personaId).select('blockedPersonas');
     const myBlockedIds = (mePersona?.blockedPersonas || []).map(id => id.toString());
-    const personasWhoBlockedMe = await Persona.find({ blockedPersonas: req.personaId }).select('_id');
     const blockerIds = personasWhoBlockedMe.map(p => p._id.toString());
-    const allBlockedPersonaIds = Array.from(new Set([...myBlockedIds, ...blockerIds]));
-
-    const rawConversations = await Conversation.find({
-      participants: req.personaId,
-      deletedBy: { $ne: req.personaId },
-      $or: [
-        { spaceId: { $exists: false } },
-        { spaceId: null }
-      ]
-    })
-      .populate({
-        path: 'participants',
-        select: 'username displayName avatar bio status customStatus type userId',
-        populate: { path: 'userId', select: 'role email' }
-      })
-      .populate({
-        path: 'lastMessage',
-        populate: { path: 'senderPersonaId', select: 'username displayName' }
-      })
-      .populate('spaceId')
-      .sort({ updatedAt: -1 });
+    const allBlockedPersonaIds = new Set([...myBlockedIds, ...blockerIds]);
 
     // Exclude direct conversations with blocked users and any space-linked conversation
     const filteredConversations = rawConversations.filter(conv => {
@@ -46,7 +53,7 @@ export const getConversations = async (req, res) => {
         });
         if (otherParticipant) {
           const otherId = otherParticipant._id ? otherParticipant._id.toString() : otherParticipant.toString();
-          if (allBlockedPersonaIds.includes(otherId)) {
+          if (allBlockedPersonaIds.has(otherId)) {
             return false;
           }
         }
@@ -54,29 +61,52 @@ export const getConversations = async (req, res) => {
       return true;
     });
 
-    const conversations = await Promise.all(filteredConversations.map(async (conv) => {
-      const convObj = conv.toObject();
-      const isLocked = lockedSet.has(String(conv._id));
-      convObj.isLocked = isLocked;
-      if (isLocked && convObj.lastMessage && typeof convObj.lastMessage === 'object') {
-        convObj.lastMessage = {
-          ...convObj.lastMessage,
+    // Batch compute unread message counts for all conversations in a SINGLE aggregation query
+    const convIds = filteredConversations.map(c => c._id);
+    const unreadMap = {};
+
+    if (convIds.length > 0) {
+      const unreadAgg = await Message.aggregate([
+        {
+          $match: {
+            conversationId: { $in: convIds },
+            senderPersonaId: { $ne: personaObjId },
+            status: { $ne: 'read' },
+            readBy: { $nin: [personaObjId] },
+            deletedFor: { $nin: [personaObjId] }
+          }
+        },
+        {
+          $group: {
+            _id: '$conversationId',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+
+      unreadAgg.forEach(item => {
+        unreadMap[String(item._id)] = item.count;
+      });
+    }
+
+    const conversations = filteredConversations.map((conv) => {
+      const convIdStr = String(conv._id);
+      const isLocked = lockedSet.has(convIdStr);
+      let lastMessage = conv.lastMessage;
+      if (isLocked && lastMessage && typeof lastMessage === 'object') {
+        lastMessage = {
+          ...lastMessage,
           content: '🔒 Passcode locked conversation'
         };
       }
 
-      // Compute unread message count for this persona
-      const unreadCount = await Message.countDocuments({
-        conversationId: conv._id,
-        senderPersonaId: { $ne: req.personaId },
-        status: { $ne: 'read' },
-        readBy: { $nin: [req.personaId] },
-        deletedFor: { $nin: [req.personaId] }
-      });
-      convObj.unreadCount = unreadCount;
-
-      return convObj;
-    }));
+      return {
+        ...conv,
+        isLocked,
+        lastMessage,
+        unreadCount: unreadMap[convIdStr] || 0
+      };
+    });
 
     res.json({ success: true, conversations });
   } catch (error) {

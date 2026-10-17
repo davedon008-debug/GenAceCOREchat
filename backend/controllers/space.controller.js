@@ -450,35 +450,60 @@ export const deleteSpace = async (req, res) => {
 
 export const getSpaces = async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select('lockedSpaces lockedConversations role');
+    const personaObjId = mongoose.Types.ObjectId.isValid(req.personaId)
+      ? new mongoose.Types.ObjectId(req.personaId)
+      : req.personaId;
+
+    // Fetch user locks and member spaces concurrently
+    const [user, rawSpaces] = await Promise.all([
+      User.findById(req.userId).select('lockedSpaces lockedConversations role').lean(),
+      Space.find({ 'members.personaId': req.personaId })
+        .populate('members.personaId', 'username displayName avatar bio status customStatus type')
+        .populate('ownerPersonaId', 'username displayName avatar bio status customStatus type')
+        .sort({ updatedAt: -1 })
+        .lean()
+    ]);
+
     const lockedSpacesSet = new Set((user?.lockedSpaces || []).map(id => String(id)));
     const lockedConvSet = new Set((user?.lockedConversations || []).map(id => String(id)));
 
-    // Return ONLY spaces where current persona is an actual member
-    const query = {
-      'members.personaId': req.personaId
-    };
+    // Batch compute unread message counts for all spaces in a SINGLE aggregation query
+    const spaceIds = rawSpaces.map(s => s._id);
+    const unreadMap = {};
 
-    const rawSpaces = await Space.find(query)
-      .populate('members.personaId', 'username displayName avatar bio status customStatus type')
-      .populate('ownerPersonaId', 'username displayName avatar bio status customStatus type')
-      .sort({ updatedAt: -1 });
+    if (spaceIds.length > 0) {
+      const unreadAgg = await Message.aggregate([
+        {
+          $match: {
+            spaceId: { $in: spaceIds },
+            senderPersonaId: { $ne: personaObjId },
+            status: { $ne: 'read' },
+            readBy: { $nin: [personaObjId] },
+            deletedFor: { $nin: [personaObjId] }
+          }
+        },
+        {
+          $group: {
+            _id: '$spaceId',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
 
-    const spaces = await Promise.all(rawSpaces.map(async (space) => {
-      const spaceObj = space.toObject();
-      const isLocked = lockedSpacesSet.has(String(space._id)) || (space.conversationId && lockedConvSet.has(String(space.conversationId)));
-      spaceObj.isLocked = !!isLocked;
-
-      const unreadCount = await Message.countDocuments({
-        spaceId: space._id,
-        senderPersonaId: { $ne: req.personaId },
-        status: { $ne: 'read' },
-        readBy: { $nin: [req.personaId] },
-        deletedFor: { $nin: [req.personaId] }
+      unreadAgg.forEach(item => {
+        unreadMap[String(item._id)] = item.count;
       });
-      spaceObj.unreadCount = unreadCount;
-      return spaceObj;
-    }));
+    }
+
+    const spaces = rawSpaces.map((space) => {
+      const spaceIdStr = String(space._id);
+      const isLocked = lockedSpacesSet.has(spaceIdStr) || (space.conversationId && lockedConvSet.has(String(space.conversationId)));
+      return {
+        ...space,
+        isLocked: !!isLocked,
+        unreadCount: unreadMap[spaceIdStr] || 0
+      };
+    });
 
     res.json({ success: true, spaces });
   } catch (error) {
