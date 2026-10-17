@@ -35,6 +35,19 @@ import SecretLoversModal from '../../components/games/SecretLoversModal';
 import { playNotificationSound, playSentSound, getNotifPrefs } from '../../lib/sound';
 import { playCallConnected, playCallEnded, playRingback, stopAllSFX } from '../../lib/callSFX';
 import { enableWebPushNotifications } from '../../lib/pushSubscription';
+import MessageSkeleton from '../../components/MessageSkeleton';
+import {
+  getCacheKey,
+  getCachedMessages,
+  setCachedMessages,
+  appendMessageToCache,
+  updateMessageInCache,
+  removeMessageFromCache,
+  updateMessageInAllCaches,
+  removeMessageFromAllCaches,
+  markReadInAllCaches,
+  clearMessageCache
+} from '../../lib/messageCache';
 
 import { Plus, Search, User, X, Bell, UserX } from 'lucide-react';
 
@@ -67,6 +80,7 @@ export default function ChatPage() {
   
   const [activeObject, setActiveObject] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [polls, setPolls] = useState([]);
   const [replyingToMessage, setReplyingToMessage] = useState(null);
@@ -681,6 +695,8 @@ export default function ChatPage() {
       fetchContacts();
       fetchBlockedUsers();
       fetchPasscodeStatus();
+    } else {
+      clearMessageCache();
     }
   }, [activePersona]);
 
@@ -822,10 +838,15 @@ export default function ChatPage() {
   const refreshActiveMessages = async (targetId = activeIdRef.current, targetType = activeTypeRef.current) => {
     if (!targetId) return;
     try {
+      const cacheKey = getCacheKey(targetId, targetType);
       if (targetType === 'conversation') {
         const msgRes = await api.get(`/messages/conversation/${targetId}`);
         if (msgRes.data.success && Array.isArray(msgRes.data.messages)) {
-          setMessages(msgRes.data.messages);
+          setCachedMessages(cacheKey, msgRes.data.messages);
+          if (String(activeIdRef.current) === String(targetId) && activeTypeRef.current === 'conversation') {
+            setMessages(msgRes.data.messages);
+            setIsMessagesLoading(false);
+          }
         }
       } else if (targetType === 'space') {
         const spaceObj = (spacesRef.current || []).find(s => String(s._id) === String(targetId));
@@ -833,7 +854,11 @@ export default function ChatPage() {
         const convId = (typeof rawConvId === 'object' && rawConvId ? (rawConvId._id || rawConvId.id) : rawConvId) || 'none';
         const msgRes = await api.get(`/messages/conversation/${convId}?spaceId=${targetId}`);
         if (msgRes.data.success && Array.isArray(msgRes.data.messages)) {
-          setMessages(msgRes.data.messages);
+          setCachedMessages(cacheKey, msgRes.data.messages);
+          if (String(activeIdRef.current) === String(targetId) && activeTypeRef.current === 'space') {
+            setMessages(msgRes.data.messages);
+            setIsMessagesLoading(false);
+          }
         }
       }
     } catch (err) {
@@ -950,6 +975,14 @@ export default function ChatPage() {
         }
       }
 
+      // Synchronize in-memory cache across rooms
+      if (msgConvId) {
+        appendMessageToCache(getCacheKey(msgConvId, 'conversation'), newMsg);
+      }
+      if (msgSpaceId) {
+        appendMessageToCache(getCacheKey(msgSpaceId, 'space'), newMsg);
+      }
+
       // Trigger visual toast banner & sound chime for ALL incoming messages from other users
       if (!isFromMe) {
         const senderName = newMsg.senderPersonaId?.displayName || newMsg.senderPersonaId?.username || 'Someone';
@@ -1043,14 +1076,17 @@ export default function ChatPage() {
 
     const handleReactionUpdate = ({ messageId, reactions }) => {
       setMessages(prev => prev.map(m => m._id === messageId ? { ...m, reactions } : m));
+      updateMessageInAllCaches(messageId, { reactions });
     };
 
     const handleMessageDeleted = ({ messageId }) => {
       setMessages(prev => prev.filter(m => m._id !== messageId));
+      removeMessageFromAllCaches(messageId);
       fetchConversations();
     };
 
     const handleMessagesRead = ({ conversationId: readConvId, spaceId: readSpaceId, readerPersonaId }) => {
+      markReadInAllCaches(readConvId, readSpaceId, readerPersonaId);
       setMessages(prev => prev.map(m => {
         const mConvId = m.conversationId?._id || m.conversationId;
         const mSpaceId = m.spaceId?._id || m.spaceId;
@@ -1079,6 +1115,7 @@ export default function ChatPage() {
     };
 
     const handleMessageBurned = ({ messageId, content, isBurned }) => {
+      updateMessageInAllCaches(messageId, { content, isBurned: true, mediaUrl: '' });
       setMessages(prev => prev.map(m => String(m._id || m.id) === String(messageId) ? { ...m, content, isBurned: true, mediaUrl: '' } : m));
     };
 
@@ -1186,14 +1223,40 @@ export default function ChatPage() {
         localStorage.setItem('donchat_active_type', 'conversation');
       }
 
-      const msgRes = await api.get(`/messages/conversation/${convId}`);
-      if (msgRes.data.success) {
-        setMessages(msgRes.data.messages);
+      const cacheKey = getCacheKey(convId, 'conversation');
+      const cached = getCachedMessages(cacheKey);
+
+      // ⚡ 0ms INSTANT SWITCH: If previously cached, display immediately!
+      if (cached && cached.length > 0) {
+        setMessages(cached);
+        setIsMessagesLoading(false);
+      } else {
+        setMessages([]);
+        setIsMessagesLoading(true);
       }
+
+      // Background revalidation (stale-while-revalidate)
+      api.get(`/messages/conversation/${convId}`)
+        .then((msgRes) => {
+          if (msgRes.data?.success && Array.isArray(msgRes.data.messages)) {
+            setCachedMessages(cacheKey, msgRes.data.messages);
+            if (String(activeIdRef.current) === String(convId) && activeTypeRef.current === 'conversation') {
+              setMessages(msgRes.data.messages);
+            }
+          }
+        })
+        .catch((err) => console.error('Failed to load conversation messages:', err))
+        .finally(() => {
+          if (String(activeIdRef.current) === String(convId)) {
+            setIsMessagesLoading(false);
+          }
+        });
+
       markActiveRoomAsRead(convId, 'conversation');
       return true;
     } catch (err) {
       console.error('Failed to load conversation messages:', err);
+      setIsMessagesLoading(false);
       return false;
     }
   };
@@ -1288,6 +1351,18 @@ export default function ChatPage() {
     if (!spaceId) return false;
 
     try {
+      const cacheKey = getCacheKey(spaceId, 'space');
+      const cached = getCachedMessages(cacheKey);
+
+      // ⚡ 0ms INSTANT SWITCH: If previously cached, display immediately!
+      if (cached && cached.length > 0) {
+        setMessages(cached);
+        setIsMessagesLoading(false);
+      } else {
+        setMessages([]);
+        setIsMessagesLoading(true);
+      }
+
       const res = await api.get(`/spaces/${spaceId}`);
       if (res.data.success && res.data.space) {
         setActiveId(spaceId);
@@ -1304,16 +1379,30 @@ export default function ChatPage() {
         const rawConvId = res.data.space.conversationId;
         const convId = (typeof rawConvId === 'object' && rawConvId ? (rawConvId._id || rawConvId.id) : rawConvId) || 'none';
 
-        const msgRes = await api.get(`/messages/conversation/${convId}?spaceId=${spaceId}`);
-        if (msgRes.data.success) {
-          setMessages(msgRes.data.messages);
-        }
+        api.get(`/messages/conversation/${convId}?spaceId=${spaceId}`)
+          .then((msgRes) => {
+            if (msgRes.data?.success && Array.isArray(msgRes.data.messages)) {
+              setCachedMessages(cacheKey, msgRes.data.messages);
+              if (String(activeIdRef.current) === String(spaceId) && activeTypeRef.current === 'space') {
+                setMessages(msgRes.data.messages);
+              }
+            }
+          })
+          .catch((err) => console.error('Failed to load space messages:', err))
+          .finally(() => {
+            if (String(activeIdRef.current) === String(spaceId)) {
+              setIsMessagesLoading(false);
+            }
+          });
+
         markActiveRoomAsRead(spaceId, 'space');
         return true;
       }
+      setIsMessagesLoading(false);
       return false;
     } catch (err) {
       console.error('Failed to load space details:', err);
+      setIsMessagesLoading(false);
       return false;
     }
   };
@@ -1345,6 +1434,8 @@ export default function ChatPage() {
     };
 
     setMessages(prev => [...prev, optimisticMsg]);
+    const currentKey = getCacheKey(activeId, activeType);
+    appendMessageToCache(currentKey, optimisticMsg);
 
     try {
       const res = await api.post('/messages', {
@@ -1368,11 +1459,13 @@ export default function ChatPage() {
           return prev.map(m => (m._id === tempId ? sentMsg : m));
         });
 
+        appendMessageToCache(currentKey, sentMsg);
         fetchConversations();
       }
     } catch (err) {
       console.error('Failed to send message:', err);
       setMessages(prev => prev.filter(m => m._id !== tempId));
+      removeMessageFromCache(currentKey, tempId);
     }
   };
 
@@ -1429,6 +1522,7 @@ export default function ChatPage() {
       const res = await api.post(`/messages/${messageId}/reaction`, { emoji });
       if (res.data.success) {
         setMessages(prev => prev.map(m => m._id === messageId ? res.data.message : m));
+        updateMessageInCache(getCacheKey(activeId, activeType), messageId, res.data.message);
         if (socket) {
           socket.emit('reaction:toggle', { roomId: activeId, messageId, reactions: res.data.message.reactions });
         }
@@ -1443,6 +1537,7 @@ export default function ChatPage() {
       const res = await api.post(`/messages/${messageId}/burn`);
       if (res.data.success) {
         setMessages(prev => prev.map(m => m._id === messageId ? res.data.message : m));
+        updateMessageInCache(getCacheKey(activeId, activeType), messageId, res.data.message);
       }
     } catch (err) {
       console.error('Failed to burn message:', err);
@@ -1454,6 +1549,7 @@ export default function ChatPage() {
       const res = await api.delete(`/messages/${messageId}?mode=${mode}`);
       if (res.data.success) {
         setMessages(prev => prev.filter(m => m._id !== messageId));
+        removeMessageFromCache(getCacheKey(activeId, activeType), messageId);
         fetchConversations();
         if (socket && mode === 'everyone') {
           socket.emit('message:delete', { roomId: activeId, messageId });
@@ -1828,27 +1924,40 @@ export default function ChatPage() {
                   <CosmicHeroBanner title={headerTitle} memberCount={`${activeObject?.members?.length || 0}`} />
 
                   {/* Chat Feed */}
-                  <div className="flex-1 overflow-y-auto px-4 md:px-6 space-y-2 bg-[#090c15]">
-                    {messages.map(m => (
-                      <MessageItem
-                        key={m._id}
-                        message={m}
-                        currentPersonaId={activePersona?._id}
-                        activePersona={activePersona}
-                        onReaction={handleToggleReaction}
-                        onBurnMessage={handleBurnMessage}
-                        onDeleteMessage={handleDeleteMessage}
-                        onReplyMessage={(msg) => setReplyingToMessage(msg)}
-                        onOpenSecretLovers={(gId) => handleOpenSecretLovers(gId)}
-                      />
-                    ))}
-                    {typingUser && (
-                      <p className="text-[11px] text-cyan-400 italic animate-pulse">
-                        ✍️ {typingUser} is typing...
-                      </p>
-                    )}
-                    <div ref={messageEndRef} />
-                  </div>
+                  {isMessagesLoading ? (
+                    <MessageSkeleton />
+                  ) : (
+                    <div className="flex-1 overflow-y-auto px-4 md:px-6 space-y-2 bg-[#090c15]">
+                      {messages.map(m => (
+                        <MessageItem
+                          key={m._id}
+                          message={m}
+                          currentPersonaId={activePersona?._id}
+                          activePersona={activePersona}
+                          onReaction={handleToggleReaction}
+                          onBurnMessage={handleBurnMessage}
+                          onDeleteMessage={handleDeleteMessage}
+                          onReplyMessage={(msg) => setReplyingToMessage(msg)}
+                          onOpenSecretLovers={(gId) => handleOpenSecretLovers(gId)}
+                        />
+                      ))}
+                      {messages.length === 0 && (
+                        <div className="flex flex-col items-center justify-center h-full py-12 text-center select-none text-slate-500">
+                          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-xl mb-3">
+                            💬
+                          </div>
+                          <p className="text-sm font-semibold text-slate-300">No messages in this space yet</p>
+                          <p className="text-xs text-slate-500 mt-1">Be the first to share an idea or spark a discussion!</p>
+                        </div>
+                      )}
+                      {typingUser && (
+                        <p className="text-[11px] text-cyan-400 italic animate-pulse">
+                          ✍️ {typingUser} is typing...
+                        </p>
+                      )}
+                      <div ref={messageEndRef} />
+                    </div>
+                  )}
                 </SpaceCanvas>
               ) : (
                 <div className="flex-1 flex flex-col overflow-hidden bg-[#090c15]">
@@ -1863,27 +1972,40 @@ export default function ChatPage() {
                     />
                   )}
 
-                  <div className="flex-1 overflow-y-auto p-4 pt-6 md:p-6 md:pt-8 space-y-3 bg-[#090c15]">
-                    {messages.map(m => (
-                      <MessageItem
-                        key={m._id}
-                        message={m}
-                        currentPersonaId={activePersona?._id}
-                        activePersona={activePersona}
-                        onReaction={handleToggleReaction}
-                        onBurnMessage={handleBurnMessage}
-                        onDeleteMessage={handleDeleteMessage}
-                        onReplyMessage={(msg) => setReplyingToMessage(msg)}
-                        onOpenSecretLovers={(gId) => handleOpenSecretLovers(gId)}
-                      />
-                    ))}
-                    {typingUser && (
-                      <p className="text-[11px] text-cyan-400 italic animate-pulse">
-                        ✍️ {typingUser} is typing...
-                      </p>
-                    )}
-                    <div ref={messageEndRef} />
-                  </div>
+                  {isMessagesLoading ? (
+                    <MessageSkeleton />
+                  ) : (
+                    <div className="flex-1 overflow-y-auto p-4 pt-6 md:p-6 md:pt-8 space-y-3 bg-[#090c15]">
+                      {messages.map(m => (
+                        <MessageItem
+                          key={m._id}
+                          message={m}
+                          currentPersonaId={activePersona?._id}
+                          activePersona={activePersona}
+                          onReaction={handleToggleReaction}
+                          onBurnMessage={handleBurnMessage}
+                          onDeleteMessage={handleDeleteMessage}
+                          onReplyMessage={(msg) => setReplyingToMessage(msg)}
+                          onOpenSecretLovers={(gId) => handleOpenSecretLovers(gId)}
+                        />
+                      ))}
+                      {messages.length === 0 && (
+                        <div className="flex flex-col items-center justify-center h-full py-12 text-center select-none text-slate-500">
+                          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-xl mb-3">
+                            ✨
+                          </div>
+                          <p className="text-sm font-semibold text-slate-300">Start of your private conversation</p>
+                          <p className="text-xs text-slate-500 mt-1">Send a message to break the ice!</p>
+                        </div>
+                      )}
+                      {typingUser && (
+                        <p className="text-[11px] text-cyan-400 italic animate-pulse">
+                          ✍️ {typingUser} is typing...
+                        </p>
+                      )}
+                      <div ref={messageEndRef} />
+                    </div>
+                  )}
                 </div>
               )}
 
