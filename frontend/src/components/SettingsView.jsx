@@ -10,8 +10,17 @@ import PasscodeModal from './PasscodeModal';
 import {
   User, Palette, Bell, Shield, UserX, HelpCircle, Camera, Edit2,
   Check, LogOut, Moon, Sun, Monitor, Lock, Eye, EyeOff, Key,
-  MessageSquare, ChevronRight, X, Save, Loader2, CheckCircle, AlertCircle, Volume2, ArrowLeft
+  MessageSquare, ChevronRight, X, Save, Loader2, CheckCircle, AlertCircle, Volume2, ArrowLeft,
+  Smartphone, Upload, Play, Square, Trash2, Music
 } from 'lucide-react';
+import {
+  getRingtoneSettings,
+  setRingtoneMode,
+  setVibrateEnabled,
+  uploadCustomRingtone,
+  deleteCustomRingtone,
+  getCustomRingtoneBlob
+} from '../lib/ringtoneManager';
 
 // ─── Inline editable field ────────────────────────────────────────────────────
 function EditableField({ label, value, onSave, type = 'text', placeholder, mono = false, multiline = false }) {
@@ -575,6 +584,98 @@ export default function SettingsView({ onBack, defaultSection }) {
     });
   };
 
+  // ── Call Ringtone Preferences ──
+  const [ringtoneSettings, setRingtoneSettings] = useState(getRingtoneSettings);
+  const [testingAudio, setTestingAudio] = useState(false);
+  const ringtoneAudioRef = useRef(null);
+  const ringtoneFileInputRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (ringtoneAudioRef.current) {
+        try {
+          ringtoneAudioRef.current.pause();
+          ringtoneAudioRef.current.currentTime = 0;
+        } catch (e) {}
+      }
+    };
+  }, []);
+
+  const handleRingtoneModeChange = (mode) => {
+    setRingtoneMode(mode);
+    setRingtoneSettings(getRingtoneSettings());
+    stopRingtoneTest();
+  };
+
+  const handleVibrateToggle = () => {
+    const nextVal = !ringtoneSettings.vibrate;
+    setVibrateEnabled(nextVal);
+    setRingtoneSettings(prev => ({ ...prev, vibrate: nextVal }));
+    if (nextVal && typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([200, 100, 200]);
+    }
+  };
+
+  const handleCustomRingtoneUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await uploadCustomRingtone(file);
+      setRingtoneSettings(getRingtoneSettings());
+    } catch (err) {
+      alert('Could not save ringtone: ' + err.message);
+    }
+  };
+
+  const handleDeleteCustomRingtone = async () => {
+    stopRingtoneTest();
+    await deleteCustomRingtone();
+    setRingtoneSettings(getRingtoneSettings());
+  };
+
+  const stopRingtoneTest = () => {
+    if (ringtoneAudioRef.current) {
+      try {
+        ringtoneAudioRef.current.pause();
+        ringtoneAudioRef.current.currentTime = 0;
+      } catch (e) {}
+      ringtoneAudioRef.current = null;
+    }
+    setTestingAudio(false);
+  };
+
+  const handleTestRingtone = async () => {
+    if (testingAudio) {
+      stopRingtoneTest();
+      return;
+    }
+    const blob = await getCustomRingtoneBlob();
+    if (!blob) {
+      alert('Please upload a ringtone audio file from your device first.');
+      return;
+    }
+    try {
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = () => {
+        setTestingAudio(false);
+        URL.revokeObjectURL(url);
+      };
+      ringtoneAudioRef.current = audio;
+      setTestingAudio(true);
+      const p = audio.play();
+      if (p !== undefined) {
+        p.catch(err => {
+          console.warn('Playback error:', err);
+          setTestingAudio(false);
+        });
+      }
+    } catch (err) {
+      console.warn('Playback error:', err);
+      setTestingAudio(false);
+    }
+  };
+
   const navItems = [
     { id: 'profile', label: 'Profile', icon: <User className="w-4 h-4" /> },
     { id: 'appearance', label: 'Appearance', icon: <Palette className="w-4 h-4" /> },
@@ -963,6 +1064,168 @@ export default function SettingsView({ onBack, defaultSection }) {
                 ))}
               </div>
               <p className="text-[10px] text-gray-500">Changes are saved instantly and apply to all new messages.</p>
+            </div>
+
+            {/* ── Call Ringtone & Phone Alerts ── */}
+            <div className="p-6 rounded-3xl bg-[#0f172a] border border-indigo-500/20 space-y-4 shadow-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                  <Smartphone className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white">Call Ringtone & Device Alerts</h4>
+                  <p className="text-[11px] text-gray-400">Choose between your phone&apos;s native ringtone or a custom audio file</p>
+                </div>
+              </div>
+
+              {/* Mode Selection */}
+              <div className="space-y-2.5 pt-1">
+                {/* Option 1: Phone / Device Native */}
+                <div
+                  onClick={() => handleRingtoneModeChange('phone_default')}
+                  className={`p-4 rounded-2xl border cursor-pointer transition flex items-start gap-3.5 ${
+                    ringtoneSettings.mode === 'phone_default'
+                      ? 'bg-indigo-600/15 border-indigo-500/60 shadow-lg shadow-indigo-500/10'
+                      : 'bg-[#151c2e] border-[#27344d] hover:border-gray-600'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="ringtone_mode"
+                    checked={ringtoneSettings.mode === 'phone_default'}
+                    onChange={() => handleRingtoneModeChange('phone_default')}
+                    className="mt-1 accent-indigo-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-bold text-white">Use Phone / Device Ringtone</p>
+                      <span className="text-[9px] px-2 py-0.5 rounded-full font-mono font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Default
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
+                      Uses your mobile phone&apos;s native alert sound and device vibration pattern. No artificial sounds.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Option 2: Custom Phone Ringtone */}
+                <div
+                  onClick={() => handleRingtoneModeChange('custom')}
+                  className={`p-4 rounded-2xl border cursor-pointer transition flex flex-col gap-3 ${
+                    ringtoneSettings.mode === 'custom'
+                      ? 'bg-indigo-600/15 border-indigo-500/60 shadow-lg shadow-indigo-500/10'
+                      : 'bg-[#151c2e] border-[#27344d] hover:border-gray-600'
+                  }`}
+                >
+                  <div className="flex items-start gap-3.5">
+                    <input
+                      type="radio"
+                      name="ringtone_mode"
+                      checked={ringtoneSettings.mode === 'custom'}
+                      onChange={() => handleRingtoneModeChange('custom')}
+                      className="mt-1 accent-indigo-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-white">Custom Phone Ringtone</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
+                        Select an audio file (MP3, WAV, M4A) directly from your phone or device storage.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Custom audio controls */}
+                  <div className="pl-7 space-y-2.5">
+                    <input
+                      type="file"
+                      ref={ringtoneFileInputRef}
+                      accept="audio/*"
+                      className="hidden"
+                      onChange={handleCustomRingtoneUpload}
+                    />
+
+                    {ringtoneSettings.customFileName ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-[#0c101c] border border-cyan-500/30">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Music className="w-4 h-4 text-cyan-400 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-white truncate max-w-[200px]">{ringtoneSettings.customFileName}</p>
+                            {ringtoneSettings.customFileSize && (
+                              <p className="text-[10px] text-gray-400 font-mono">
+                                {(ringtoneSettings.customFileSize / (1024 * 1024)).toFixed(2)} MB
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleTestRingtone(); }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                              testingAudio
+                                ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
+                                : 'bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-600/40'
+                            }`}
+                          >
+                            {testingAudio ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                            <span>{testingAudio ? 'Stop' : 'Test'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); ringtoneFileInputRef.current?.click(); }}
+                            className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 transition"
+                            title="Replace audio file"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteCustomRingtone(); }}
+                            className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition"
+                            title="Remove custom ringtone"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); ringtoneFileInputRef.current?.click(); }}
+                        className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold transition"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Choose Audio File from Phone</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Vibration Toggle */}
+              <div className="pt-3 border-t border-[#1e293b] flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-white">Call Vibration</p>
+                  <p className="text-[10px] text-gray-400">Vibrate phone on incoming calls</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleVibrateToggle}
+                  aria-pressed={ringtoneSettings.vibrate}
+                  className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 ${
+                    ringtoneSettings.vibrate ? 'bg-indigo-600' : 'bg-gray-700'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${
+                      ringtoneSettings.vibrate ? 'right-1' : 'left-1'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             {/* Closed-App / Lock Screen Background Push Card */}

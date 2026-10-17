@@ -19,7 +19,8 @@ self.addEventListener('push', (event) => {
       badge: '/icon.png',
       tag: isCall ? ('call-' + (notifData.callId || Date.now())) : (rawPayload.tag || 'genace-notification'),
       requireInteraction: isCall, // Keep visible on screen for calls
-      vibrate: isCall ? [400, 200, 400, 200, 600] : [200, 100, 200],
+      silent: false,
+      vibrate: isCall ? [1000, 500, 1000, 500, 1000, 500, 1000] : [200, 100, 200],
       data: {
         url: rawPayload.url || '/chat',
         type: notifData.type || 'message',

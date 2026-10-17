@@ -1,17 +1,27 @@
 'use client';
-
-import { useEffect } from 'react';
-import { Phone, PhoneOff, Video } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Phone, PhoneOff, Video, Volume2, VolumeX, Smartphone } from 'lucide-react';
 import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 import { playIncomingRingtone, stopAllSFX } from '../lib/callSFX';
+import { getRingtoneSettings, stopRingtoneAudio, stopCallVibration } from '../lib/ringtoneManager';
 
 export default function IncomingCallModal({ call, onAccept, onDecline }) {
+  const [silenced, setSilenced] = useState(false);
+  const [ringtoneInfo, setRingtoneInfo] = useState({ mode: 'phone_default', customFileName: null });
+
   useEffect(() => {
+    setRingtoneInfo(getRingtoneSettings());
     playIncomingRingtone();
     return () => {
       stopAllSFX();
     };
   }, []);
+
+  const handleSilence = () => {
+    setSilenced(true);
+    stopRingtoneAudio();
+    stopCallVibration();
+  };
 
   if (!call) return null;
 
@@ -23,6 +33,36 @@ export default function IncomingCallModal({ call, onAccept, onDecline }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fadeIn">
       <div className="relative w-full max-w-sm bg-[#101625] border border-indigo-500/30 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center overflow-hidden">
+        {/* Top bar with quick silence button */}
+        <div className="w-full flex items-center justify-between mb-2">
+          <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1.5">
+            {ringtoneInfo.mode === 'custom' && ringtoneInfo.customFileName ? (
+              <>
+                <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="truncate max-w-[140px] text-cyan-300">{ringtoneInfo.customFileName}</span>
+              </>
+            ) : (
+              <>
+                <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Phone Ringtone & Vibrate</span>
+              </>
+            )}
+          </span>
+          {!silenced ? (
+            <button
+              onClick={handleSilence}
+              title="Silence ringtone & vibration"
+              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition flex items-center gap-1 text-[11px]"
+            >
+              <VolumeX className="w-3.5 h-3.5" />
+              <span>Silence</span>
+            </button>
+          ) : (
+            <span className="text-[10px] font-mono text-amber-400 flex items-center gap-1">
+              <VolumeX className="w-3 h-3" /> Silenced
+            </span>
+          )}
+        </div>
         {/* Glowing Background Pulse Halo */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl animate-pulse" />
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />

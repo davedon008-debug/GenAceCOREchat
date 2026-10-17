@@ -1,5 +1,10 @@
-// Web Audio API Synthesized Call SFX (Zero External MP3 Assets Required)
+import {
+  playActiveRingtone,
+  stopRingtoneAudio,
+  stopCallVibration
+} from './ringtoneManager';
 
+// Ringtone & Call Audio Engine
 let audioCtx = null;
 let activeLoopInterval = null;
 let activeOscillators = [];
@@ -13,12 +18,25 @@ const getAudioContext = () => {
     }
   }
   if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume();
+    audioCtx.resume().catch(() => {});
   }
   return audioCtx;
 };
 
+// Auto-unlock audio playback on first user gesture
+export const unlockAudio = () => {
+  try {
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+  } catch (e) {}
+};
+
 export const stopAllSFX = () => {
+  stopRingtoneAudio();
+  stopCallVibration();
+
   if (activeLoopInterval) {
     clearInterval(activeLoopInterval);
     activeLoopInterval = null;
@@ -31,43 +49,9 @@ export const stopAllSFX = () => {
 
 export const playIncomingRingtone = () => {
   stopAllSFX();
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
-  const playToneBurst = () => {
-    try {
-      const now = ctx.currentTime;
-      const osc1 = ctx.createOscillator();
-      const osc2 = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc1.type = 'sine';
-      osc2.type = 'sine';
-      osc1.frequency.setValueAtTime(440, now); // A4
-      osc2.frequency.setValueAtTime(480, now); // Harmonic pair
-
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.15, now + 0.05);
-      gain.gain.setValueAtTime(0.15, now + 1.2);
-      gain.gain.linearRampToValueAtTime(0, now + 1.4);
-
-      osc1.connect(gain);
-      osc2.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc1.start(now);
-      osc2.start(now);
-      osc1.stop(now + 1.4);
-      osc2.stop(now + 1.4);
-
-      activeOscillators.push(osc1, osc2);
-    } catch (err) {
-      console.warn('Audio synthesis error:', err);
-    }
-  };
-
-  playToneBurst();
-  activeLoopInterval = setInterval(playToneBurst, 2400);
+  playActiveRingtone().catch(err => {
+    console.warn('[CallSFX] Error playing active ringtone:', err);
+  });
 };
 
 export const playRingback = () => {
@@ -77,6 +61,7 @@ export const playRingback = () => {
 
   const playPulse = () => {
     try {
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -85,8 +70,8 @@ export const playRingback = () => {
       osc.frequency.setValueAtTime(425, now);
 
       gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.1, now + 0.05);
-      gain.gain.setValueAtTime(0.1, now + 1.0);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
+      gain.gain.setValueAtTime(0.12, now + 1.0);
       gain.gain.linearRampToValueAtTime(0, now + 1.1);
 
       osc.connect(gain);
@@ -108,6 +93,7 @@ export const playCallConnected = () => {
   if (!ctx) return;
 
   try {
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const now = ctx.currentTime;
     const osc1 = ctx.createOscillator();
     const osc2 = ctx.createOscillator();
@@ -118,7 +104,7 @@ export const playCallConnected = () => {
     osc1.frequency.setValueAtTime(523.25, now); // C5
     osc2.frequency.setValueAtTime(659.25, now + 0.12); // E5
 
-    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.setValueAtTime(0.15, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
 
     osc1.connect(gain);
@@ -138,6 +124,7 @@ export const playCallEnded = () => {
   if (!ctx) return;
 
   try {
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const now = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -146,7 +133,7 @@ export const playCallEnded = () => {
     osc.frequency.setValueAtTime(400, now);
     osc.frequency.exponentialRampToValueAtTime(200, now + 0.3);
 
-    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.setValueAtTime(0.15, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
 
     osc.connect(gain);

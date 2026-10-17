@@ -33,7 +33,7 @@ import CallModal from '../../components/CallModal';
 import IncomingCallModal from '../../components/IncomingCallModal';
 import SecretLoversModal from '../../components/games/SecretLoversModal';
 import { playNotificationSound, playSentSound, getNotifPrefs } from '../../lib/sound';
-import { playCallConnected, playCallEnded, playRingback, playIncomingRingtone, stopAllSFX } from '../../lib/callSFX';
+import { playCallConnected, playCallEnded, playRingback, playIncomingRingtone, stopAllSFX, unlockAudio } from '../../lib/callSFX';
 import { enableWebPushNotifications } from '../../lib/pushSubscription';
 import MessageSkeleton from '../../components/MessageSkeleton';
 import {
@@ -157,6 +157,25 @@ export default function ChatPage() {
     return iceServersRef.current || [{ urls: 'stun:stun.l.google.com:19302' }];
   };
   useEffect(() => { if (token) loadIceServers(); }, [token]);
+
+  // Unlock browser audio autoplay policy on first user gesture
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleFirstGesture = () => {
+      unlockAudio();
+      window.removeEventListener('click', handleFirstGesture);
+      window.removeEventListener('touchstart', handleFirstGesture);
+      window.removeEventListener('keydown', handleFirstGesture);
+    };
+    window.addEventListener('click', handleFirstGesture, { once: true });
+    window.addEventListener('touchstart', handleFirstGesture, { once: true });
+    window.addEventListener('keydown', handleFirstGesture, { once: true });
+    return () => {
+      window.removeEventListener('click', handleFirstGesture);
+      window.removeEventListener('touchstart', handleFirstGesture);
+      window.removeEventListener('keydown', handleFirstGesture);
+    };
+  }, []);
 
   const cleanupCall = () => {
     stopAllSFX();
