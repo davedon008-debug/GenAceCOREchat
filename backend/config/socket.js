@@ -467,8 +467,7 @@ export const initSocketServer = (httpServer) => {
           roomId,
           isVideo: !!isVideo,
           callerName,
-          callerPersonaId: socket.personaId,
-          callerPersona: callerPersona || { _id: socket.personaId, displayName: callerName }
+          callerPersonaId: String(socket.personaId)
         }
       ).catch(pushErr => console.warn('[Call Push Dispatch Warning]:', pushErr?.message || pushErr));
     });

@@ -126,9 +126,7 @@ export const sendPushNotifications = async (recipientPersonaIds = [], title, bod
     // 2. Dispatch Web Push Notifications for Web Browsers (Closed Tab / PWA Background)
     if (webSubscriptions.length > 0) {
       let targetUrl = '/chat';
-      if (data.type === 'call') {
-        targetUrl = `/chat?callId=${data.callId}&action=call${data.roomId ? '&conversationId=' + data.roomId : ''}`;
-      } else if (data.conversationId) {
+      if (data.conversationId) {
         targetUrl = `/chat?conversationId=${data.conversationId}`;
       } else if (data.spaceId) {
         targetUrl = `/chat?spaceId=${data.spaceId}`;

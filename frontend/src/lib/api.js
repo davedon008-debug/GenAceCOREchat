@@ -41,7 +41,6 @@ api.interceptors.response.use(
         msg.includes('jwt expired') ||
         msg.includes('account no longer exists') ||
         msg.includes('terminated') ||
-        msg.includes('not authorized') ||
         msg.includes('invalid token');
 
       if (isAuthFail && typeof window !== 'undefined') {

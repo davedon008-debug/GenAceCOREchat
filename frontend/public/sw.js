@@ -21,14 +21,9 @@ self.addEventListener('push', (event) => {
       requireInteraction: isCall, // Keep visible on screen for calls
       vibrate: isCall ? [400, 200, 400, 200, 600] : [200, 100, 200],
       data: {
-        url: rawPayload.url || (isCall ? `/chat?callId=${notifData.callId}&action=call` : '/chat'),
+        url: rawPayload.url || '/chat',
         type: notifData.type || 'message',
-        callId: notifData.callId,
-        callerName: notifData.callerName,
-        callerPersonaId: notifData.callerPersonaId,
-        callerPersona: notifData.callerPersona,
-        roomId: notifData.roomId,
-        isVideo: notifData.isVideo
+        callId: notifData.callId
       },
       actions: isCall ? [
         { action: 'answer', title: '📞 Answer' },
@@ -52,13 +47,12 @@ self.addEventListener('notificationclick', (event) => {
   if (event.action === 'decline') {
     if (notifData.callId) {
       // 1. Tell backend to reject the call immediately (notifies caller without reloading app)
-      const rejectPromise = fetch('/api/calls/reject', {
+      const rejectPromise = fetch('https://genacecorechat.onrender.com/api/calls/reject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           callId: notifData.callId,
-          reason: 'declined',
-          responderPersonaId: notifData.callerPersonaId
+          reason: 'declined'
         })
       }).catch(err => console.warn('[SW] Call reject fetch error:', err));
 
@@ -83,13 +77,10 @@ self.addEventListener('notificationclick', (event) => {
       // Search for any existing open app tab
       for (const client of clientList) {
         if ('focus' in client) {
-          // CRITICAL FIX: Do NOT call client.navigate(targetUrl)!
-          // Navigating an existing client forces a hard reload, destroying React state and disconnecting the socket.
-          // Instead, simply postMessage with the call info and focus the tab!
           client.postMessage({
             type: 'GENACE_NOTIFICATION_CLICK',
             action: event.action || 'open',
-            data: notifData
+            callId: notifData.callId
           });
           return client.focus();
         }

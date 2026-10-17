@@ -656,15 +656,6 @@ export default function ChatPage() {
           console.log('[Call Recovery] Restored pending call on load:', call);
           setIncomingCall(call);
           playIncomingRingtone();
-
-          if (typeof window !== 'undefined') {
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('action') === 'answer' || urlParams.get('callAction') === 'answer') {
-              setTimeout(() => {
-                handleAcceptCall();
-              }, 400);
-            }
-          }
         }
       } catch (err) {
         if (socket) socket.emit('call:query-pending');
@@ -1578,17 +1569,23 @@ export default function ChatPage() {
 
   // Handle URL query parameters (?conversationId=... or ?spaceId=...) on initial load
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !token || !activePersona) return;
     const params = new URLSearchParams(window.location.search);
     const convId = params.get('conversationId');
     const spId = params.get('spaceId');
 
-    if (convId && (!activeId || activeId !== convId)) {
-      selectConversation(convId);
-    } else if (spId && (!activeId || activeId !== spId)) {
-      selectSpace(spId);
+    if (convId && conversations.length > 0 && (!activeId || activeId !== convId)) {
+      const match = conversations.find(c => String(c._id) === String(convId));
+      if (match) {
+        selectConversation(convId, match);
+      }
+    } else if (spId && spaces.length > 0 && (!activeId || activeId !== spId)) {
+      const match = spaces.find(s => String(s._id) === String(spId));
+      if (match) {
+        selectSpace(spId);
+      }
     }
-  }, [conversations, spaces]);
+  }, [conversations, spaces, token, activePersona]);
 
   const handleSendMessage = async ({ content, contentType, mediaUrl, voiceDuration, replyTo }) => {
     if (!activeId || (!content && !mediaUrl)) return;
