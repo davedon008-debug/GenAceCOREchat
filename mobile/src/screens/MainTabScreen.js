@@ -23,11 +23,12 @@ import SpaceDetailsModal from '../components/SpaceDetailsModal';
 import SetPasscodeModal from '../components/SetPasscodeModal';
 import AvatarViewerModal from '../components/AvatarViewerModal';
 import IncomingCallModal from '../components/IncomingCallModal';
+import InviteFriendsModal from '../components/InviteFriendsModal';
 import { playIncomingRingtone, stopAllSFX } from '../lib/callSFX';
 import Logo from '../components/Logo';
 import {
   Menu, Search, MessageSquare, Zap, Users, Settings, Compass,
-  Globe, Info, Plus, Shield, Crown, Lock, ChevronRight, X, User, Camera
+  Globe, Info, Plus, Shield, Crown, Lock, ChevronRight, X, User, Camera, Share2
 } from 'lucide-react-native';
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80';
@@ -71,6 +72,7 @@ export default function MainTabScreen({ navigation }) {
   const [createSpaceVisible, setCreateSpaceVisible] = useState(false);
   const [personaModalVisible, setPersonaModalVisible] = useState(false);
   const [inviteModalSpace, setInviteModalSpace] = useState(null);
+  const [inviteFriendsVisible, setInviteFriendsVisible] = useState(false);
   const [adminModalVisible, setAdminModalVisible] = useState(false);
   const [friendRequestsVisible, setFriendRequestsVisible] = useState(false);
   const [membersDrawerVisible, setMembersDrawerVisible] = useState(false);
@@ -1220,6 +1222,38 @@ export default function MainTabScreen({ navigation }) {
                     </View>
                   );
                 }}
+                ListFooterComponent={
+                  <TouchableOpacity
+                    style={[
+                      styles.inviteFriendsBannerMobile,
+                      {
+                        backgroundColor: themeMode === 'light' ? 'rgba(79, 70, 229, 0.08)' : 'rgba(99, 102, 241, 0.12)',
+                        borderColor: themeMode === 'light' ? 'rgba(79, 70, 229, 0.25)' : 'rgba(99, 102, 241, 0.3)'
+                      }
+                    ]}
+                    onPress={() => setInviteFriendsVisible(true)}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.inviteBannerLeft}>
+                      <View style={[styles.inviteBannerIcon, { backgroundColor: dynamicColors.primary }]}>
+                        <Share2 size={18} color="#ffffff" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={[styles.inviteBannerTitle, { color: dynamicColors.text }]}>Invite friends</Text>
+                          <View style={{ backgroundColor: 'rgba(99, 102, 241, 0.2)', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 }}>
+                            <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#6366f1' }}>Web Link</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.inviteBannerSub, { color: dynamicColors.textSecondary }]} numberOfLines={1}>
+                          Share web link to WhatsApp, Instagram, Snapchat & more!
+                        </Text>
+                      </View>
+                    </View>
+                    <ChevronRight size={18} color={dynamicColors.textMuted} />
+                  </TouchableOpacity>
+                }
+                ListFooterComponentStyle={{ marginTop: 14, marginBottom: 32 }}
               />
             )}
           </View>
@@ -1955,6 +1989,12 @@ export default function MainTabScreen({ navigation }) {
         handle={avatarViewerTarget.handle}
         bio={avatarViewerTarget.bio}
         customStatus={avatarViewerTarget.customStatus}
+      />
+
+      <InviteFriendsModal
+        visible={inviteFriendsVisible}
+        onClose={() => setInviteFriendsVisible(false)}
+        activePersona={activePersona}
       />
 
       <IncomingCallModal
@@ -2940,6 +2980,36 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#818cf8',
     letterSpacing: 0.5,
+  },
+  inviteFriendsBannerMobile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  inviteBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+    marginRight: 8,
+  },
+  inviteBannerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inviteBannerTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  inviteBannerSub: {
+    fontSize: 10.5,
+    marginTop: 2,
   },
 });
 

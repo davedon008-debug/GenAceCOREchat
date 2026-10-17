@@ -6,8 +6,13 @@ import { Search, Share2, ChevronRight, Menu, ArrowLeft } from 'lucide-react';
 
 import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
+import InviteFriendsModal from './InviteFriendsModal';
+import { useAuth } from '../context/AuthContext';
 
-export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileSidebar, onBack, onRefreshContacts }) {
+export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileSidebar, onBack, onRefreshContacts, activePersona: propPersona }) {
+  const authCtx = useAuth();
+  const activePersona = propPersona || authCtx?.activePersona;
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('suggested'); // 'suggested' | 'contacts' | 'requests'
   const [addedHandles, setAddedHandles] = useState([]);
@@ -234,18 +239,35 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
       </div>
 
       {/* Invite Friends Footer Banner */}
-      <div className="max-w-2xl w-full p-3.5 sm:p-4 rounded-3xl bg-gradient-to-r from-indigo-950/60 to-blue-950/60 border border-indigo-500/30 flex items-center justify-between cursor-pointer hover:border-indigo-400/60 transition group">
+      <div
+        onClick={() => setShowInviteModal(true)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowInviteModal(true); } }}
+        className="max-w-2xl w-full p-3.5 sm:p-4 rounded-3xl bg-gradient-to-r from-indigo-950/60 to-blue-950/60 border border-indigo-500/30 flex items-center justify-between cursor-pointer hover:border-indigo-400/60 hover:from-indigo-900/60 hover:to-blue-900/60 active:scale-[0.99] transition-all group shadow-lg shadow-indigo-950/40"
+      >
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-indigo-300 group-hover:scale-105 group-hover:bg-indigo-600/50 transition-all shrink-0">
             <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div className="min-w-0 flex-1 overflow-hidden">
-            <h4 className="text-xs font-bold text-white group-hover:text-indigo-300 transition truncate">Invite friends</h4>
-            <p className="text-[10px] text-gray-300 truncate">Share the app with your friends and grow the community!</p>
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs font-bold text-white group-hover:text-indigo-300 transition truncate">Invite friends</h4>
+              <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-indigo-500/20 text-[9px] font-bold text-indigo-300 border border-indigo-500/30">
+                Share Link
+              </span>
+            </div>
+            <p className="text-[10px] text-gray-300 truncate">Share the web link to WhatsApp, Instagram, Snapchat & more!</p>
           </div>
         </div>
         <ChevronRight className="w-5 h-5 text-indigo-400 group-hover:translate-x-1 transition shrink-0 ml-2" />
       </div>
+
+      <InviteFriendsModal
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        activePersona={activePersona}
+      />
 
       <AvatarViewerModal
         isOpen={avatarViewerTarget.isOpen}

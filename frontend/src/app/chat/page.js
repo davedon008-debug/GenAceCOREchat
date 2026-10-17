@@ -2264,6 +2264,7 @@ export default function ChatPage() {
           ) : activeNavView === 'friends' ? (
             <FriendsView
               allContacts={allContacts}
+              activePersona={activePersona}
               onStartDM={(id) => startNewDirectMessage(id)}
               onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
               onBack={() => setActiveNavView('chats')}
