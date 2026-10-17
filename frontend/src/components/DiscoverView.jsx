@@ -99,7 +99,7 @@ export default function DiscoverView({ allContacts = [], onSelectSpace, onStartD
     : allContacts.filter(c => (c.displayName || c.username)?.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#090c15] p-6 overflow-y-auto select-none space-y-8">
+    <div className="flex-1 flex flex-col h-full bg-[#090c15] p-4 sm:p-6 pb-28 md:pb-6 overflow-y-auto select-none space-y-6 sm:space-y-8">
       {/* Header */}
       <div className="border-b border-[#1e293b] pb-5 flex items-center gap-3">
         {onOpenMobileSidebar && (

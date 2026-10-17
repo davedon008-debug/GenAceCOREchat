@@ -55,7 +55,7 @@ export const registerUser = async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, personaId: defaultPersona._id },
       getJwtSecret(),
-      { expiresIn: '7d' }
+      { expiresIn: '365d' }
     );
 
     res.status(201).json({
@@ -129,7 +129,7 @@ export const loginUser = async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, personaId: defaultPersona._id },
       getJwtSecret(),
-      { expiresIn: '7d' }
+      { expiresIn: '365d' }
     );
 
     res.json({
@@ -221,7 +221,7 @@ export const demoLogin = async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, personaId: defaultPersona._id },
       getJwtSecret(),
-      { expiresIn: '7d' }
+      { expiresIn: '365d' }
     );
 
     res.json({

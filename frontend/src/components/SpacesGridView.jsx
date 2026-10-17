@@ -44,7 +44,7 @@ export default function SpacesGridView({ spaces = [], onSelectSpace, onOpenCreat
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#080b14] p-3 sm:p-6 overflow-y-auto select-none space-y-4 sm:space-y-6">
+    <div className="flex-1 flex flex-col h-full bg-[#080b14] p-3 sm:p-6 pb-28 md:pb-6 overflow-y-auto select-none space-y-4 sm:space-y-6">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1d273e] pb-5">
         <div className="flex items-center gap-3 min-w-0 flex-1">

@@ -209,7 +209,7 @@ export default function AdminView({ onBack, onInspectSpace, onOpenMobileSidebar 
   });
 
   return (
-    <div className="flex-1 h-full bg-[#080b14] flex flex-col justify-between p-4 md:p-6 select-none relative overflow-y-auto">
+    <div className="flex-1 h-full bg-[#080b14] flex flex-col justify-between p-4 md:p-6 pb-28 md:pb-6 select-none relative overflow-y-auto">
       
       {/* Toast Alert Popup */}
       {toastMessage && (

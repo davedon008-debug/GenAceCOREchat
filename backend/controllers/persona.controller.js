@@ -77,7 +77,7 @@ export const switchPersona = async (req, res) => {
     const token = jwt.sign(
       { userId: req.userId, personaId: persona._id },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '365d' }
     );
 
     res.json({

@@ -305,6 +305,42 @@ export default function ChatPage() {
       if (activeCallRef.current || incomingCallRef.current) return;
       console.log('[Call] Incoming call received:', data);
       setIncomingCall(data);
+
+      const callerName = data?.callerPersona?.displayName || data?.callerPersona?.username || 'Someone';
+      const callTypeStr = data?.isVideo ? 'Video' : 'Voice';
+
+      // Flash tab title to alert user even in another tab
+      if (typeof document !== 'undefined') {
+        const prevTitle = document.title;
+        let toggle = false;
+        const callTitleInterval = setInterval(() => {
+          if (!incomingCallRef.current) {
+            clearInterval(callTitleInterval);
+            document.title = prevTitle;
+            return;
+          }
+          document.title = toggle ? `📞 INCOMING CALL: ${callerName}` : `⚡ ${callerName} is calling you...`;
+          toggle = !toggle;
+        }, 1000);
+      }
+
+      // Dispatch system notification so call displays on background of device
+      try {
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          const callNotif = new Notification(`📞 Incoming ${callTypeStr} Call`, {
+            body: `${callerName} is calling you on GenAce. Tap to answer!`,
+            icon: getMediaUrl(data?.callerPersona?.avatar) || '/icon.png',
+            tag: `call-${data?.callId || Date.now()}`,
+            requireInteraction: true
+          });
+          callNotif.onclick = () => {
+            if (typeof window !== 'undefined') window.focus();
+            callNotif.close();
+          };
+        }
+      } catch (err) {
+        console.warn('Call background notification notice:', err);
+      }
     };
 
     const handleCallAccepted = async (data) => {
@@ -767,8 +803,17 @@ export default function ChatPage() {
       }).catch(() => {});
     }
 
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && activePersona?._id) {
-      enableWebPushNotifications().catch(() => {});
+    if (typeof window !== 'undefined' && 'Notification' in window && activePersona?._id) {
+      if (Notification.permission === 'granted') {
+        enableWebPushNotifications().catch(() => {});
+      } else if (Notification.permission === 'default' && typeof Notification.requestPermission === 'function') {
+        // Prompt for notification permission so calls and messages can display in background
+        Notification.requestPermission().then((perm) => {
+          if (perm === 'granted') {
+            enableWebPushNotifications().catch(() => {});
+          }
+        }).catch(() => {});
+      }
     }
   }, [activePersona]);
 
@@ -952,6 +997,7 @@ export default function ChatPage() {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('focus', handleVisibilityOrFocus);
+      window.addEventListener('online', handleVisibilityOrFocus);
       document.addEventListener('visibilitychange', handleVisibilityOrFocus);
     }
 
@@ -966,6 +1012,7 @@ export default function ChatPage() {
       socket.off('reconnect', handleSocketReconnect);
       if (typeof window !== 'undefined') {
         window.removeEventListener('focus', handleVisibilityOrFocus);
+        window.removeEventListener('online', handleVisibilityOrFocus);
         document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
       }
       clearInterval(pollInterval);
@@ -1935,8 +1982,8 @@ export default function ChatPage() {
       </div>
 
       {/* Main Workspace Viewport: Always flex and visible across all screen sizes */}
-      <main className="flex-1 flex h-full overflow-hidden relative w-full bg-[#080b14]">
-        <div className="flex-1 flex flex-col h-full overflow-hidden">
+      <main className="flex-1 flex h-full min-h-0 overflow-hidden relative w-full bg-[#080b14]">
+        <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
           {activeId ? (
             <div className="flex-1 flex flex-col h-full overflow-hidden">
               {/* Header Bar */}
@@ -2147,7 +2194,7 @@ export default function ChatPage() {
               </div>
 
               {/* Mobile Full-Screen Main Tab List View matching MainTabScreen.js */}
-              <div className="block md:hidden flex-1 h-full overflow-hidden pb-14">
+              <div className="block md:hidden flex-1 h-full overflow-hidden pb-24">
                 <Sidebar
                   conversations={conversations}
                   spaces={spaces}

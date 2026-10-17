@@ -5,6 +5,7 @@ import Persona from '../models/Persona.js';
 import Conversation from '../models/Conversation.js';
 import Space from '../models/Space.js';
 import Message from '../models/Message.js';
+import { sendPushNotifications } from './push.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -362,14 +363,34 @@ export const initSocketServer = (httpServer) => {
       if (!targetPersonaId) return;
       const targetRoom = `persona:${targetPersonaId}`;
       console.log(`[Call Signaling] Persona ${socket.personaId} initiating ${isVideo ? 'Video' : 'Audio'} call to ${targetPersonaId} (CallId: ${callId})`);
-      io.to(targetRoom).emit('call:incoming', {
+      
+      const payload = {
         callId,
         callerPersona: callerPersona || { _id: socket.personaId, displayName: 'User' },
         callerSocketId: socket.id,
         roomId,
         isVideo: !!isVideo,
         timestamp: Date.now()
-      });
+      };
+
+      io.to(targetRoom).emit('call:incoming', payload);
+
+      // Dispatch Web Push Notification so device receives call alert in background/locked screen
+      const callerName = callerPersona?.displayName || callerPersona?.username || 'Someone';
+      const callTypeStr = isVideo ? 'Video' : 'Voice';
+      sendPushNotifications(
+        [targetPersonaId],
+        `📞 Incoming ${callTypeStr} Call`,
+        `${callerName} is calling you on GenAce...`,
+        {
+          type: 'call',
+          callId,
+          roomId,
+          isVideo: !!isVideo,
+          callerName,
+          callerPersonaId: socket.personaId
+        }
+      ).catch(pushErr => console.warn('[Call Push Dispatch Warning]:', pushErr?.message || pushErr));
     });
 
     socket.on('call:accept', ({ targetPersonaId, targetSocketId, callId }) => {

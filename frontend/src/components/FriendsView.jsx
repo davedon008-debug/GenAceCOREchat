@@ -100,7 +100,7 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#080b14] p-3 sm:p-6 overflow-y-auto select-none space-y-4 sm:space-y-6">
+    <div className="flex-1 flex flex-col h-full bg-[#080b14] p-3 sm:p-6 pb-28 md:pb-6 overflow-y-auto select-none space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="border-b border-[#1d273e] pb-4 flex items-center gap-3">
         {onOpenMobileSidebar && (

@@ -177,7 +177,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen w-full flex items-center justify-center p-3 sm:p-6 relative overflow-hidden bg-[#080b14]">
+    <main className="min-h-screen w-full flex items-center justify-center p-3 sm:p-6 relative overflow-y-auto bg-[#080b14]">
       {/* Background Gradient Blurs */}
       <div className="absolute top-1/4 left-1/4 w-72 h-72 sm:w-96 sm:h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-72 h-72 sm:w-96 sm:h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />

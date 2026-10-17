@@ -203,8 +203,22 @@ html.light textarea::placeholder {
   scrollbar-width: none;
 }
 
+/* Touch scrolling momentum for iOS / Mobile WebKit */
+.overflow-y-auto,
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile Safe Area & Bottom Navigation Clearance */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-area-bottom {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+}
+
 /* Smooth theme transition on all elements */
 *, *::before, *::after {
   transition: background-color 0.25s ease, border-color 0.25s ease, color 0.1s ease;
 }
 button, a, input, textarea { transition-duration: 0.15s; }
+

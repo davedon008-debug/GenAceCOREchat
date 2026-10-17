@@ -38,7 +38,10 @@ export default function MobileBottomNav({
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0e1a]/95 backdrop-blur-xl border-t border-[#1d273e] px-2 py-1.5 flex items-center justify-around shadow-2xl select-none">
+    <nav
+      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0e1a]/95 backdrop-blur-xl border-t border-[#1d273e] px-2 pt-1.5 pb-2 flex items-center justify-around shadow-2xl select-none"
+      style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0.5rem))' }}
+    >
       {tabs.map((tab) => {
         const IconComponent = tab.icon;
         const isActive = activeTab === tab.id;

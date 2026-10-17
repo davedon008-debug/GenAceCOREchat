@@ -641,7 +641,7 @@ export default function SettingsView({ onBack, defaultSection }) {
       {/* ── Main settings layout ── */}
       <div className="flex-1 flex flex-col md:flex-row overflow-y-auto">
         {/* Left Settings Navigation Sidebar */}
-        <div className={`w-full md:w-64 border-r border-[#1d273e] p-6 space-y-6 shrink-0 bg-[#101625] ${mobileShowPanel ? 'hidden md:block' : 'block md:block'}`}>
+        <div className={`w-full md:w-64 border-r border-[#1d273e] p-6 pb-28 md:pb-6 space-y-6 shrink-0 bg-[#101625] ${mobileShowPanel ? 'hidden md:block' : 'block md:block'}`}>
           <div>
             <h2 className="text-xl font-black text-white font-outfit tracking-tight">Settings</h2>
             <p className="text-xs text-gray-400">Account settings and preferences</p>
@@ -682,7 +682,7 @@ export default function SettingsView({ onBack, defaultSection }) {
         </div>
 
         {/* Main Settings Display Area */}
-        <div className={`flex-1 p-6 md:p-8 space-y-6 overflow-y-auto ${mobileShowPanel ? 'block md:block' : 'hidden md:block'}`}>
+        <div className={`flex-1 p-6 pb-28 md:p-8 space-y-6 overflow-y-auto ${mobileShowPanel ? 'block md:block' : 'hidden md:block'}`}>
 
         {/* ─── PROFILE TAB ─── */}
         {activeSubTab === 'profile' && (

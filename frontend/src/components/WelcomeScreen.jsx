@@ -89,7 +89,7 @@ export default function WelcomeScreen({
   const showDropdown = searchFocused && searchQuery.trim().length > 0;
 
   return (
-    <div className="flex-1 h-full bg-[#080b14] flex flex-col justify-between p-4 md:p-6 select-none relative overflow-y-auto">
+    <div className="flex-1 h-full bg-[#080b14] flex flex-col justify-between p-4 md:p-6 pb-28 md:pb-6 select-none relative overflow-y-auto">
       {/* 1. TOP HEADER & SEARCH BAR matching reference screenshot */}
       <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#141b2d] shrink-0">
         {/* Navigation & Action Controls Row on Mobile / Right side on Desktop */}
