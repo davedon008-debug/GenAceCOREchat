@@ -518,6 +518,9 @@ export default function ConversationScreen({ route, navigation }) {
     if (!callToAccept) return;
     const { callId, callerPersona, isVideo, roomId, callerSocketId } = callToAccept;
 
+    // Immediately stop ringtone audio synchronously upon accepting
+    stopAllSFX();
+
     const RTCPeerConnectionClass = global.RTCPeerConnection || window.RTCPeerConnection;
     if (!RTCPeerConnectionClass) {
       Alert.alert(
@@ -575,6 +578,13 @@ export default function ConversationScreen({ route, navigation }) {
       handleDeclineCall();
     }
   };
+
+  // If navigated here after tapping Accept on MainTabScreen incoming call popup
+  useEffect(() => {
+    if (route.params?.autoAcceptCall) {
+      handleAcceptCall(route.params.autoAcceptCall);
+    }
+  }, [route.params?.autoAcceptCall]);
 
   const handleDeclineCall = () => {
     if (incomingCall && socket) {
@@ -1540,10 +1550,13 @@ export default function ConversationScreen({ route, navigation }) {
               const isPending = item.pending === true || item.sending === true || item.status === 'pending' || (!item._id && !item.id);
               if (isPending) return null; // 0 ticks (pending/uploading)
 
-              const isSeenByRecipient = Array.isArray(item.readBy) && item.readBy.some(pId => {
-                const idStr = typeof pId === 'object' ? (pId._id || pId.id) : pId;
-                return idStr && String(idStr) !== String(activePersona?._id);
-              });
+              const isSeenByRecipient = item.status === 'read' ||
+                item.read === true ||
+                item.isRead === true ||
+                (Array.isArray(item.readBy) && item.readBy.some(pId => {
+                  const idStr = typeof pId === 'object' ? (pId._id || pId.id) : pId;
+                  return idStr && String(idStr) !== String(activePersona?._id);
+                }));
 
               if (isSeenByRecipient) {
                 // 2 ticks (Blue double checkmarks when recipient has actually seen the message)

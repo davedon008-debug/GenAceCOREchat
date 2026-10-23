@@ -18,7 +18,7 @@ const getAudioContext = () => {
   return audioCtx;
 };
 
-export const stopAllSFX = async () => {
+export const stopAllSFX = () => {
   if (activeLoopInterval) {
     clearInterval(activeLoopInterval);
     activeLoopInterval = null;
@@ -29,8 +29,8 @@ export const stopAllSFX = async () => {
   activeOscillators = [];
 };
 
-export const playIncomingRingtone = async () => {
-  await stopAllSFX();
+export const playIncomingRingtone = () => {
+  stopAllSFX();
   const ctx = getAudioContext();
   if (!ctx) return;
 

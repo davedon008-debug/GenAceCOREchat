@@ -115,16 +115,20 @@ export const getMessages = async (req, res) => {
 
     // Auto-mark unread messages in this conversation/space from other personas as read
     if (req.personaId && (query.conversationId || query.spaceId)) {
+      const readerObjectId = mongoose.Types.ObjectId.isValid(req.personaId)
+        ? new mongoose.Types.ObjectId(req.personaId)
+        : req.personaId;
+
       const readFilter = {
-        senderPersonaId: { $ne: req.personaId },
-        readBy: { $nin: [req.personaId] }
+        senderPersonaId: { $ne: readerObjectId },
+        readBy: { $nin: [readerObjectId] }
       };
       if (query.conversationId) readFilter.conversationId = query.conversationId;
       if (query.spaceId) readFilter.spaceId = query.spaceId;
 
       Message.updateMany(readFilter, {
         $set: { status: 'read' },
-        $addToSet: { readBy: req.personaId }
+        $addToSet: { readBy: readerObjectId }
       }).exec().then(result => {
         if (result.modifiedCount > 0) {
           const io = getIO();
@@ -153,16 +157,20 @@ export const markAsRead = async (req, res) => {
       return res.status(400).json({ success: false, message: 'conversationId or spaceId required' });
     }
 
+    const readerObjectId = mongoose.Types.ObjectId.isValid(req.personaId)
+      ? new mongoose.Types.ObjectId(req.personaId)
+      : req.personaId;
+
     const filter = {
-      senderPersonaId: { $ne: req.personaId },
-      readBy: { $nin: [req.personaId] }
+      senderPersonaId: { $ne: readerObjectId },
+      readBy: { $nin: [readerObjectId] }
     };
     if (conversationId) filter.conversationId = conversationId;
     if (spaceId) filter.spaceId = spaceId;
 
     const result = await Message.updateMany(filter, {
       $set: { status: 'read' },
-      $addToSet: { readBy: req.personaId }
+      $addToSet: { readBy: readerObjectId }
     });
 
     if (result.modifiedCount > 0) {

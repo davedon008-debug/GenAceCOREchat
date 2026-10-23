@@ -554,6 +554,9 @@ export default function ChatPage() {
     if (!incomingCall) return;
     const { callId, callerPersona, isVideo, roomId, callerSocketId } = incomingCall;
 
+    // Immediately stop ringtone audio and vibration synchronously upon clicking Accept
+    stopAllSFX();
+
     try {
       await loadIceServers();
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -603,6 +606,7 @@ export default function ChatPage() {
   };
 
   const handleDeclineCall = () => {
+    stopAllSFX();
     if (incomingCall && socket) {
       socket.emit('call:reject', {
         targetPersonaId: String(incomingCall.callerPersona._id),
@@ -611,7 +615,7 @@ export default function ChatPage() {
         reason: 'declined'
       });
     }
-    stopAllSFX();
+    incomingCallRef.current = null;
     setIncomingCall(null);
   };
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { PhoneOff, Mic, MicOff, Video, VideoOff, Monitor, Maximize2, Minimize2 } from 'lucide-react';
 import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
+import { stopAllSFX } from '../lib/callSFX';
 
 export default function CallModal({
   call,
@@ -23,6 +24,11 @@ export default function CallModal({
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
+
+  // Guarantee that any ringing audio is completely silenced during active call window
+  useEffect(() => {
+    stopAllSFX();
+  }, []);
 
   // Attach local media stream to video element
   useEffect(() => {

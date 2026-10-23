@@ -126,6 +126,8 @@ export async function deleteCustomRingtone() {
 let activeAudio = null;
 let activeBlobUrl = null;
 let activeVibrationTimer = null;
+let isRinging = false;
+const allActiveAudios = new Set();
 
 export function stopCallVibration() {
   if (activeVibrationTimer) {
@@ -148,14 +150,28 @@ export function triggerCallVibration() {
   }
 }
 
-export async function stopRingtoneAudio() {
+export function stopRingtoneAudio() {
+  isRinging = false;
+
   if (activeAudio) {
     try {
       activeAudio.pause();
       activeAudio.currentTime = 0;
+      activeAudio.src = '';
     } catch (e) {}
     activeAudio = null;
   }
+
+  // Force-pause all audio instances to prevent orphaned looping elements
+  allActiveAudios.forEach(audio => {
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.src = '';
+    } catch (e) {}
+  });
+  allActiveAudios.clear();
+
   if (activeBlobUrl) {
     try { URL.revokeObjectURL(activeBlobUrl); } catch (e) {}
     activeBlobUrl = null;
@@ -164,34 +180,63 @@ export async function stopRingtoneAudio() {
 
 /** Play custom ringtone if present, or trigger phone vibration */
 export async function playActiveRingtone() {
-  await stopRingtoneAudio();
+  stopRingtoneAudio();
   stopCallVibration();
+
+  // Mark current session as actively ringing
+  isRinging = true;
 
   const settings = getRingtoneSettings();
 
   // Trigger hardware vibration if enabled
-  if (settings.vibrate) {
+  if (settings.vibrate && isRinging) {
     triggerCallVibration();
   }
 
   // If set to custom mode, play the user's uploaded phone ringtone
   if (settings.mode === 'custom') {
-    const blob = await getCustomRingtoneBlob();
-    if (blob) {
-      try {
-        activeBlobUrl = URL.createObjectURL(blob);
-        activeAudio = new Audio(activeBlobUrl);
-        activeAudio.loop = true;
-        activeAudio.volume = 0.95;
-        const promise = activeAudio.play();
-        if (promise !== undefined) {
-          promise.catch((err) => {
-            console.warn('[Ringtone] Audio playback error:', err);
-          });
-        }
-      } catch (err) {
-        console.warn('[Ringtone] Failed to load custom audio blob:', err);
+    let blob = null;
+    try {
+      blob = await getCustomRingtoneBlob();
+    } catch (err) {
+      console.warn('[Ringtone] Error reading blob:', err);
+    }
+
+    // Critical: check if the call was already answered/declined while waiting for IndexedDB
+    if (!isRinging || !blob) {
+      return;
+    }
+
+    try {
+      const blobUrl = URL.createObjectURL(blob);
+      activeBlobUrl = blobUrl;
+      const audio = new Audio(blobUrl);
+      audio.loop = true;
+      audio.volume = 0.95;
+
+      allActiveAudios.add(audio);
+      activeAudio = audio;
+
+      // Final check right before play
+      if (!isRinging) {
+        audio.pause();
+        audio.src = '';
+        allActiveAudios.delete(audio);
+        try { URL.revokeObjectURL(blobUrl); } catch (e) {}
+        activeAudio = null;
+        activeBlobUrl = null;
+        return;
       }
+
+      const promise = audio.play();
+      if (promise !== undefined) {
+        promise.catch((err) => {
+          allActiveAudios.delete(audio);
+          console.warn('[Ringtone] Audio playback error:', err);
+        });
+      }
+    } catch (err) {
+      console.warn('[Ringtone] Failed to load custom audio blob:', err);
     }
   }
   // If settings.mode === 'phone_default', no synthetic audio is played.

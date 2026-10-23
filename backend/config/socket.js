@@ -374,8 +374,12 @@ export const initSocketServer = (httpServer) => {
       if (!targetRoom || !socket.personaId) return;
 
       try {
+        const readerObjectId = mongoose.Types.ObjectId.isValid(socket.personaId)
+          ? new mongoose.Types.ObjectId(socket.personaId)
+          : socket.personaId;
+
         const filter = {
-          senderPersonaId: { $ne: socket.personaId }
+          senderPersonaId: { $ne: readerObjectId }
         };
         if (conversationId) filter.conversationId = conversationId;
         else if (spaceId) filter.spaceId = spaceId;
@@ -383,7 +387,7 @@ export const initSocketServer = (httpServer) => {
 
         await Message.updateMany(filter, {
           $set: { status: 'read' },
-          $addToSet: { readBy: socket.personaId }
+          $addToSet: { readBy: readerObjectId }
         });
 
         const readPayload = {
