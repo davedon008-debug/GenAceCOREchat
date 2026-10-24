@@ -11,6 +11,7 @@ const PWAContext = createContext({
   openInstallPrompt: () => {},
   closeInstallPrompt: () => {},
   promptInstall: async () => {},
+  markInstalled: () => {},
   deferredPrompt: null,
 });
 
@@ -43,6 +44,21 @@ export function PWAProvider({ children }) {
     return isApple;
   }, []);
 
+  const markInstalled = useCallback(() => {
+    setIsInstalled(true);
+    setCanInstall(false);
+    setDeferredPrompt(null);
+    setShowModal(false);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('genace_installed_confirmed', 'true');
+        sessionStorage.removeItem('genace_install_dismissed_session');
+      } catch (e) {
+        console.warn('[PWA] Storage error:', e);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -52,11 +68,20 @@ export function PWAProvider({ children }) {
     const ios = checkIOS();
     setIsIOS(ios);
 
-    // If already running inside installed standalone PWA, don't show prompt
+    // If already running inside standalone PWA, mark installed
     if (standalone) {
       setIsInstalled(true);
       return;
     }
+
+    // Check if user previously confirmed installation on this device
+    try {
+      const previouslyInstalled = localStorage.getItem('genace_installed_confirmed') === 'true';
+      if (previouslyInstalled) {
+        setIsInstalled(true);
+        return;
+      }
+    } catch (e) {}
 
     // Check if dismissed in this specific tab session
     const sessionDismissed = sessionStorage.getItem('genace_install_dismissed_session') === 'true';
@@ -66,27 +91,20 @@ export function PWAProvider({ children }) {
 
     // Capture beforeinstallprompt event (Chromium browsers: Chrome, Edge, Android Chrome, Samsung Internet, Brave)
     const handleBeforeInstallPrompt = (e) => {
-      // Prevent automatic browser mini-infobar
       e.preventDefault();
       setDeferredPrompt(e);
       setCanInstall(true);
 
-      // If user hasn't dismissed in this tab, show prompt
       if (!sessionDismissed && !standalone) {
-        // Small delay to ensure initial page view renders smoothly
         setTimeout(() => {
           setShowModal(true);
         }, 1200);
       }
     };
 
-    // Listen for successful install
+    // Listen for successful install event from browser
     const handleAppInstalled = () => {
-      setIsInstalled(true);
-      setCanInstall(false);
-      setDeferredPrompt(null);
-      setShowModal(false);
-      sessionStorage.removeItem('genace_install_dismissed_session');
+      markInstalled();
       console.log('[PWA] GenAce was installed successfully!');
     };
 
@@ -105,7 +123,7 @@ export function PWAProvider({ children }) {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, [checkStandalone, checkIOS]);
+  }, [checkStandalone, checkIOS, markInstalled]);
 
   const openInstallPrompt = useCallback(() => {
     setShowModal(true);
@@ -130,17 +148,19 @@ export function PWAProvider({ children }) {
         const choice = await deferredPrompt.userChoice;
         if (choice.outcome === 'accepted') {
           console.log('[PWA] User accepted the install prompt');
-          setIsInstalled(true);
-          setShowModal(false);
-          setDeferredPrompt(null);
+          markInstalled();
+          return true;
         } else {
-          console.log('[PWA] User dismissed the install prompt');
+          console.log('[PWA] User dismissed the native install prompt');
+          return false;
         }
       } catch (err) {
         console.error('[PWA] Error showing native prompt:', err);
+        return false;
       }
     }
-  }, [deferredPrompt]);
+    return false;
+  }, [deferredPrompt, markInstalled]);
 
   return (
     <PWAContext.Provider
@@ -153,6 +173,7 @@ export function PWAProvider({ children }) {
         openInstallPrompt,
         closeInstallPrompt,
         promptInstall,
+        markInstalled,
         deferredPrompt,
       }}
     >
