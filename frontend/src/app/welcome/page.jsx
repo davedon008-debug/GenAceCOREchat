@@ -4,11 +4,13 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Logo from '../../components/Logo';
-import { Settings, MessageSquare, Users, UserPlus, Compass, Zap, ArrowRight, X } from 'lucide-react';
+import { usePWA } from '../../context/PWAContext';
+import { Settings, MessageSquare, Users, UserPlus, Compass, Zap, ArrowRight, X, Download } from 'lucide-react';
 
 export default function WelcomePage() {
   const router = useRouter();
   const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
+  const { isStandalone, isInstalled, openInstallPrompt } = usePWA();
 
   return (
     <div className="min-h-screen w-full bg-[#080b14] text-white flex flex-col items-center justify-between p-4 sm:p-6 relative overflow-x-hidden selection:bg-indigo-500 selection:text-white">
@@ -20,9 +22,19 @@ export default function WelcomePage() {
       {/* Main Inner Container */}
       <div className="w-full max-w-md mx-auto flex-1 flex flex-col justify-between py-4 space-y-6 relative z-10">
         
-        {/* Top Header Bar with Gear Settings Icon */}
+        {/* Top Header Bar with Gear Settings Icon & Install App Button */}
         <div className="w-full flex items-center justify-between pt-2">
-          <div className="w-10" /> {/* Spacer */}
+          {!isStandalone && !isInstalled ? (
+            <button
+              onClick={openInstallPrompt}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 border border-cyan-500/40 text-cyan-300 text-xs font-semibold hover:bg-cyan-500/30 transition-all shadow-md shadow-cyan-500/10 active:scale-95"
+            >
+              <Download className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Install App</span>
+            </button>
+          ) : (
+            <div className="w-10" />
+          )}
 
           <div className="relative">
             <button

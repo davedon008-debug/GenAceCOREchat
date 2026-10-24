@@ -1,10 +1,75 @@
-// Service Worker for Donchat / GenAce Web Push Notifications
+// Service Worker for Donchat / GenAce Web Push Notifications & PWA Support
+const CACHE_NAME = 'genace-pwa-cache-v2';
+
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    Promise.all([
+      caches.keys().then((keys) => {
+        return Promise.all(
+          keys.map((key) => {
+            if (key !== CACHE_NAME) {
+              return caches.delete(key);
+            }
+          })
+        );
+      }),
+      clients.claim()
+    ])
+  );
+});
+
+// Fetch handler required for PWA installability & offline resiliency
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
+
+  // Bypass API routes, socket.io, and cross-origin calls
+  if (
+    url.pathname.startsWith('/api') ||
+    url.pathname.startsWith('/socket.io') ||
+    url.hostname !== self.location.hostname
+  ) {
+    return;
+  }
+
+  // Network-first with cache fallback
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          // Cache icons, manifest, and essential static assets
+          if (
+            url.pathname.endsWith('.png') ||
+            url.pathname.endsWith('.jpg') ||
+            url.pathname.endsWith('.svg') ||
+            url.pathname.endsWith('.ico') ||
+            url.pathname.includes('/manifest.json')
+          ) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache).catch(() => {});
+            });
+          }
+        }
+        return response;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          if (event.request.mode === 'navigate') {
+            return caches.match('/');
+          }
+          return Response.error();
+        });
+      })
+  );
 });
 
 self.addEventListener('push', (event) => {
@@ -15,8 +80,8 @@ self.addEventListener('push', (event) => {
     const title = rawPayload.title || (isCall ? '📞 Incoming Call' : 'GenAce');
     const options = {
       body: rawPayload.body || (isCall ? 'Incoming call on GenAce' : 'New message received'),
-      icon: rawPayload.icon || '/icon.png',
-      badge: '/icon.png',
+      icon: rawPayload.icon || '/icon-192.png',
+      badge: '/icon-192.png',
       tag: isCall ? ('call-' + (notifData.callId || Date.now())) : (rawPayload.tag || 'genace-notification'),
       requireInteraction: isCall, // Keep visible on screen for calls
       silent: false,

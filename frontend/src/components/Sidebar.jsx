@@ -6,9 +6,10 @@ import { useSocket } from '../context/SocketContext';
 import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar, SpaceIcon } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
 import Logo from './Logo';
+import { usePWA } from '../context/PWAContext';
 import { 
   MessageSquare, Zap, Users, Compass, Bell, Settings, Crown, 
-  ChevronRight, X, Check, Plus, LogOut, Shield, Lock, Search, Menu
+  ChevronRight, X, Check, Plus, LogOut, Shield, Lock, Search, Menu, Download
 } from 'lucide-react';
 
 export default function Sidebar({ 
@@ -55,6 +56,7 @@ export default function Sidebar({
   const [avatarViewerTarget, setAvatarViewerTarget] = useState({ isOpen: false, avatarUrl: '', name: '', handle: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all'); // 'all' | 'dms' | 'spaces' | 'locked'
+  const { isStandalone, isInstalled, openInstallPrompt } = usePWA();
 
   const activePersonaStatus = activePersona?.status || 'online';
   const activeStatusColor = activePersonaStatus === 'online'
@@ -508,6 +510,22 @@ export default function Sidebar({
 
       {/* Bottom Widgets */}
       <div className="space-y-3 pt-3 border-t border-[#151c2e] mt-2">
+        {/* Install GenAce App Button */}
+        {!isStandalone && !isInstalled && (
+          <button
+            onClick={openInstallPrompt}
+            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-cyan-500/15 via-indigo-500/15 to-purple-500/15 hover:from-cyan-500/25 hover:via-indigo-500/25 hover:to-purple-500/25 border border-cyan-500/30 hover:border-cyan-400 text-cyan-200 text-xs font-semibold shadow-md shadow-cyan-500/10 transition-all duration-200 group"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                <Download className="w-3.5 h-3.5 text-cyan-400 group-hover:translate-y-0.5 transition-transform" />
+              </div>
+              <span className="font-semibold">Install GenAce</span>
+            </div>
+            <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold">App</span>
+          </button>
+        )}
+
         {/* User Profile Card */}
         <div className="relative">
           <div 

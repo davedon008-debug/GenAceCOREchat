@@ -1,20 +1,32 @@
 {
-  "id": "genace-pwa",
-  "name": "GenAce",
+  "id": "/",
+  "name": "GenAce — Autonomous Spaces & Chat",
   "short_name": "GenAce",
-  "description": "GenAce — Next-Gen Messaging & Fluid Spaces",
+  "description": "GenAce — Next-Gen Messaging, Multi-Persona Identity, Fluid Spaces and Privacy Vectors",
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/icon.png",
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/apple-touch-icon.png",
@@ -28,5 +40,16 @@
   "background_color": "#080b14",
   "theme_color": "#080b14",
   "display": "standalone",
-  "orientation": "portrait"
+  "display_override": [
+    "standalone",
+    "minimal-ui",
+    "window-controls-overlay"
+  ],
+  "orientation": "portrait-primary",
+  "categories": [
+    "social",
+    "productivity",
+    "communication"
+  ],
+  "prefer_related_applications": false
 }

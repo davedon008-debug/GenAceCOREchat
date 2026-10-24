@@ -7,11 +7,12 @@ import api, { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 import { getNotifPrefs, saveNotifPrefs, playNotificationSound } from '../lib/sound';
 import { enableWebPushNotifications, disableWebPushNotifications, getWebPushStatus } from '../lib/pushSubscription';
 import PasscodeModal from './PasscodeModal';
+import { usePWA } from '../context/PWAContext';
 import {
   User, Palette, Bell, Shield, UserX, HelpCircle, Camera, Edit2,
   Check, LogOut, Moon, Sun, Monitor, Lock, Eye, EyeOff, Key,
   MessageSquare, ChevronRight, X, Save, Loader2, CheckCircle, AlertCircle, Volume2, ArrowLeft,
-  Smartphone, Upload, Play, Square, Trash2, Music
+  Smartphone, Upload, Play, Square, Trash2, Music, Download
 } from 'lucide-react';
 import {
   getRingtoneSettings,
@@ -480,6 +481,7 @@ const STATUS_OPTIONS = [
 export default function SettingsView({ onBack, defaultSection }) {
   const { activePersona, setActivePersona, logout } = useAuth();
   const { theme, changeTheme, fontSizeScale, changeFontSize } = useTheme();
+  const { isStandalone, isInstalled, openInstallPrompt } = usePWA();
   const [activeSubTab, setActiveSubTab] = useState(defaultSection || 'profile');
   const [mobileShowPanel, setMobileShowPanel] = useState(!!defaultSection);
   const [statusSaving, setStatusSaving] = useState(false);
@@ -1358,6 +1360,26 @@ export default function SettingsView({ onBack, defaultSection }) {
                   <ChevronRight className="w-4 h-4 text-gray-400" />
                 </div>
               ))}
+
+              {!isStandalone && !isInstalled && (
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-indigo-950/30 to-purple-950/40 border border-cyan-500/40 flex items-center justify-between shadow-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0">
+                      <Download className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white">Install GenAce App</p>
+                      <p className="text-[10px] text-slate-300">Fast desktop & mobile native experience</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={openInstallPrompt}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-cyan-500/20 transition active:scale-95"
+                  >
+                    Install Now
+                  </button>
+                </div>
+              )}
 
               <div className="mt-4 p-4 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 text-center">
                 <p className="text-xs font-bold text-indigo-300">GenAce v1.0.0</p>
