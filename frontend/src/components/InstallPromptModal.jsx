@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePWA } from '../context/PWAContext';
 import { 
   Download, 
@@ -16,7 +16,8 @@ import {
   BellRing, 
   Zap, 
   ShieldCheck,
-  ExternalLink 
+  Compass,
+  AlertTriangle 
 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -33,9 +34,17 @@ export default function InstallPromptModal() {
     deferredPrompt,
   } = usePWA();
 
-  const [shareTriggered, setShareTriggered] = useState(false);
   const [installedSuccess, setInstalledSuccess] = useState(false);
   const [showManualGuide, setShowManualGuide] = useState(false);
+  const [isInAppBrowser, setIsInAppBrowser] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const ua = window.navigator.userAgent || '';
+      const inApp = /FBAN|FBAV|Instagram|Twitter|Line|WhatsApp|Snapchat|Messenger/i.test(ua);
+      setIsInAppBrowser(inApp);
+    }
+  }, []);
 
   // If running inside standalone PWA or marked installed and not showing success screen, don't render
   if ((isStandalone || isInstalled) && !installedSuccess) {
@@ -43,7 +52,7 @@ export default function InstallPromptModal() {
   }
 
   const handleInstallClick = async () => {
-    // 1. Android / Chromium (Chrome, Edge, Samsung Internet)
+    // 1. Android / Chromium (Chrome, Edge, Samsung Internet, Brave)
     if (deferredPrompt) {
       const accepted = await promptInstall();
       if (accepted) {
@@ -52,30 +61,10 @@ export default function InstallPromptModal() {
       return;
     }
 
-    // 2. iOS (iPhone / iPad)
-    if (isIOS) {
-      setShareTriggered(true);
-
-      // Try triggering native iOS share sheet if supported
-      if (typeof navigator !== 'undefined' && navigator.share) {
-        try {
-          await navigator.share({
-            title: 'GenAce — Next-Gen Messaging',
-            text: 'Install GenAce on your Home Screen',
-            url: window.location.href,
-          });
-          // User returned from share sheet
-          setInstalledSuccess(true);
-        } catch (err) {
-          // User dismissed or aborted native share sheet; visual guide remains visible
-          console.log('[PWA] Native share sheet dismissed:', err);
-        }
-      }
-      return;
+    // 2. Desktop Chrome / other browsers without deferredPrompt
+    if (!isIOS) {
+      setShowManualGuide(true);
     }
-
-    // 3. Other desktop browsers
-    setShowManualGuide(true);
   };
 
   const handleConfirmDone = () => {
@@ -149,7 +138,7 @@ export default function InstallPromptModal() {
                 </h2>
 
                 <p className="text-slate-300 text-xs max-w-xs leading-relaxed">
-                  GenAce is now ready on your device. You can launch it directly from your Home Screen anytime for the fastest full-screen experience.
+                  GenAce has been added as a standalone app. Close your browser and tap the <strong>GenAce</strong> icon on your phone&apos;s Home Screen or App Library for full-screen messaging!
                 </p>
 
                 {/* App icon preview card */}
@@ -165,11 +154,11 @@ export default function InstallPromptModal() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <span>GenAce App</span>
+                      <span>GenAce Standalone App</span>
                       <Check className="w-3.5 h-3.5 text-emerald-400" />
                     </h4>
                     <p className="text-[11px] text-slate-400 truncate">
-                      Tap the icon on your phone to open
+                      Ready on your iPhone Home Screen
                     </p>
                   </div>
                 </div>
@@ -179,12 +168,12 @@ export default function InstallPromptModal() {
                     onClick={handleFinishSuccess}
                     className="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 hover:from-emerald-400 hover:via-teal-500 hover:to-cyan-500 text-white font-semibold text-sm shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-all transform hover:scale-[1.02] active:scale-[0.98]"
                   >
-                    Done — Open from Home Screen
+                    Done — Open on iPhone
                   </button>
                 </div>
               </div>
             ) : (
-              /* ─── CASE B: STANDARD INSTALL INSTRUCTION VIEW ─── */
+              /* ─── CASE B: INSTALL INSTRUCTION VIEW ─── */
               <div className="flex flex-col items-center animate-fade-in">
                 {/* Header: App Logo & Badges */}
                 <div className="relative mb-3 group">
@@ -203,26 +192,86 @@ export default function InstallPromptModal() {
 
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-[11px] font-semibold tracking-wider uppercase mb-2">
                   <Sparkles className="w-3 h-3 text-cyan-400" />
-                  <span>Official Web App</span>
+                  <span>Official iPhone & Web App</span>
                 </div>
 
                 <h2 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-white via-cyan-100 to-indigo-200 bg-clip-text text-transparent">
-                  Install GenAce
+                  Install GenAce App
                 </h2>
                 <p className="text-slate-300 text-xs mt-1.5 max-w-xs leading-relaxed">
-                  Add GenAce to your home screen or desktop for the fastest autonomous messaging experience.
+                  Install GenAce as a standalone app on your iPhone or device for full-screen mode and instant notifications.
                 </p>
 
-                {/* Key Advantages List (hidden when iOS guide is actively being followed to avoid tall screen) */}
-                {!shareTriggered && !isIOS && (
-                  <div className="mt-4 space-y-2.5 bg-slate-900/60 rounded-2xl p-3.5 border border-slate-800/80 w-full text-left">
+                {/* In-App Browser Warning (WhatsApp / Instagram / Telegram) */}
+                {isIOS && isInAppBrowser && (
+                  <div className="mt-3 p-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-left w-full animate-fade-in">
+                    <div className="flex items-center gap-2 text-amber-300 font-bold text-xs mb-1">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Opened in WhatsApp / In-App Browser</span>
+                    </div>
+                    <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                      Apple only allows installing apps from <strong>Safari</strong>. Tap the <strong>Safari</strong> or <strong>⋯ icon</strong> at bottom right, then choose <strong>&quot;Open in Safari&quot;</strong>.
+                    </p>
+                  </div>
+                )}
+
+                {/* iPhone Interactive Installation Steps */}
+                {isIOS && (
+                  <div className="mt-4 p-4 rounded-2xl bg-[#0e1628] border border-cyan-500/40 text-left w-full shadow-inner animate-fade-in space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-cyan-300 font-bold text-xs">
+                        <Smartphone className="w-4 h-4 text-cyan-400" />
+                        <span>How to Install on iPhone:</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-cyan-400/80 uppercase font-semibold">Safari</span>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      <div className="flex items-start gap-3 p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/20">
+                        <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                          1
+                        </div>
+                        <div className="text-xs text-slate-200 leading-snug">
+                          Look at the <strong>bottom bar of Safari</strong> and tap the <strong>Share</strong> button <Share className="w-3.5 h-3.5 inline mx-1 text-cyan-400" />.
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3 p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/20">
+                        <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                          2
+                        </div>
+                        <div className="text-xs text-slate-200 leading-snug">
+                          Scroll down the menu and tap <strong className="text-white">Add to Home Screen</strong> <PlusSquare className="w-3.5 h-3.5 inline mx-1 text-cyan-400" />.
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3 p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/20">
+                        <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                          3
+                        </div>
+                        <div className="text-xs text-slate-200 leading-snug">
+                          Tap <strong className="text-white">Add</strong> in the top-right corner. GenAce will appear on your Home Screen!
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-1 flex items-center justify-center gap-1.5 text-[11px] text-cyan-300/80 animate-pulse">
+                      <ArrowDown className="w-3.5 h-3.5" />
+                      <span>Share button is located at the bottom of your iPhone screen</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Non-iOS Key Advantages List */}
+                {!isIOS && !showManualGuide && (
+                  <div className="mt-4 space-y-2 bg-slate-900/60 rounded-2xl p-3.5 border border-slate-800/80 w-full text-left">
                     <div className="flex items-center gap-3 text-xs text-slate-200">
                       <div className="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center shrink-0">
                         <BellRing className="w-3.5 h-3.5 text-cyan-400" />
                       </div>
                       <div>
                         <span className="font-semibold text-white">Instant Notifications</span>
-                        <p className="text-[11px] text-slate-400 leading-snug">Receive call rings and chat alerts.</p>
+                        <p className="text-[11px] text-slate-400 leading-snug">Call rings & instant space alerts.</p>
                       </div>
                     </div>
 
@@ -232,40 +281,9 @@ export default function InstallPromptModal() {
                       </div>
                       <div>
                         <span className="font-semibold text-white">Full-Screen & Zero Lag</span>
-                        <p className="text-[11px] text-slate-400 leading-snug">No browser address bar, instant native speed.</p>
+                        <p className="text-[11px] text-slate-400 leading-snug">Runs as standalone app without browser bars.</p>
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {/* iOS Step-by-Step Guide with Visual Cards */}
-                {isIOS && !deferredPrompt && (
-                  <div className="mt-4 p-4 rounded-2xl bg-[#0e1628] border border-cyan-500/30 text-left w-full shadow-inner animate-fade-in">
-                    <div className="flex items-center gap-2 text-cyan-300 font-semibold text-xs mb-3">
-                      <Smartphone className="w-4 h-4" />
-                      <span>How to install on iPhone & iPad:</span>
-                    </div>
-
-                    <ol className="text-xs text-slate-300 space-y-2.5 pl-0.5">
-                      <li className="flex items-start gap-2.5">
-                        <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">1</span>
-                        <span>
-                          Tap the <strong className="text-white">Share</strong> button <Share className="w-3.5 h-3.5 inline mx-1 text-cyan-400" /> at bottom of Safari.
-                        </span>
-                      </li>
-                      <li className="flex items-start gap-2.5">
-                        <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">2</span>
-                        <span>
-                          Scroll down and tap <strong className="text-white">Add to Home Screen</strong> <PlusSquare className="w-3.5 h-3.5 inline mx-1 text-cyan-400" />.
-                        </span>
-                      </li>
-                      <li className="flex items-start gap-2.5">
-                        <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">3</span>
-                        <span>
-                          Tap <strong className="text-white">Add</strong> in the top-right corner.
-                        </span>
-                      </li>
-                    </ol>
                   </div>
                 )}
 
@@ -277,34 +295,22 @@ export default function InstallPromptModal() {
                       <span>Browser Install Instructions:</span>
                     </div>
                     <p className="text-[11px] text-slate-300 leading-relaxed">
-                      Click the <strong>Install GenAce</strong> icon (⊕ or ⬇) in your browser's address bar, or open your browser menu (⋮) and select <strong>&quot;Install GenAce&quot;</strong>.
+                      Click the <strong>Install GenAce</strong> icon (⊕ or ⬇) in your browser&apos;s address bar, or open your browser menu (⋮) and select <strong>&quot;Install GenAce&quot;</strong>.
                     </p>
                   </div>
                 )}
 
                 {/* Action Buttons */}
                 <div className="mt-5 space-y-2.5 w-full">
-                  {/* Primary Button */}
                   {isIOS ? (
-                    shareTriggered ? (
-                      /* When iPhone user tapped Add, show green confirmation button */
-                      <button
-                        onClick={handleConfirmDone}
-                        className="w-full flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 hover:from-emerald-400 hover:via-teal-500 hover:to-cyan-500 text-white font-semibold text-sm shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
-                      >
-                        <Check className="w-4 h-4" />
-                        <span>✓ I&apos;ve Added to Home Screen</span>
-                      </button>
-                    ) : (
-                      /* Initial iPhone button */
-                      <button
-                        onClick={handleInstallClick}
-                        className="w-full flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-xl bg-gradient-to-r from-cyan-500 via-indigo-600 to-purple-600 hover:from-cyan-400 hover:via-indigo-500 hover:to-purple-500 text-white font-semibold text-sm shadow-[0_0_30px_rgba(6,182,212,0.4)] hover:shadow-[0_0_35px_rgba(6,182,212,0.6)] transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
-                      >
-                        <PlusSquare className="w-4 h-4" />
-                        <span>Add to Home Screen</span>
-                      </button>
-                    )
+                    /* iPhone Confirm Button */
+                    <button
+                      onClick={handleConfirmDone}
+                      className="w-full flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 hover:from-emerald-400 hover:via-teal-500 hover:to-cyan-500 text-white font-semibold text-sm shadow-[0_0_25px_rgba(16,185,129,0.35)] transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>✓ I&apos;ve Added It to Home Screen</span>
+                    </button>
                   ) : (
                     /* Android / Desktop Button */
                     <button
