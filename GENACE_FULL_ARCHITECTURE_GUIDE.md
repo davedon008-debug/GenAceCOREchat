@@ -342,11 +342,50 @@ The PWA enables zero-friction, native-like installation directly from any shared
    - Displays a glassmorphic prompt with glowing app icon and feature highlights.
    - On Android/Desktop: triggers `deferredPrompt.prompt()`.
    - On iOS Safari: renders a step-by-step visual guide pointing to Safari's Share button (⎋) $\rightarrow$ *"Add to Home Screen"* (➕).
-   - Keeps a floating quick-install badge if dismissed, ensuring one-tap installation anytime.
+---
+
+## 10. Privacy Onboarding, Demo Showcase & Fluid Space Lifecycle
+
+### 10.1 Privacy Onboarding & Discovery Gate (`frontend/src/components/PrivacySetupModal.jsx`)
+To ensure total user consent before public indexing:
+1. **Persona Privacy Schema (`backend/models/Persona.js`)**:
+   - `privacySettings.setupCompleted`: Boolean flag tracking whether user finished onboarding.
+   - `privacySettings.whoCanFindMe`: `'everyone'` | `'contacts'` | `'nobody'`.
+   - `privacySettings.onlineVisibility`: `'everyone'` | `'contacts'` | `'nobody'`.
+   - `privacySettings.newAccountAnnouncements`: Boolean opt-in for broadcasting presence upon join.
+   - `privacySettings.agreedAt`: ISO timestamp of user agreement.
+2. **Server-Side Discovery Gating (`backend/controllers/persona.controller.js`)**:
+   - Both `getAllContacts` and `searchPersonas` filter out users whose `setupCompleted` is `false` or whose discovery mode restricts visibility, preventing non-consensual indexing on the "Friends" directory.
+3. **Presence Masking & Stealth Mode (`backend/config/socket.js`)**:
+   - Socket connection inspects persona `onlineVisibility`. Personas selecting `'nobody'` are broadcast as `offline` in global presence registries.
+4. **Responsive Modal UI**:
+   - Implemented across Web (`PrivacySetupModal.jsx`) and Mobile React Native (`PrivacySetupModal.js`) with responsive `max-h-[92vh]`, internal scrollable body, and pinned "Continue to GenAce" action button.
+
+### 10.2 Demo Account Showcase Architecture (`backend/controllers/auth.controller.js`)
+A restricted tour mode allowing prospective users to test live messaging, WebRTC calls, and fluid spaces:
+1. **User Flag**: `user.isDemo: true` persisted on the master account.
+2. **Zero-Friction Tour Onboarding**:
+   - `demoLogin` initializes `demo@donchat.com`, clears any previous passcodes, auto-completes privacy setup for immediate test discovery, and provisions a companion persona (`@genace_guide` - *GenAce Showcase Companion*).
+   - Generates a starter direct message introducing interactive features (voice notes, real-time audio/video calls, fluid spaces).
+3. **Security Lockdown Enforcements**:
+   - Changing password (`POST /api/auth/change-password`): Rejected with HTTP 403.
+   - Modifying passcode lock (`POST /api/auth/set-chat-passcode`): Rejected with HTTP 403.
+   - Deleting fluid spaces (`DELETE /api/spaces/:id`): Rejected with HTTP 403.
+   - Persistent showcase banner rendered in frontend and mobile informing users of demo testing mode with direct link to register their own free account.
+
+### 10.3 Fluid Space Exit Lifecycle & Sidebar Restoration
+1. **Clean State Reset (`frontend/src/app/chat/page.js`)**:
+   - `handleCloseActiveChat()` executes a comprehensive teardown: leaves active socket room (`leaveRoom`), clears `activeId`, `activeType`, and `activeObject`, flushes messages/tasks/polls, and removes cached active ID keys from `localStorage`.
+2. **Dynamic Sidebar Mode Switching (`frontend/src/components/RightMembersPanel.jsx`)**:
+   - Space members mode is conditionally guarded: `activeSpace={(activeId && activeType === 'space') ? activeObject : null}`.
+   - When a space is closed, deleted, or left, the panel automatically falls back to the default **Online Contacts & Members Directory** form.
+3. **Member Self-Removal ("🚪 Leave Space") (`backend/controllers/space.controller.js`)**:
+   - Allows non-owner space participants to voluntarily leave spaces via `DELETE /api/spaces/:spaceId/members/:personaId` without requiring admin permissions (`isSelf`).
+   - Dispatches real-time `space:left` and `space:member_removed` Socket.IO events to synchronise participant rosters.
 
 ---
 
-## 10. File & Directory Reference
+## 11. File & Directory Reference
 
 ```text
 DONCHAT/
@@ -356,45 +395,53 @@ DONCHAT/
 │   │   ├── push.js               # Web Push (VAPID) & Expo Push service
 │   │   └── socket.js             # Real-time Socket.IO server & WebRTC signaling
 │   ├── controllers/
-│   │   ├── auth.controller.js    # Registration, login, password reset
+│   │   ├── auth.controller.js    # Registration, login, password reset, demo tour
 │   │   ├── message.controller.js # Message creation, read receipts, reactions, burn
-│   │   ├── persona.controller.js # Multi-persona creation, editing, switching
-│   │   └── space.controller.js   # Spaces, members, tasks, and polls
+│   │   ├── persona.controller.js # Multi-persona creation, privacy gate, switching
+│   │   └── space.controller.js   # Spaces, members, tasks, self-leave, and polls
 │   ├── models/
 │   │   ├── Conversation.js       # 1-on-1 and group conversation schema
 │   │   ├── Message.js            # Unified message schema with privacy vectors
-│   │   ├── Persona.js            # Identity persona schema
+│   │   ├── Persona.js            # Identity persona & privacySettings schema
 │   │   ├── PushSubscription.js   # Browser push subscription storage
 │   │   ├── Space.js              # Fluid spaces schema
-│   │   └── User.js               # Master user account schema
+│   │   └── User.js               # Master user account schema & isDemo flag
 │   └── server.js                 # Express HTTP server setup & middleware
-└── frontend/
-    ├── public/
-    │   ├── manifest.json         # PWA metadata & application manifest
-    │   ├── sw.js                 # Service worker for push & offline shell
-    │   ├── icon-192.png          # High-res PWA icon (192x192)
-    │   └── icon-512.png          # High-res PWA icon (512x512)
+├── frontend/
+│   ├── public/
+│   │   ├── manifest.json         # PWA metadata & application manifest
+│   │   ├── sw.js                 # Service worker for push & offline shell
+│   │   ├── icon-192.png          # High-res PWA icon (192x192)
+│   │   └── icon-512.png          # High-res PWA icon (512x512)
+│   └── src/
+│       ├── app/
+│       │   ├── chat/page.js      # Core messaging, spaces controller & WebRTC engine
+│       │   ├── layout.js         # Root layout with PWA, Socket, and Auth providers
+│       │   └── welcome/page.jsx  # Welcome landing page with install triggers
+│       ├── components/
+│       │   ├── CallModal.jsx          # Active WebRTC audio/video call UI
+│       │   ├── IncomingCallModal.jsx  # Ringing incoming call modal with silence controls
+│       │   ├── InstallPromptModal.jsx # Cosmic PWA install modal & floating pill
+│       │   ├── MessageInput.jsx       # Voice note recorder, attachments, text input
+│       │   ├── MessageItem.jsx        # Rich message bubble, reactions, burn animations
+│       │   ├── PrivacySetupModal.jsx  # Privacy onboarding consent dialog
+│       │   ├── RightMembersPanel.jsx  # Members directory & Space members panel
+│       │   ├── SettingsView.jsx       # Custom ringtones, passcode lock, privacy controls
+│       │   └── Sidebar.jsx            # Conversations, spaces list, persona switcher
+│       ├── context/
+│       │   ├── AuthContext.jsx   # Master user & active persona state
+│       │   ├── PWAContext.jsx    # PWA install prompt & standalone detection
+│       │   └── SocketContext.jsx # Socket.IO client singleton connection
+│       └── lib/
+│           ├── api.js                # Axios HTTP client with JWT interceptors
+│           ├── callSFX.js            # Web Audio API procedural sound synthesizer
+│           ├── pushSubscription.js   # Client WebPush registration helper
+│           ├── ringtoneManager.js    # Custom ringtone IndexedDB storage & vibration
+│           └── sound.js              # Notification & sent message chime player
+└── mobile/
     └── src/
-        ├── app/
-        │   ├── chat/page.js      # Core messaging & WebRTC call controller
-        │   ├── layout.js         # Root layout with PWA, Socket, and Auth providers
-        │   └── welcome/page.jsx  # Welcome landing page with install triggers
         ├── components/
-        │   ├── CallModal.jsx          # Active WebRTC audio/video call UI
-        │   ├── IncomingCallModal.jsx  # Ringing incoming call modal with silence controls
-        │   ├── InstallPromptModal.jsx # Cosmic PWA install modal & floating pill
-        │   ├── MessageInput.jsx       # Voice note recorder, attachments, text input
-        │   ├── MessageItem.jsx        # Rich message bubble, reactions, burn animations
-        │   ├── SettingsView.jsx       # Custom ringtones, passcode lock, profile settings
-        │   └── Sidebar.jsx            # Conversations, spaces list, persona switcher
-        ├── context/
-        │   ├── AuthContext.jsx   # Master user & active persona state
-        │   ├── PWAContext.jsx    # PWA install prompt & standalone detection
-        │   └── SocketContext.jsx # Socket.IO client singleton connection
-        └── lib/
-            ├── api.js                # Axios HTTP client with JWT interceptors
-            ├── callSFX.js            # Web Audio API procedural sound synthesizer
-            ├── pushSubscription.js   # Client WebPush registration helper
-            ├── ringtoneManager.js    # Custom ringtone IndexedDB storage & vibration
-            └── sound.js              # Notification & sent message chime player
+        │   └── PrivacySetupModal.js  # React Native privacy onboarding consent dialog
+        └── screens/
+            └── MainTabScreen.js      # Mobile core tab navigator & demo showcase banner
 ```

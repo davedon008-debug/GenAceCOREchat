@@ -23,12 +23,31 @@ const PersonaSchema = new mongoose.Schema({
   isDefault: { type: Boolean, default: false },
   blockedPersonas: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Persona' }],
   contacts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Persona' }],
-  pushTokens: [{ type: String }]
+  pushTokens: [{ type: String }],
+  privacySettings: {
+    setupCompleted: { type: Boolean, default: false },
+    whoCanFindMe: { 
+      type: String, 
+      enum: ['everyone', 'friends', 'nobody'], 
+      default: 'friends' 
+    },
+    onlineVisibility: { 
+      type: String, 
+      enum: ['everyone', 'friends', 'nobody'], 
+      default: 'nobody' 
+    },
+    newAccountAnnouncements: { 
+      type: Boolean, 
+      default: false 
+    },
+    agreedAt: { type: Date, default: null }
+  }
 }, { timestamps: true });
 
 PersonaSchema.index({ userId: 1 });
 PersonaSchema.index({ blockedPersonas: 1 });
 PersonaSchema.index({ contacts: 1 });
 PersonaSchema.index({ updatedAt: -1 });
+PersonaSchema.index({ 'privacySettings.setupCompleted': 1, 'privacySettings.whoCanFindMe': 1 });
 
 export default mongoose.models.Persona || mongoose.model('Persona', PersonaSchema);

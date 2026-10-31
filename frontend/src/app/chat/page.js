@@ -28,6 +28,7 @@ import SettingsView from '../../components/SettingsView';
 import DiscoverView from '../../components/DiscoverView';
 import AdminView from '../../components/AdminView';
 import PasscodeModal from '../../components/PasscodeModal';
+import PrivacySetupModal from '../../components/PrivacySetupModal';
 import MobileBottomNav from '../../components/MobileBottomNav';
 import CallModal from '../../components/CallModal';
 import IncomingCallModal from '../../components/IncomingCallModal';
@@ -53,7 +54,7 @@ import { Plus, Search, User, X, Bell, UserX } from 'lucide-react';
 
 export default function ChatPage() {
   const router = useRouter();
-  const { token, user, activePersona, loading, logout } = useAuth();
+  const { token, user, activePersona, setActivePersona, loading, logout } = useAuth();
   const socketContext = useSocket() || {};
   const socket = socketContext.socket;
   const onlineUserIds = socketContext.onlineUserIds || [];
@@ -112,6 +113,15 @@ export default function ChatPage() {
   const [pendingUnlockTarget, setPendingUnlockTarget] = useState(null);
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcodeModalMode, setPasscodeModalMode] = useState('unlock');
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+
+  useEffect(() => {
+    if (activePersona?._id) {
+      if (!activePersona.privacySettings || !activePersona.privacySettings.setupCompleted) {
+        setShowPrivacyModal(true);
+      }
+    }
+  }, [activePersona]);
 
   const showToast = (message, type = 'info') => {
     setToastAlertConfig({ message, type });
@@ -1315,9 +1325,17 @@ export default function ChatPage() {
       }
     };
 
+    const handleSpaceLeft = ({ spaceId, spaceTitle }) => {
+      if (activeType === 'space' && String(activeId) === String(spaceId)) {
+        handleCloseActiveChat();
+      }
+      fetchSpaces();
+      fetchConversations();
+    };
+
     const handleSpaceKicked = ({ spaceId, spaceTitle }) => {
       if (activeType === 'space' && String(activeId) === String(spaceId)) {
-        setActiveId(null);
+        handleCloseActiveChat();
         showToast(`You were removed from ${spaceTitle || 'this space'} by an admin.`, 'error');
       }
       fetchSpaces();
@@ -1326,10 +1344,7 @@ export default function ChatPage() {
 
     const handleSpaceDeleted = ({ spaceId, spaceTitle }) => {
       if (activeType === 'space' && String(activeId) === String(spaceId)) {
-        setActiveId(null);
-        setActiveType(null);
-        setActiveObject(null);
-        setMessages([]);
+        handleCloseActiveChat();
       }
       showToast(`Space "${spaceTitle || 'Unknown'}" was deleted.`, 'info');
       fetchSpaces();
@@ -1348,11 +1363,14 @@ export default function ChatPage() {
     socket.on('message:burned', handleMessageBurned);
     socket.on('space:created', handleSpaceCreated);
     socket.on('space:updated', handleSpaceUpdated);
+    socket.on('space:left', handleSpaceLeft);
     socket.on('space:kicked', handleSpaceKicked);
     socket.on('space:deleted', handleSpaceDeleted);
 
     return () => {
-      if (activeId) leaveRoom(activeId);
+      if (activeId) {
+        try { leaveRoom(activeId); } catch (e) {}
+      }
       socket.off('message:new', handleNewMessage);
       socket.off('conversation:new', handleConversationNew);
       socket.off('conversation:updated', handleConversationUpdated);
@@ -1365,6 +1383,7 @@ export default function ChatPage() {
       socket.off('message:burned', handleMessageBurned);
       socket.off('space:created', handleSpaceCreated);
       socket.off('space:updated', handleSpaceUpdated);
+      socket.off('space:left', handleSpaceLeft);
       socket.off('space:kicked', handleSpaceKicked);
       socket.off('space:deleted', handleSpaceDeleted);
     };
@@ -1466,8 +1485,22 @@ export default function ChatPage() {
   const handleCloseActiveChat = () => {
     if (activeId) {
       setUnlockedChats(prev => prev.filter(id => id !== String(activeId)));
+      try {
+        leaveRoom(activeId);
+      } catch (err) {
+        // silent catch
+      }
     }
     setActiveId(null);
+    setActiveType(null);
+    setActiveObject(null);
+    setMessages([]);
+    setTasks([]);
+    setPolls([]);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('donchat_active_id');
+      localStorage.removeItem('donchat_active_type');
+    }
   };
 
   const handleToggleLockActiveChat = async () => {
@@ -1992,8 +2025,7 @@ export default function ChatPage() {
           const res = await api.delete(`/conversations/${activeId}`);
           if (res.data.success) {
             showToast('Conversation deleted.', 'info');
-            setActiveId(null);
-            setActiveObject(null);
+            handleCloseActiveChat();
             fetchConversations();
           }
         } catch (err) {
@@ -2060,7 +2092,7 @@ export default function ChatPage() {
           activeNav={activeNavView}
           onSelectNav={(nav) => {
             setActiveNavView(nav);
-            if (nav !== 'chats') setActiveId(null);
+            if (nav !== 'chats') handleCloseActiveChat();
             setMobileSidebarOpen(false);
           }}
           onSelectConversation={(id, conv) => {
@@ -2082,7 +2114,7 @@ export default function ChatPage() {
           onOpenCreateSpace={() => setShowCreateSpaceModal(true)}
           onOpenNewPersona={() => setShowPersonaModal(true)}
           onResetActive={() => {
-            setActiveId(null);
+            handleCloseActiveChat();
             setMobileSidebarOpen(false);
           }}
           mobileOpen={mobileSidebarOpen}
@@ -2096,6 +2128,29 @@ export default function ChatPage() {
       {/* Main Workspace Viewport: Always flex and visible across all screen sizes */}
       <main className="flex-1 flex h-full min-h-0 overflow-hidden relative w-full bg-[#080b14]">
         <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+          {/* Demo Account Showcase Mode Banner */}
+          {(user?.isDemo || user?.email === 'demo@donchat.com') && (
+            <div className="bg-gradient-to-r from-amber-950/80 via-indigo-950/70 to-purple-950/80 border-b border-amber-500/30 px-3 sm:px-4 py-2 flex items-center justify-between text-xs shrink-0 select-none z-20">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="px-2 py-0.5 rounded-full font-bold text-[10px] bg-amber-500/25 text-amber-300 border border-amber-500/40 shrink-0">
+                  ⚡ DEMO SHOWCASE
+                </span>
+                <p className="text-gray-300 truncate text-[11px] sm:text-xs">
+                  Feature Testing Mode: Try real-time chats, voice notes, WebRTC calls & spaces!
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  if (logout) logout();
+                  router.push('/login');
+                }}
+                className="ml-2 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] sm:text-xs shrink-0 transition shadow-sm"
+              >
+                Register Free Account
+              </button>
+            </div>
+          )}
+
           {activeId ? (
             <div className="flex-1 flex flex-col h-full overflow-hidden">
               {/* Header Bar */}
@@ -2324,7 +2379,7 @@ export default function ChatPage() {
                   onOpenNewChat={() => setShowNewChatModal(true)}
                   onOpenCreateSpace={() => setShowCreateSpaceModal(true)}
                   onOpenNewPersona={() => setShowPersonaModal(true)}
-                  onResetActive={() => setActiveId(null)}
+                  onResetActive={handleCloseActiveChat}
                   isMobileView={true}
                   onToggleRightPanel={() => setShowRightPanel(prev => !prev)}
                 />
@@ -2355,7 +2410,7 @@ export default function ChatPage() {
             activeTab={activeNavView}
             onSelectTab={(tab) => {
               setActiveNavView(tab);
-              setActiveId(null);
+              handleCloseActiveChat();
             }}
             unreadChatsCount={(conversations || []).reduce((sum, c) => sum + (c.unreadCount || 0), 0)}
             onlineFriendsCount={(allContacts || []).filter(c => onlineUserIds.includes(String(c._id))).length}
@@ -2378,7 +2433,7 @@ export default function ChatPage() {
           allContacts={allContacts}
           onlineUserIds={onlineUserIds}
           activePersona={activePersona}
-          activeSpace={activeType === 'space' ? activeObject : null}
+          activeSpace={(activeId && activeType === 'space') ? activeObject : null}
           onStartDM={(id) => { startNewDirectMessage(id); setShowRightPanel(false); }}
           onOpenCreateSpace={() => { setShowCreateSpaceModal(true); setShowRightPanel(false); }}
           onOpenNewChat={() => { setShowNewChatModal(true); setShowRightPanel(false); }}
@@ -2396,16 +2451,27 @@ export default function ChatPage() {
               showToast(err.response?.data?.message || 'Failed to remove member', 'error');
             }
           }}
+          onLeaveSpace={async () => {
+            if (!activeId || activeType !== 'space') return;
+            try {
+              const res = await api.delete(`/spaces/${activeId}/members/${activePersona._id}`);
+              if (res.data.success) {
+                showToast(`Left space "${activeObject?.title || 'Space'}"`, 'info');
+                handleCloseActiveChat();
+                fetchSpaces();
+                fetchConversations();
+              }
+            } catch (err) {
+              showToast(err.response?.data?.message || 'Failed to leave space', 'error');
+            }
+          }}
           onDeleteSpace={async () => {
             if (!activeId || activeType !== 'space') return;
             try {
               const res = await api.delete(`/spaces/${activeId}`);
               if (res.data.success) {
                 showToast(res.data.message || 'Space deleted successfully', 'success');
-                setActiveId(null);
-                setActiveType(null);
-                setActiveObject(null);
-                setMessages([]);
+                handleCloseActiveChat();
                 fetchSpaces();
               }
             } catch (err) {
@@ -2651,6 +2717,19 @@ export default function ChatPage() {
         activePersona={activePersona}
         activeGameId={activeSecretLoversGameId}
         socket={socket}
+      />
+
+      {/* Privacy Setup Modal (Gate user agreement before public discovery) */}
+      <PrivacySetupModal
+        isOpen={showPrivacyModal}
+        activePersona={activePersona}
+        onClose={() => setShowPrivacyModal(false)}
+        onUpdated={(updatedPersona) => {
+          if (setActivePersona) setActivePersona(updatedPersona);
+          if (fetchContacts) fetchContacts();
+          setShowPrivacyModal(false);
+          showToast('Privacy preferences confirmed & saved! 🛡️', 'success');
+        }}
       />
     </div>
   );

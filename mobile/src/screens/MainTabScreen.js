@@ -24,6 +24,7 @@ import SetPasscodeModal from '../components/SetPasscodeModal';
 import AvatarViewerModal from '../components/AvatarViewerModal';
 import IncomingCallModal from '../components/IncomingCallModal';
 import InviteFriendsModal from '../components/InviteFriendsModal';
+import PrivacySetupModal from '../components/PrivacySetupModal';
 import { playIncomingRingtone, stopAllSFX } from '../lib/callSFX';
 import Logo from '../components/Logo';
 import {
@@ -80,6 +81,15 @@ export default function MainTabScreen({ navigation }) {
   const [setPasscodeVisible, setSetPasscodeVisible] = useState(false);
   const [avatarViewerTarget, setAvatarViewerTarget] = useState({ visible: false, avatarUrl: '', name: '', handle: '', bio: '', customStatus: '' });
   const [incomingCall, setIncomingCall] = useState(null);
+  const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
+
+  useEffect(() => {
+    if (activePersona?._id) {
+      if (!activePersona.privacySettings || !activePersona.privacySettings.setupCompleted) {
+        setPrivacyModalVisible(true);
+      }
+    }
+  }, [activePersona]);
 
   // Rich Web Settings states
   const [settingsSection, setSettingsSection] = useState('profile'); // 'profile' | 'appearance' | 'privacy'
@@ -599,6 +609,27 @@ export default function MainTabScreen({ navigation }) {
   return (
     <SafeAreaView style={[styles.safeContainer, { backgroundColor: dynamicColors.background }]}>
       {renderHeader()}
+
+      {/* Demo Showcase Notice on Mobile */}
+      {Boolean(user?.isDemo || user?.email === 'demo@donchat.com') && (
+        <View style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.3)', paddingHorizontal: 12, paddingVertical: 7, marginHorizontal: 16, marginTop: 8, marginBottom: 2, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1, paddingRight: 6 }}>
+            <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#fbbf24' }}>⚡ Demo Showcase Mode</Text>
+            <Text style={{ fontSize: 10, color: dynamicColors.textSecondary, marginTop: 1 }}>
+              Test chats, voice notes, calls & spaces!
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: dynamicColors.primary }}
+            onPress={() => {
+              if (logout) logout();
+              navigation.navigate('Login');
+            }}
+          >
+            <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#ffffff' }}>Register</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Main Body View based on Tab */}
       <View style={[styles.body, { backgroundColor: dynamicColors.background }]}>
@@ -1667,100 +1698,164 @@ export default function MainTabScreen({ navigation }) {
                 {/* Chat Lock Passcode Security Card */}
                 <View style={[styles.settingsCard, { backgroundColor: dynamicColors.card, borderColor: dynamicColors.cardBorder }]}>
                   <Text style={[styles.settingsSectionTitle, { color: dynamicColors.textMuted }]}>🔒 CHAT LOCK & PASSCODE PIN</Text>
-                  <Text style={[styles.settingsDesc, { color: dynamicColors.textSecondary }]}>
-                    {passcodeStatus.hasPasscode
-                      ? `4-digit PIN passcode active. Chat Lock is currently ${passcodeStatus.chatLockEnabled ? 'ENABLED' : 'DISABLED'}.`
-                      : 'Set a 4-digit PIN passcode to lock private conversations and chats.'}
-                  </Text>
+                  {Boolean(user?.isDemo || user?.email === 'demo@donchat.com') ? (
+                    <View style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.25)', marginTop: 4 }}>
+                      <Text style={{ fontSize: 11, color: '#fbbf24', fontWeight: 'bold' }}>
+                        ⚡ Chat Passcode is disabled on the Demo Account
+                      </Text>
+                      <Text style={{ fontSize: 10, color: dynamicColors.textSecondary, marginTop: 2 }}>
+                        Passcode lock is disabled so all demo guests can freely explore conversations. Register your own account to set a PIN.
+                      </Text>
+                    </View>
+                  ) : (
+                    <>
+                      <Text style={[styles.settingsDesc, { color: dynamicColors.textSecondary }]}>
+                        {passcodeStatus.hasPasscode
+                          ? `4-digit PIN passcode active. Chat Lock is currently ${passcodeStatus.chatLockEnabled ? 'ENABLED' : 'DISABLED'}.`
+                          : 'Set a 4-digit PIN passcode to lock private conversations and chats.'}
+                      </Text>
 
-                  <View style={{ gap: 10, marginTop: 4 }}>
-                    {!passcodeStatus.hasPasscode ? (
-                      <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: 'rgba(99, 102, 241, 0.15)', borderColor: dynamicColors.primary }]}
-                        onPress={() => setSetPasscodeVisible(true)}
-                      >
-                        <Text style={[styles.actionBtnText, { color: dynamicColors.primary, fontWeight: 'bold' }]}>
-                          ➕ Set 4-Digit Security Passcode
-                        </Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <>
-                        <TouchableOpacity
-                          style={[
-                            styles.actionBtn,
-                            {
-                              backgroundColor: passcodeStatus.chatLockEnabled ? 'rgba(16, 185, 129, 0.15)' : (themeMode === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
-                              borderColor: passcodeStatus.chatLockEnabled ? dynamicColors.success : dynamicColors.cardBorder
-                            }
-                          ]}
-                          onPress={handleToggleChatLock}
-                        >
-                          <Text style={[styles.actionBtnText, { color: passcodeStatus.chatLockEnabled ? dynamicColors.success : dynamicColors.text }]}>
-                            {passcodeStatus.chatLockEnabled ? '✓ Chat Lock Active (Tap to Disable)' : '🔒 Enable Chat Lock'}
-                          </Text>
-                        </TouchableOpacity>
-
-                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ gap: 10, marginTop: 4 }}>
+                        {!passcodeStatus.hasPasscode ? (
                           <TouchableOpacity
-                            style={[styles.actionBtn, { flex: 1, backgroundColor: themeMode === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)', borderColor: dynamicColors.cardBorder }]}
+                            style={[styles.actionBtn, { backgroundColor: 'rgba(99, 102, 241, 0.15)', borderColor: dynamicColors.primary }]}
                             onPress={() => setSetPasscodeVisible(true)}
                           >
-                            <Text style={[styles.actionBtnText, { color: dynamicColors.text }]}>✏️ Change Passcode</Text>
+                            <Text style={[styles.actionBtnText, { color: dynamicColors.primary, fontWeight: 'bold' }]}>
+                              ➕ Set 4-Digit Security Passcode
+                            </Text>
                           </TouchableOpacity>
+                        ) : (
+                          <>
+                            <TouchableOpacity
+                              style={[
+                                styles.actionBtn,
+                                {
+                                  backgroundColor: passcodeStatus.chatLockEnabled ? 'rgba(16, 185, 129, 0.15)' : (themeMode === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)'),
+                                  borderColor: passcodeStatus.chatLockEnabled ? dynamicColors.success : dynamicColors.cardBorder
+                                }
+                              ]}
+                              onPress={handleToggleChatLock}
+                            >
+                              <Text style={[styles.actionBtnText, { color: passcodeStatus.chatLockEnabled ? dynamicColors.success : dynamicColors.text }]}>
+                                {passcodeStatus.chatLockEnabled ? '✓ Chat Lock Active (Tap to Disable)' : '🔒 Enable Chat Lock'}
+                              </Text>
+                            </TouchableOpacity>
 
-                          <TouchableOpacity
-                            style={[styles.actionBtn, { flex: 1, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}
-                            onPress={handleRemovePasscode}
-                          >
-                            <Text style={[styles.actionBtnText, { color: colors.danger }]}>🗑️ Remove</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </>
-                    )}
-                  </View>
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                              <TouchableOpacity
+                                style={[styles.actionBtn, { flex: 1, backgroundColor: themeMode === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)', borderColor: dynamicColors.cardBorder }]}
+                                onPress={() => setSetPasscodeVisible(true)}
+                              >
+                                <Text style={[styles.actionBtnText, { color: dynamicColors.text }]}>✏️ Change Passcode</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[styles.actionBtn, { flex: 1, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}
+                                onPress={handleRemovePasscode}
+                              >
+                                <Text style={[styles.actionBtnText, { color: colors.danger }]}>🗑️ Remove</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </>
+                        )}
+                      </View>
+                    </>
+                  )}
                 </View>
 
                 {/* Privacy Preferences Controls */}
                 <View style={[styles.settingsCard, { backgroundColor: dynamicColors.card, borderColor: dynamicColors.cardBorder }]}>
-                  <Text style={[styles.settingsSectionTitle, { color: dynamicColors.textMuted }]}>👁️ PRIVACY CONTROLS</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={[styles.settingsSectionTitle, { color: dynamicColors.textMuted }]}>👁️ PRIVACY CONTROLS</Text>
+                    <TouchableOpacity
+                      onPress={() => setPrivacyModalVisible(true)}
+                      style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(99, 102, 241, 0.15)', borderWidth: 1, borderColor: dynamicColors.primary }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: dynamicColors.primary }}>Setup Modal ›</Text>
+                    </TouchableOpacity>
+                  </View>
                   <View style={{ gap: 12 }}>
                     <View style={[styles.prefRow, { borderBottomColor: dynamicColors.cardBorder }]}>
                       <Text style={[styles.prefLabel, { color: dynamicColors.text }]}>Who can find me by handle?</Text>
                       <TouchableOpacity
                         style={styles.prefValueBtn}
-                        onPress={() => setFindHandlePerm(prev => prev === 'everyone' ? 'friends' : prev === 'friends' ? 'nobody' : 'everyone')}
+                        onPress={async () => {
+                          const current = activePersona?.privacySettings?.whoCanFindMe || 'friends';
+                          const next = current === 'everyone' ? 'friends' : current === 'friends' ? 'nobody' : 'everyone';
+                          try {
+                            const res = await api.patch(`/personas/${activePersona._id}`, {
+                              privacySettings: {
+                                ...(activePersona?.privacySettings || {}),
+                                whoCanFindMe: next,
+                                setupCompleted: true
+                              }
+                            });
+                            if (res.data?.success) {
+                              setActivePersona(res.data.persona);
+                              fetchData();
+                            }
+                          } catch (e) {}
+                        }}
                       >
-                        <Text style={[styles.prefValueText, { color: dynamicColors.primary }]}>{findHandlePerm.toUpperCase()} ›</Text>
+                        <Text style={[styles.prefValueText, { color: dynamicColors.primary }]}>
+                          {(activePersona?.privacySettings?.whoCanFindMe || 'friends').toUpperCase()} ›
+                        </Text>
                       </TouchableOpacity>
                     </View>
 
                     <View style={[styles.prefRow, { borderBottomColor: dynamicColors.cardBorder }]}>
-                      <Text style={[styles.prefLabel, { color: dynamicColors.text }]}>Who can send me messages?</Text>
+                      <Text style={[styles.prefLabel, { color: dynamicColors.text }]}>Online visibility</Text>
                       <TouchableOpacity
                         style={styles.prefValueBtn}
-                        onPress={() => setMsgPerm(prev => prev === 'everyone' ? 'friends' : prev === 'friends' ? 'nobody' : 'everyone')}
+                        onPress={async () => {
+                          const current = activePersona?.privacySettings?.onlineVisibility || 'nobody';
+                          const next = current === 'nobody' ? 'friends' : current === 'friends' ? 'everyone' : 'nobody';
+                          try {
+                            const res = await api.patch(`/personas/${activePersona._id}`, {
+                              privacySettings: {
+                                ...(activePersona?.privacySettings || {}),
+                                onlineVisibility: next,
+                                setupCompleted: true
+                              }
+                            });
+                            if (res.data?.success) {
+                              setActivePersona(res.data.persona);
+                              fetchData();
+                            }
+                          } catch (e) {}
+                        }}
                       >
-                        <Text style={[styles.prefValueText, { color: dynamicColors.primary }]}>{msgPerm.toUpperCase()} ›</Text>
+                        <Text style={[styles.prefValueText, { color: dynamicColors.primary }]}>
+                          {(activePersona?.privacySettings?.onlineVisibility || 'nobody').toUpperCase()} ›
+                        </Text>
                       </TouchableOpacity>
                     </View>
 
                     <View style={[styles.prefRow, { borderBottomColor: dynamicColors.cardBorder }]}>
-                      <Text style={[styles.prefLabel, { color: dynamicColors.text }]}>Show online status</Text>
+                      <Text style={[styles.prefLabel, { color: dynamicColors.text }]}>New account announcements</Text>
                       <TouchableOpacity
                         style={styles.prefValueBtn}
-                        onPress={() => setShowOnline(prev => !prev)}
+                        onPress={async () => {
+                          const current = Boolean(activePersona?.privacySettings?.newAccountAnnouncements);
+                          try {
+                            const res = await api.patch(`/personas/${activePersona._id}`, {
+                              privacySettings: {
+                                ...(activePersona?.privacySettings || {}),
+                                newAccountAnnouncements: !current,
+                                setupCompleted: true
+                              }
+                            });
+                            if (res.data?.success) {
+                              setActivePersona(res.data.persona);
+                              fetchData();
+                            }
+                          } catch (e) {}
+                        }}
                       >
-                        <Text style={[styles.prefValueText, { color: dynamicColors.primary }]}>{showOnline ? 'ENABLED ›' : 'DISABLED ›'}</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <View style={[styles.prefRow, { borderBottomColor: dynamicColors.cardBorder }]}>
-                      <Text style={[styles.prefLabel, { color: dynamicColors.text }]}>Read receipts</Text>
-                      <TouchableOpacity
-                        style={styles.prefValueBtn}
-                        onPress={() => setReadReceipts(prev => !prev)}
-                      >
-                        <Text style={[styles.prefValueText, { color: dynamicColors.primary }]}>{readReceipts ? 'ENABLED ›' : 'DISABLED ›'}</Text>
+                        <Text style={[styles.prefValueText, { color: dynamicColors.primary }]}>
+                          {activePersona?.privacySettings?.newAccountAnnouncements ? 'ENABLED ›' : 'DISABLED ›'}
+                        </Text>
                       </TouchableOpacity>
                     </View>
 
@@ -1778,37 +1873,48 @@ export default function MainTabScreen({ navigation }) {
                 {/* Change Login Password Form */}
                 <View style={[styles.settingsCard, { backgroundColor: dynamicColors.card, borderColor: dynamicColors.cardBorder }]}>
                   <Text style={[styles.settingsSectionTitle, { color: dynamicColors.textMuted }]}>🔑 CHANGE LOGIN PASSWORD</Text>
-                  <View style={{ gap: 10 }}>
-                    <TextInput
-                      style={[styles.settingsInput, { backgroundColor: dynamicColors.inputBg, borderColor: dynamicColors.inputBorder, color: dynamicColors.text }]}
-                      placeholder="Current Password"
-                      placeholderTextColor={dynamicColors.textMuted}
-                      secureTextEntry
-                      value={currPassword}
-                      onChangeText={setCurrPassword}
-                    />
+                  {Boolean(user?.isDemo || user?.email === 'demo@donchat.com') ? (
+                    <View style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.25)', marginTop: 4 }}>
+                      <Text style={{ fontSize: 11, color: '#fbbf24', fontWeight: 'bold' }}>
+                        ⚡ Demo Showcase Account
+                      </Text>
+                      <Text style={{ fontSize: 10, color: dynamicColors.textSecondary, marginTop: 2 }}>
+                        Password modification is disabled on the shared Demo Account. Register your own free account to personalize your credentials.
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={{ gap: 10 }}>
+                      <TextInput
+                        style={[styles.settingsInput, { backgroundColor: dynamicColors.inputBg, borderColor: dynamicColors.inputBorder, color: dynamicColors.text }]}
+                        placeholder="Current Password"
+                        placeholderTextColor={dynamicColors.textMuted}
+                        secureTextEntry
+                        value={currPassword}
+                        onChangeText={setCurrPassword}
+                      />
 
-                    <TextInput
-                      style={[styles.settingsInput, { backgroundColor: dynamicColors.inputBg, borderColor: dynamicColors.inputBorder, color: dynamicColors.text }]}
-                      placeholder="New Password (min 6 chars)"
-                      placeholderTextColor={dynamicColors.textMuted}
-                      secureTextEntry
-                      value={newPassword}
-                      onChangeText={setNewPassword}
-                    />
+                      <TextInput
+                        style={[styles.settingsInput, { backgroundColor: dynamicColors.inputBg, borderColor: dynamicColors.inputBorder, color: dynamicColors.text }]}
+                        placeholder="New Password (min 6 chars)"
+                        placeholderTextColor={dynamicColors.textMuted}
+                        secureTextEntry
+                        value={newPassword}
+                        onChangeText={setNewPassword}
+                      />
 
-                    <TouchableOpacity
-                      style={[styles.saveProfileBtn, { backgroundColor: dynamicColors.primary }, changingPass && { opacity: 0.5 }]}
-                      disabled={changingPass}
-                      onPress={handleChangeAccountPassword}
-                    >
-                      {changingPass ? (
-                        <ActivityIndicator color="#ffffff" size="small" />
-                      ) : (
-                        <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 'bold' }}>Update Login Password</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
+                      <TouchableOpacity
+                        style={[styles.saveProfileBtn, { backgroundColor: dynamicColors.primary }, changingPass && { opacity: 0.5 }]}
+                        disabled={changingPass}
+                        onPress={handleChangeAccountPassword}
+                      >
+                        {changingPass ? (
+                          <ActivityIndicator color="#ffffff" size="small" />
+                        ) : (
+                          <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 'bold' }}>Update Login Password</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               </View>
             )}
@@ -2001,6 +2107,16 @@ export default function MainTabScreen({ navigation }) {
         call={incomingCall}
         onAcceptCall={() => handleAcceptIncomingCall(incomingCall)}
         onDeclineCall={() => handleDeclineIncomingCall(incomingCall)}
+      />
+
+      <PrivacySetupModal
+        visible={privacyModalVisible}
+        onClose={() => setPrivacyModalVisible(false)}
+        activePersona={activePersona}
+        onUpdated={(updated) => {
+          setActivePersona(updated);
+          fetchData();
+        }}
       />
     </SafeAreaView>
   );

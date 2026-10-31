@@ -96,21 +96,52 @@ export const searchPersonas = async (req, res) => {
     const cleanQuery = query ? query.trim().replace(/^@/, '') : '';
 
     const reqPersonaId = req.personaId ? req.personaId.toString() : null;
+    let savedContactIds = [];
+    let blockedIds = [];
 
-    let filter = {};
     if (reqPersonaId) {
-      filter._id = { $ne: req.personaId };
+      const requester = await Persona.findById(reqPersonaId).select('contacts blockedPersonas').lean();
+      if (requester) {
+        savedContactIds = (requester.contacts || []).map(id => id.toString());
+        blockedIds = (requester.blockedPersonas || []).map(id => id.toString());
+      }
     }
+
+    let baseFilter = {};
+    if (reqPersonaId) {
+      baseFilter._id = { $ne: req.personaId };
+    }
+    if (blockedIds.length > 0) {
+      baseFilter._id = { $ne: req.personaId, $nin: blockedIds };
+    }
+
+    // Privacy gating:
+    // Only return personas if:
+    // 1. They are already in the requester's saved contacts
+    // 2. OR they have completed privacy setup AND chose 'everyone' for whoCanFindMe
+    const privacyCondition = {
+      $or: [
+        { _id: { $in: savedContactIds } },
+        {
+          'privacySettings.setupCompleted': true,
+          'privacySettings.whoCanFindMe': 'everyone'
+        }
+      ]
+    };
+
+    const filterConditions = [baseFilter, privacyCondition];
 
     if (cleanQuery) {
       const escapedQuery = cleanQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.$or = [
-        { username: { $regex: escapedQuery, $options: 'i' } },
-        { displayName: { $regex: escapedQuery, $options: 'i' } }
-      ];
+      filterConditions.push({
+        $or: [
+          { username: { $regex: escapedQuery, $options: 'i' } },
+          { displayName: { $regex: escapedQuery, $options: 'i' } }
+        ]
+      });
     }
 
-    const personas = await Persona.find(filter)
+    const personas = await Persona.find({ $and: filterConditions })
       .populate('userId', 'role email masterName')
       .sort({ updatedAt: -1 })
       .limit(30);
@@ -134,14 +165,30 @@ export const getAllContacts = async (req, res) => {
     const savedContactIds = (persona.contacts || []).map(id => id.toString());
     const blockedIds = (persona.blockedPersonas || []).map(id => id.toString());
 
-    let filter = { _id: { $ne: req.personaId } };
+    let baseFilter = { _id: { $ne: req.personaId } };
     if (blockedIds.length > 0) {
-      filter._id = { $ne: req.personaId, $nin: blockedIds };
+      baseFilter._id = { $ne: req.personaId, $nin: blockedIds };
     }
+
+    // Privacy gating:
+    // Only display someone publicly in the friends column if:
+    // 1. They are already in the requester's saved contacts
+    // 2. OR they have completed privacy setup AND set whoCanFindMe to 'everyone'
+    const privacyCondition = {
+      $or: [
+        { _id: { $in: savedContactIds } },
+        {
+          'privacySettings.setupCompleted': true,
+          'privacySettings.whoCanFindMe': 'everyone'
+        }
+      ]
+    };
+
+    const filter = { $and: [baseFilter, privacyCondition] };
 
     // Fetch available personas across system with lean projection
     const allSystemPersonas = await Persona.find(filter)
-      .select('username displayName avatar status customStatus type bio updatedAt userId')
+      .select('username displayName avatar status customStatus type bio updatedAt userId privacySettings')
       .populate('userId', 'role email')
       .sort({ updatedAt: -1 })
       .limit(60)
@@ -222,7 +269,7 @@ export const updatePersona = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Persona not found or unauthorized' });
     }
 
-    const { username, displayName, bio, avatar, customStatus, status } = req.body;
+    const { username, displayName, bio, avatar, customStatus, status, privacySettings } = req.body;
 
     // Username uniqueness check (if changing)
     if (username && username.toLowerCase() !== persona.username) {
@@ -241,6 +288,18 @@ export const updatePersona = async (req, res) => {
     }
     if (customStatus !== undefined) persona.customStatus = customStatus;
     if (status !== undefined && ['online', 'away', 'dnd', 'offline'].includes(status)) persona.status = status;
+
+    if (privacySettings !== undefined) {
+      const existingSettings = persona.privacySettings ? (persona.privacySettings.toObject ? persona.privacySettings.toObject() : persona.privacySettings) : {};
+      const isCompleting = privacySettings.setupCompleted !== undefined ? Boolean(privacySettings.setupCompleted) : existingSettings.setupCompleted;
+
+      persona.privacySettings = {
+        ...existingSettings,
+        ...privacySettings,
+        setupCompleted: isCompleting,
+        agreedAt: isCompleting ? (existingSettings.agreedAt || new Date()) : existingSettings.agreedAt
+      };
+    }
 
     await persona.save();
 

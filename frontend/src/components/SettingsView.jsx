@@ -7,6 +7,7 @@ import api, { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 import { getNotifPrefs, saveNotifPrefs, playNotificationSound } from '../lib/sound';
 import { enableWebPushNotifications, disableWebPushNotifications, getWebPushStatus } from '../lib/pushSubscription';
 import PasscodeModal from './PasscodeModal';
+import PrivacySetupModal from './PrivacySetupModal';
 import { usePWA } from '../context/PWAContext';
 import {
   User, Palette, Bell, Shield, UserX, HelpCircle, Camera, Edit2,
@@ -100,6 +101,8 @@ function EditableField({ label, value, onSave, type = 'text', placeholder, mono 
 
 // ─── Change Password Form ─────────────────────────────────────────────────────
 function ChangePasswordForm() {
+  const { user } = useAuth();
+  const isDemo = Boolean(user?.isDemo || user?.email === 'demo@donchat.com');
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -111,6 +114,19 @@ function ChangePasswordForm() {
   const [error, setError] = useState('');
 
   const reset = () => { setCurrent(''); setNext(''); setConfirm(''); setError(''); setSuccess(''); };
+
+  if (isDemo) {
+    return (
+      <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
+        <p className="font-bold text-amber-300 flex items-center gap-1.5">
+          <span>⚡ Demo Tour Account</span>
+        </p>
+        <p className="text-[11px] text-gray-400">
+          Password changes are disabled on the shared Demo Account. Register your own free account to personalize your credentials.
+        </p>
+      </div>
+    );
+  }
 
   const handleSubmit = async () => {
     setError(''); setSuccess('');
@@ -306,6 +322,8 @@ function BlockedUsersTab() {
 
 // ─── Chat Lock & Passcode Settings Component ─────────────────────────────────
 function ChatLockSettings() {
+  const { user } = useAuth();
+  const isDemo = Boolean(user?.isDemo || user?.email === 'demo@donchat.com');
   const [status, setStatus] = useState({ hasPasscode: false, chatLockEnabled: false, lockedConversations: [] });
   const [loading, setLoading] = useState(true);
   const [passcodeModalMode, setPasscodeModalMode] = useState(null);
@@ -487,6 +505,7 @@ export default function SettingsView({ onBack, defaultSection }) {
   const [statusSaving, setStatusSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [showPrivacySetupModal, setShowPrivacySetupModal] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleAvatarFileSelect = async (e) => {
@@ -1297,23 +1316,158 @@ export default function SettingsView({ onBack, defaultSection }) {
             <ChatLockSettings />
 
             <div className="p-6 rounded-3xl bg-[#0f172a] border border-[#1e293b] space-y-4">
-              {[
-                { label: 'Who can find me by handle?', value: 'Everyone', icon: <Eye className="w-4 h-4 text-indigo-400" /> },
-                { label: 'Who can send me messages?', value: 'Friends Only', icon: <MessageSquare className="w-4 h-4 text-indigo-400" /> },
-                { label: 'Show online status', value: 'Enabled', icon: <EyeOff className="w-4 h-4 text-indigo-400" /> },
-                { label: 'Read receipts', value: 'Enabled', icon: <Check className="w-4 h-4 text-indigo-400" /> },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-3.5 rounded-2xl bg-[#151c2e] border border-[#27344d] cursor-pointer hover:border-indigo-500/30 transition">
-                  <div className="flex items-center gap-3">
-                    {item.icon}
-                    <span className="text-xs font-semibold text-white">{item.label}</span>
+              <div className="flex items-center justify-between pb-2 border-b border-[#1e293b]">
+                <div>
+                  <h4 className="text-xs font-bold text-white font-outfit">Discovery & Public Visibility</h4>
+                  <p className="text-[11px] text-gray-400">Decide who can find and connect with you on the Friends column</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPrivacySetupModal(true)}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold transition"
+                >
+                  Setup Modal
+                </button>
+              </div>
+
+              {/* Setting 1: Who can find me? */}
+              <div
+                onClick={async () => {
+                  const current = activePersona?.privacySettings?.whoCanFindMe || 'friends';
+                  const next = current === 'everyone' ? 'friends' : current === 'friends' ? 'nobody' : 'everyone';
+                  await patchPersona({
+                    privacySettings: {
+                      ...(activePersona?.privacySettings || {}),
+                      whoCanFindMe: next,
+                      setupCompleted: true
+                    }
+                  });
+                }}
+                className="flex items-center justify-between p-3.5 rounded-2xl bg-[#151c2e] border border-[#27344d] cursor-pointer hover:border-indigo-500/30 transition group"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/15 flex items-center justify-center text-indigo-400 shrink-0">
+                    <User className="w-4 h-4" />
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
-                    <span>{item.value}</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
+                  <div>
+                    <span className="text-xs font-semibold text-white group-hover:text-indigo-300 transition block">
+                      Who can find me?
+                    </span>
+                    <span className="text-[10px] text-gray-400 block">
+                      {activePersona?.privacySettings?.whoCanFindMe === 'everyone'
+                        ? 'Friends and other GenAce users (Public on Friends column)'
+                        : activePersona?.privacySettings?.whoCanFindMe === 'nobody'
+                        ? 'Hidden from all discovery & search'
+                        : 'Friends only (Only contacts)'}
+                    </span>
                   </div>
                 </div>
-              ))}
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                    activePersona?.privacySettings?.whoCanFindMe === 'everyone'
+                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                      : activePersona?.privacySettings?.whoCanFindMe === 'nobody'
+                      ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+                      : 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                  }`}>
+                    {activePersona?.privacySettings?.whoCanFindMe === 'everyone'
+                      ? 'Everyone'
+                      : activePersona?.privacySettings?.whoCanFindMe === 'nobody'
+                      ? 'Nobody'
+                      : 'Friends only'}
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-white transition" />
+                </div>
+              </div>
+
+              {/* Setting 2: Online visibility */}
+              <div
+                onClick={async () => {
+                  const current = activePersona?.privacySettings?.onlineVisibility || 'nobody';
+                  const next = current === 'nobody' ? 'friends' : current === 'friends' ? 'everyone' : 'nobody';
+                  await patchPersona({
+                    privacySettings: {
+                      ...(activePersona?.privacySettings || {}),
+                      onlineVisibility: next,
+                      setupCompleted: true
+                    }
+                  });
+                }}
+                className="flex items-center justify-between p-3.5 rounded-2xl bg-[#151c2e] border border-[#27344d] cursor-pointer hover:border-indigo-500/30 transition group"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/15 flex items-center justify-center text-indigo-400 shrink-0">
+                    <EyeOff className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-white group-hover:text-indigo-300 transition block">
+                      Online visibility
+                    </span>
+                    <span className="text-[10px] text-gray-400 block">
+                      {activePersona?.privacySettings?.onlineVisibility === 'nobody'
+                        ? 'Nobody (Stealth mode - appear offline)'
+                        : activePersona?.privacySettings?.onlineVisibility === 'friends'
+                        ? 'Friends only (Contacts see green dot)'
+                        : 'Everyone sees online status'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                    activePersona?.privacySettings?.onlineVisibility === 'nobody'
+                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                      : 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                  }`}>
+                    {activePersona?.privacySettings?.onlineVisibility === 'everyone'
+                      ? 'Everyone'
+                      : activePersona?.privacySettings?.onlineVisibility === 'friends'
+                      ? 'Friends only'
+                      : 'Nobody'}
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-white transition" />
+                </div>
+              </div>
+
+              {/* Setting 3: New account announcements */}
+              <div
+                onClick={async () => {
+                  const current = Boolean(activePersona?.privacySettings?.newAccountAnnouncements);
+                  await patchPersona({
+                    privacySettings: {
+                      ...(activePersona?.privacySettings || {}),
+                      newAccountAnnouncements: !current,
+                      setupCompleted: true
+                    }
+                  });
+                }}
+                className="flex items-center justify-between p-3.5 rounded-2xl bg-[#151c2e] border border-[#27344d] cursor-pointer hover:border-indigo-500/30 transition group"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/15 flex items-center justify-center text-indigo-400 shrink-0">
+                    <Shield className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-white group-hover:text-indigo-300 transition block">
+                      New account announcements
+                    </span>
+                    <span className="text-[10px] text-gray-400 block">
+                      {activePersona?.privacySettings?.newAccountAnnouncements
+                        ? 'Notify network of registration.'
+                        : 'Your registration stays private.'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                    activePersona?.privacySettings?.newAccountAnnouncements
+                      ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                      : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                  }`}>
+                    {activePersona?.privacySettings?.newAccountAnnouncements ? 'Enabled' : 'Disabled'}
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-white transition" />
+                </div>
+              </div>
 
               <div className="pt-4 border-t border-[#1e293b] space-y-3">
                 <a
@@ -1390,6 +1544,17 @@ export default function SettingsView({ onBack, defaultSection }) {
         )}
       </div>{/* end main content area */}
       </div>{/* end inner layout wrapper */}
+
+      <PrivacySetupModal
+        isOpen={showPrivacySetupModal}
+        activePersona={activePersona}
+        onClose={() => setShowPrivacySetupModal(false)}
+        onUpdated={(updated) => {
+          if (setActivePersona) setActivePersona(updated);
+          setSavedFlash('Privacy preferences updated! 🛡️');
+          setTimeout(() => setSavedFlash(''), 2500);
+        }}
+      />
     </div>
   );
 }

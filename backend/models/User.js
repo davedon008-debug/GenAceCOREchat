@@ -5,6 +5,7 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true },
   masterName: { type: String, required: true, trim: true },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
+  isDemo: { type: Boolean, default: false },
   personas: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Persona' }],
   chatPasscode: { type: String, default: null },
   chatLockEnabled: { type: Boolean, default: false },

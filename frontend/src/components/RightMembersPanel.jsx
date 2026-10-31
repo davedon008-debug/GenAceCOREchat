@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, ChevronRight, Plus, UserPlus, Upload, Zap, MoreHorizontal, Users, X, UserMinus, ShieldCheck, Trash2, Settings, Link, Smile, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Search, ChevronRight, Plus, UserPlus, Upload, Zap, MoreHorizontal, Users, X, UserMinus, ShieldCheck, Trash2, Settings, Link, Smile, Loader2, Image as ImageIcon, LogOut } from 'lucide-react';
 import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar, SpaceIcon, isImageIcon } from '../lib/api';
 import { useSocket } from '../context/SocketContext';
 import AvatarViewerModal from './AvatarViewerModal';
@@ -16,6 +16,7 @@ export default function RightMembersPanel({
   onOpenNewChat,
   onOpenInviteModal,
   onRemoveSpaceMember,
+  onLeaveSpace,
   onDeleteSpace,
   isOpen = false,
   onClose
@@ -237,8 +238,8 @@ export default function RightMembersPanel({
       {/* ── SCROLLABLE BODY ── */}
       <div className="flex-1 overflow-y-auto px-4 pb-28 xl:pb-4 pt-4 space-y-5">
 
-      {/* SPACE MEMBERS MODE (When viewing a Fluid Space) */}
-      {activeSpace ? (
+      {/* SPACE MEMBERS MODE (When viewing an active Fluid Space) */}
+      {activeSpace && activeSpace._id ? (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
@@ -288,6 +289,21 @@ export default function RightMembersPanel({
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>🗑️ Delete Entire Space</span>
+            </button>
+          )}
+
+          {/* Member Leave Space Button (For non-owner participants) */}
+          {!isSpaceOwner && myMember && onLeaveSpace && (
+            <button
+              onClick={() => {
+                if (confirm(`Leave Space "${activeSpace.title}"?\n\nYou will be removed from this space.`)) {
+                  onLeaveSpace();
+                }
+              }}
+              className="w-full py-2 px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>🚪 Leave Space</span>
             </button>
           )}
 

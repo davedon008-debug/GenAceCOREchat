@@ -97,6 +97,10 @@ export const broadcastPresence = async () => {
 
     validIds.forEach(pId => {
       const p = onlinePersonas.find(item => String(item._id) === String(pId));
+      if (p?.privacySettings?.onlineVisibility === 'nobody') {
+        personaStatuses[pId] = 'offline';
+        return;
+      }
       const dbStatus = p?.status;
       const effectiveStatus = (dbStatus && dbStatus !== 'offline') ? dbStatus : 'online';
 

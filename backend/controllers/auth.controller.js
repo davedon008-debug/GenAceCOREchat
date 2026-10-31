@@ -139,7 +139,8 @@ export const loginUser = async (req, res) => {
         id: user._id,
         email: user.email,
         masterName: user.masterName,
-        role: user.role || 'user'
+        role: user.role || 'user',
+        isDemo: Boolean(user.isDemo || user.email === 'demo@donchat.com')
       },
       activePersona: defaultPersona,
       personas: userPersonas
@@ -193,15 +194,18 @@ export const demoLogin = async (req, res) => {
         }
       }
 
+      user.isDemo = true;
+      user.chatPasscode = null;
+      user.chatLockEnabled = false;
       user.personas = [persona._id];
       await user.save();
       user = await User.findById(user._id).populate('personas');
     } else {
-      // Ensure user role is explicitly 'user', never 'admin'
-      if (user.role !== 'user') {
-        user.role = 'user';
-        await user.save();
-      }
+      user.isDemo = true;
+      user.role = 'user';
+      user.chatPasscode = null;
+      user.chatLockEnabled = false;
+      await user.save();
     }
 
     let userPersonas = await Persona.find({ userId: user._id });
@@ -218,6 +222,81 @@ export const demoLogin = async (req, res) => {
     }
 
     const defaultPersona = userPersonas.find(p => p.isDefault) || userPersonas[0];
+    defaultPersona.privacySettings = {
+      setupCompleted: true,
+      whoCanFindMe: 'everyone',
+      onlineVisibility: 'everyone',
+      newAccountAnnouncements: false,
+      agreedAt: new Date()
+    };
+    await defaultPersona.save();
+
+    // Pre-seed or ensure Showcase Companion exists so demo visitors can test chats and calls immediately
+    try {
+      let guideUser = await User.findOne({ email: 'showcase@donchat.com' });
+      if (!guideUser) {
+        const salt = await bcrypt.genSalt(10);
+        const guidePass = await bcrypt.hash('guide_secure_2026', salt);
+        guideUser = await User.create({
+          email: 'showcase@donchat.com',
+          password: guidePass,
+          masterName: 'GenAce Showcase Companion',
+          role: 'user',
+          isDemo: true
+        });
+      }
+
+      let guidePersona = await Persona.findOne({ username: 'genace_guide' });
+      if (!guidePersona) {
+        guidePersona = await Persona.create({
+          userId: guideUser._id,
+          username: 'genace_guide',
+          displayName: 'GenAce Showcase Companion',
+          bio: 'Official demo test partner. Send me test messages, voice notes, stickers, or try audio/video calls!',
+          type: 'business',
+          privacySettings: { setupCompleted: true, whoCanFindMe: 'everyone', onlineVisibility: 'everyone' }
+        });
+        guideUser.personas = [guidePersona._id];
+        await guideUser.save();
+      }
+
+      // Ensure direct conversation exists between demo persona and showcase guide
+      let demoConv = await Conversation.findOne({
+        type: 'direct',
+        participants: { $all: [defaultPersona._id, guidePersona._id] }
+      });
+      if (!demoConv && String(defaultPersona._id) !== String(guidePersona._id)) {
+        demoConv = await Conversation.create({
+          type: 'direct',
+          participants: [defaultPersona._id, guidePersona._id],
+          name: 'GenAce Showcase Companion'
+        });
+
+        await Message.create({
+          conversationId: demoConv._id,
+          senderPersonaId: guidePersona._id,
+          content: '👋 Welcome to the GenAce Demo Account! This account is set up for you to test all messaging, calling, and space features.',
+          contentType: 'text'
+        });
+
+        await Message.create({
+          conversationId: demoConv._id,
+          senderPersonaId: guidePersona._id,
+          content: '🎙️ Try sending a text, voice message, or attachment here. You can also tap the phone/video call button at the top to test WebRTC audio/video calling!',
+          contentType: 'text'
+        });
+      }
+
+      // Add to contacts
+      if (guidePersona && !defaultPersona.contacts?.includes(guidePersona._id)) {
+        await Persona.findByIdAndUpdate(defaultPersona._id, {
+          $addToSet: { contacts: guidePersona._id }
+        });
+      }
+    } catch (companionErr) {
+      console.warn('Showcase companion notice:', companionErr?.message);
+    }
+
     const token = jwt.sign(
       { userId: user._id, personaId: defaultPersona._id },
       getJwtSecret(),
@@ -227,7 +306,7 @@ export const demoLogin = async (req, res) => {
     res.json({
       success: true,
       token,
-      user: { id: user._id, email: user.email, masterName: user.masterName, role: 'user' },
+      user: { id: user._id, email: user.email, masterName: user.masterName, role: 'user', isDemo: true },
       activePersona: defaultPersona,
       personas: userPersonas
     });
@@ -254,6 +333,13 @@ export const changePassword = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    if (user.isDemo || user.email === 'demo@donchat.com') {
+      return res.status(403).json({
+        success: false,
+        message: 'The Demo Account is for feature demonstration only and cannot modify passwords. Please register a free personal account.'
+      });
+    }
+
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
       return res.status(400).json({ success: false, message: 'Current password is incorrect' });
@@ -274,6 +360,13 @@ export const setChatPasscode = async (req, res) => {
     const { passcode, currentPasscode } = req.body;
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (user.isDemo || user.email === 'demo@donchat.com') {
+      return res.status(403).json({
+        success: false,
+        message: 'Chat passcode locking is disabled on the Demo Account so all visitors can freely explore chats and features.'
+      });
+    }
 
     const strPasscode = passcode !== undefined && passcode !== null ? String(passcode).trim() : '';
     const strCurrent = currentPasscode !== undefined && currentPasscode !== null ? String(currentPasscode).trim() : '';

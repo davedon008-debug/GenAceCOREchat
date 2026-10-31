@@ -300,16 +300,17 @@ export const removeMemberFromSpace = async (req, res) => {
       return myPersonaIdStrs.includes(mId);
     });
 
+    const isSelf = myPersonaIdStrs.includes(targetIdStr);
     const isAdminRole = requesterMember && ['owner', 'admin'].includes(requesterMember.role);
     const isOwnerOrAdmin = isOwner || isAdminRole || isSystemAdmin;
 
-    if (!isOwnerOrAdmin) {
-      return res.status(403).json({ success: false, message: 'Only Space Admins can remove members' });
+    if (!isOwnerOrAdmin && !isSelf) {
+      return res.status(403).json({ success: false, message: 'Only Space Admins can remove other members' });
     }
 
     // Prevent removing owner persona
     if (targetIdStr && targetIdStr === ownerIdStr) {
-      return res.status(400).json({ success: false, message: 'Space owner cannot be removed' });
+      return res.status(400).json({ success: false, message: isSelf ? 'Space owner cannot leave without transferring ownership or deleting space' : 'Space owner cannot be removed' });
     }
 
     // Filter out target persona as well as any null/broken member references
@@ -344,18 +345,22 @@ export const removeMemberFromSpace = async (req, res) => {
       .populate('members.personaId', 'username displayName avatar bio status customStatus type userId')
       .populate('ownerPersonaId', 'username displayName avatar bio status customStatus type userId');
 
-    console.log(`[Space Admin] User ${req.userId} (Persona ${req.personaId}) successfully removed target ${targetIdStr || personaId} from Space ${spaceId}`);
+    console.log(`[Space] User ${req.userId} (Persona ${req.personaId}) ${isSelf ? 'left' : 'removed target ' + (targetIdStr || personaId) + ' from'} Space ${spaceId}`);
 
     const io = getIO();
     if (io) {
       io.to(String(space._id)).emit('space:updated', updatedSpace);
       if (targetIdStr) {
         io.to(String(space._id)).emit('space:member_removed', { spaceId, personaId: targetIdStr });
-        io.to(`persona:${targetIdStr}`).emit('space:kicked', { spaceId, spaceTitle: space.title });
+        if (isSelf) {
+          io.to(`persona:${targetIdStr}`).emit('space:left', { spaceId, spaceTitle: space.title });
+        } else {
+          io.to(`persona:${targetIdStr}`).emit('space:kicked', { spaceId, spaceTitle: space.title });
+        }
       }
     }
 
-    res.json({ success: true, space: updatedSpace, removedPersonaId: targetIdStr || personaId });
+    res.json({ success: true, message: isSelf ? 'Left space successfully' : 'Member removed from space', space: updatedSpace, removedPersonaId: targetIdStr || personaId });
   } catch (error) {
     console.error('removeMemberFromSpace error:', error);
     res.status(500).json({ success: false, message: 'Failed to remove member from Space', error: error.message });
@@ -387,7 +392,13 @@ export const deleteSpace = async (req, res) => {
       });
     }
 
-    const currentUser = await User.findById(req.userId).select('role');
+    const currentUser = await User.findById(req.userId).select('role isDemo email');
+    if (currentUser?.isDemo || currentUser?.email === 'demo@donchat.com') {
+      return res.status(403).json({
+        success: false,
+        message: 'The Demo Account is for feature demonstration and cannot delete spaces. Please register your own account.'
+      });
+    }
     const isSystemAdmin = currentUser?.role === 'admin';
 
     // Resolve owner persona/user ID string
