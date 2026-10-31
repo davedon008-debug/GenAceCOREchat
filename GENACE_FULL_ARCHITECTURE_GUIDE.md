@@ -385,7 +385,84 @@ A restricted tour mode allowing prospective users to test live messaging, WebRTC
 
 ---
 
-## 11. File & Directory Reference
+## 11. Platform Feature Parity & Gap Analysis: Web vs. Mobile
+
+This section provides a granular comparison between the **Web Platform (Next.js 14 PWA)** and the **Mobile Application (React Native / Expo)**, detailing every feature exclusive to the web and the technical gap on mobile.
+
+### 11.1 Executive Feature Matrix
+
+| Feature / Architectural Vector | Web Platform (`frontend`) | Mobile App (`mobile`) | Parity Status & Technical Reason |
+| :--- | :---: | :---: | :--- |
+| **P2P WebRTC Video & Audio Calls** | **Full Native WebRTC** (`RTCPeerConnection`, `<video>`, `<audio>`) | **Web Fallback Only** (`Platform.OS === 'web'`) | ⚠️ **Web Exclusive**: Native iOS/Android builds require bare prebuild with `react-native-webrtc` drivers. |
+| **Secret Lovers Interactive Card Game** | **Full Engine + Procedural SFX** (`secretLoversSFX.js`, interactive cards) | **Not Implemented** | ❌ **Web Exclusive**: Card flip animations, matchmaking cards, and game SFX have not been ported to React Native. |
+| **Progressive Web App (PWA) Engine** | **Full PWA** (`InstallPromptModal`, `sw.js`, VAPID WebPush) | **N/A (Native App)** | ℹ️ **Web Specific**: Mobile uses native OS packaging (Expo/EAS, APNs, FCM). |
+| **Background Call Action Buttons** | **Service Worker Notifications** (`📞 Answer` / `✕ Decline`) | **Standard Push Notifications** | ❌ **Web Exclusive**: Service worker handles decline REST API calls in background without app launch. |
+| **Persistent 3-Column Workspace** | **Full 3-Column Layout** (Nav + Workspace + Right Members Panel) | **Single-Column Stack** | ℹ️ **Form-Factor**: Mobile uses tab navigation and bottom sliding drawers. |
+| **Dual-Mode Members Panel (`RightMembersPanel`)** | **Dedicated Panel** (Space roster, admin tools, kick/leave + Contacts) | **Basic Contacts Drawer** (`MembersDrawerModal`) | ⚠️ **Web Exclusive**: Mobile drawer only lists general contacts; lacks space members roster, admin tools, and self-leave. |
+| **Space Administration & Emoji Customizer** | **Full Controls** (Preset emoji icons, rename, kick member, delete) | **Modal-Only Editing** | ⚠️ **Web Superior**: Web has inline space header editing with 16 preset cosmic emojis and member removal. |
+| **Member Voluntary Self-Leave ("🚪 Leave Space")** | **Interactive Button + Socket Flow** (`onLeaveSpace`) | **Not Implemented in UI** | ❌ **Web Exclusive**: Web allows members to leave spaces directly from the members sidebar. |
+| **Dedicated Full-Page Admin Dashboard** | **Full Admin Suite** (`AdminView.jsx`, space audit, user ban) | **Compact Popup** (`AdminModal.js`) | ⚠️ **Web Exclusive**: Web has a full analytics dashboard with live inspection of spaces and users. |
+| **Procedural Web Audio API Synthesizer** | **Mathematical Sound Synthesizer** (`callSFX.js`, dual-sine waves) | **Expo-AV Static Files** | ❌ **Web Exclusive**: `window.AudioContext` is browser-only; native mobile uses static audio assets. |
+| **Custom Ringtone Manager (IndexedDB)** | **User Audio Uploads + IndexedDB** (`ringtoneManager.js`) | **Bundled Ringtones Only** | ❌ **Web Exclusive**: Web lets users upload MP3/WAV files stored in client IndexedDB. |
+| **Live Voice Note Decibel Waveform Analyser** | **Real-Time Visualizer** (`AnalyserNode` frequency bars) | **Duration Timer Only** | ❌ **Web Exclusive**: Web dynamically draws soundwave decibel bars while recording voice notes. |
+| **Zero-Latency In-Memory Message Cache** | **LRU Memory Cache** (`messageCache.js`, 0ms space/chat switch) | **REST Refetch on Mount** | ⚠️ **Web Superior**: Web loads instantly from memory before server revalidation. |
+| **Live In-App Webcam Photo Capture** | **Webcam Viewfinder Modal** (`navigator.mediaDevices.getUserMedia`) | **System Camera App** (`expo-image-picker`) | ℹ️ **Platform Native**: Mobile delegates to the native device camera app. |
+| **Global Hardware Keyboard Shortcuts** | **`Ctrl + K` search, `Esc` deselect, `Enter` send** | **Touch Gestures Only** | ℹ️ **Form-Factor**: Desktop keyboard optimized. |
+| **Desktop Welcome Canvas & Launchpad** | **Interactive Welcome Canvas** (`WelcomeScreen.jsx`, 2x2 cards) | **Direct Tab View** | ℹ️ **Form-Factor**: Desktop displays hero cards when no conversation is active. |
+
+---
+
+### 11.2 Deep-Dive: Features Available on Web but Missing or Limited on Mobile
+
+#### 1. Interactive Secret Lovers Social Game Engine
+- **Web**: Includes an interactive card game built directly into fluid spaces and direct messages. Features real-time turn progression, card flip animations, countdown chimes, and dedicated sound effects synthesized procedurally via `frontend/src/lib/secretLoversSFX.js`.
+- **Mobile Gap**: The mobile client has no Secret Lovers game renderer, game invite cards, or game SFX.
+
+#### 2. Native WebRTC P2P Audio & Video Streaming
+- **Web**: Implements full `RTCPeerConnection` with bidirectional audio and video tracks, local/remote video rendering in `<video>` tags, device selection (mic/cam), and Web Audio synthesis for ringtones.
+- **Mobile Gap**: `mobile/src/components/CallModal.js` is currently restricted to web runtime (`Platform.OS === 'web'`). Native iOS/Android builds require bare workflow migration with `react-native-webrtc` native drivers.
+
+#### 3. Dual-Mode Members Directory & Fluid Space Management
+- **Web**: Features `RightMembersPanel.jsx` which dynamically toggles between:
+  - **Space Members Mode**: Displays space member count, owner/admin badges, 16 preset space icon selectors, admin delete space button, member kick actions, and member voluntary self-leave ("🚪 Leave Space").
+  - **General Contacts Mode**: Displays real-time online contacts with live presence dots, search filtering, and offline contact lists.
+- **Mobile Gap**: `MembersDrawerModal.js` on mobile only displays a general contacts list. It does not display active space members, member roles, kick buttons, or voluntary leave options.
+
+#### 4. Service Worker Background Calls & PWA Install Engine
+- **Web**: Integrates `public/sw.js` and `InstallPromptModal.jsx`. Incoming calls while the browser is closed or minimized trigger persistent system notifications with interactive `📞 Answer` and `✕ Decline` action buttons that invoke backend endpoints without loading the app shell.
+- **Mobile Gap**: Mobile relies on Expo Push Notifications, which currently display standard notification banners without background call action button hooks.
+
+#### 5. Custom Ringtone Upload & Client IndexedDB Persistence
+- **Web**: `SettingsView.jsx` provides a full ringtone studio (`ringtoneManager.js`) where users can upload custom MP3, WAV, or OGG audio files, test-play them in the browser, and store them client-side in browser IndexedDB.
+- **Mobile Gap**: Mobile settings only allow switching between static presets via `expo-av`, with no user upload or persistent client storage for custom audio files.
+
+#### 6. Live Audio Waveform Decibel Analyzer
+- **Web**: `MessageInput.jsx` hooks into the browser `AudioContext` and `AnalyserNode` during voice note recording, dynamically rendering live bouncing audio frequency bars that reflect microphone volume.
+- **Mobile Gap**: Mobile records via `expo-av` displaying only an elapsed duration text counter (`0:05`).
+
+#### 7. Full-Page Platform Admin Dashboard
+- **Web**: `AdminView.jsx` provides a dedicated management dashboard for administrators, enabling live inspection of active spaces, platform-wide analytics, and one-click space termination.
+- **Mobile Gap**: Mobile provides only a compact `AdminModal.js` dialog with limited functionality.
+
+#### 8. In-Memory Zero-Latency Cache Engine
+- **Web**: `messageCache.js` caches the last 100 messages for each space and conversation in client memory, enabling instant (0ms) room switching before background revalidation.
+- **Mobile Gap**: Mobile re-fetches message history over the network each time a conversation is opened.
+
+---
+
+### 11.3 Roadmap for Mobile Feature Parity
+
+To bring the mobile application to 100% feature parity with the web platform, the following engineering steps are recommended:
+
+1. **Bare Workflow Prebuild for WebRTC**: Run `npx expo prebuild` and integrate `react-native-webrtc` with native video views (`RTCView`) for iOS and Android.
+2. **Secret Lovers Mobile Port**: Create React Native interactive card components (`SecretLoversCard.js`) and replicate card flip animations using `react-native-reanimated`.
+3. **Space Members in Mobile Drawer**: Upgrade `MembersDrawerModal.js` to accept `activeSpace`, displaying space members, admin tools, and the "Leave Space" action.
+4. **Interactive Push Notification Actions**: Configure `expo-notifications` with notification categories and background task handlers for incoming call Answer/Decline actions.
+5. **MMKV / SQLite Caching Layer**: Implement an offline in-memory cache using `react-native-mmkv` to achieve 0ms room switching on mobile.
+
+---
+
+## 12. File & Directory Reference
 
 ```text
 DONCHAT/
@@ -419,15 +496,18 @@ DONCHAT/
 │       │   ├── layout.js         # Root layout with PWA, Socket, and Auth providers
 │       │   └── welcome/page.jsx  # Welcome landing page with install triggers
 │       ├── components/
+│       │   ├── AdminView.jsx          # Dedicated platform admin dashboard
 │       │   ├── CallModal.jsx          # Active WebRTC audio/video call UI
 │       │   ├── IncomingCallModal.jsx  # Ringing incoming call modal with silence controls
 │       │   ├── InstallPromptModal.jsx # Cosmic PWA install modal & floating pill
-│       │   ├── MessageInput.jsx       # Voice note recorder, attachments, text input
+│       │   ├── MessageInput.jsx       # Voice note recorder, waveform analyzer, text input
 │       │   ├── MessageItem.jsx        # Rich message bubble, reactions, burn animations
 │       │   ├── PrivacySetupModal.jsx  # Privacy onboarding consent dialog
-│       │   ├── RightMembersPanel.jsx  # Members directory & Space members panel
+│       │   ├── RightMembersPanel.jsx  # Dual-mode members directory & space admin panel
 │       │   ├── SettingsView.jsx       # Custom ringtones, passcode lock, privacy controls
-│       │   └── Sidebar.jsx            # Conversations, spaces list, persona switcher
+│       │   ├── Sidebar.jsx            # Conversations, spaces list, persona switcher
+│       │   ├── SpaceCanvas.jsx        # Inline space tasks & polls workspace
+│       │   └── WelcomeScreen.jsx      # Desktop welcome canvas & quick launchpad
 │       ├── context/
 │       │   ├── AuthContext.jsx   # Master user & active persona state
 │       │   ├── PWAContext.jsx    # PWA install prompt & standalone detection
@@ -435,13 +515,19 @@ DONCHAT/
 │       └── lib/
 │           ├── api.js                # Axios HTTP client with JWT interceptors
 │           ├── callSFX.js            # Web Audio API procedural sound synthesizer
+│           ├── messageCache.js       # Zero-latency in-memory message cache
 │           ├── pushSubscription.js   # Client WebPush registration helper
 │           ├── ringtoneManager.js    # Custom ringtone IndexedDB storage & vibration
+│           ├── secretLoversSFX.js    # Secret Lovers procedural game sound synthesizer
 │           └── sound.js              # Notification & sent message chime player
 └── mobile/
     └── src/
         ├── components/
-        │   └── PrivacySetupModal.js  # React Native privacy onboarding consent dialog
+        │   ├── MembersDrawerModal.js # General contacts sliding drawer
+        │   ├── PrivacySetupModal.js  # React Native privacy onboarding consent dialog
+        │   ├── SpaceCanvasModal.js   # Space tasks & polls modal popup
+        │   └── CallModal.js          # Web-runtime WebRTC call modal
         └── screens/
+            ├── ConversationScreen.js # Mobile messaging room view
             └── MainTabScreen.js      # Mobile core tab navigator & demo showcase banner
 ```

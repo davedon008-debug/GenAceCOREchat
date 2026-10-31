@@ -31,6 +31,7 @@
 For in-depth code architecture, data models, Socket.IO network events, and WebRTC state machines, refer to:
 
 📖 **[Full Architecture & Implementation Guide](GENACE_FULL_ARCHITECTURE_GUIDE.md)**  
+⚖️ **[Web vs. Mobile Feature Parity Matrix](GENACE_FULL_ARCHITECTURE_GUIDE.md#11-platform-feature-parity--gap-analysis-web-vs-mobile)**  
 📱 **[Mobile Publishing Guide](PUBLISHING_GUIDE.md)**
 
 ---
