@@ -24,6 +24,15 @@ const PersonaSchema = new mongoose.Schema({
   blockedPersonas: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Persona' }],
   contacts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Persona' }],
   pushTokens: [{ type: String }],
+  mutedStatusPersonas: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Persona' }],
+  statusPrivacy: {
+    defaultType: {
+      type: String,
+      enum: ['all_contacts', 'everyone', 'exclude'],
+      default: 'all_contacts'
+    },
+    mutedViewers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Persona' }]
+  },
   privacySettings: {
     setupCompleted: { type: Boolean, default: false },
     whoCanFindMe: { 

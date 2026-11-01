@@ -133,12 +133,21 @@ export default function FriendRequestsModal({ visible, onClose, onSuccess }) {
                       <Text style={styles.itemSub}>@{c.username}</Text>
                     </View>
 
-                    <TouchableOpacity
-                      style={styles.dangerPill}
-                      onPress={() => handleBlock(c._id, c.username)}
-                    >
-                      <Text style={styles.dangerPillText}>Block</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <TouchableOpacity
+                        style={styles.removePill}
+                        onPress={() => handleRemoveContact(c._id, c.displayName || c.username)}
+                      >
+                        <Text style={styles.removePillText}>Remove</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.dangerPill}
+                        onPress={() => handleBlock(c._id, c.username)}
+                      >
+                        <Text style={styles.dangerPillText}>Block</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ))
               )
@@ -303,6 +312,19 @@ const styles = StyleSheet.create({
   },
   actionPillText: {
     color: colors.primary,
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  removePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  removePillText: {
+    color: colors.textMuted || '#94a3b8',
     fontSize: 11,
     fontWeight: 'bold',
   },

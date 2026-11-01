@@ -141,12 +141,18 @@ export const searchPersonas = async (req, res) => {
       });
     }
 
-    const personas = await Persona.find({ $and: filterConditions })
+    const rawPersonas = await Persona.find({ $and: filterConditions })
       .populate('userId', 'role email masterName')
       .sort({ updatedAt: -1 })
-      .limit(30);
+      .limit(30)
+      .lean();
 
-    res.json({ success: true, personas });
+    const personas = rawPersonas.map(p => ({
+      ...p,
+      isContact: savedContactIds.includes(String(p._id))
+    }));
+
+    res.json({ success: true, personas, savedContactIds });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to search personas', error: error.message });
   }
@@ -196,15 +202,16 @@ export const getAllContacts = async (req, res) => {
 
     // Prioritize explicitly saved contacts at top of list
     const contactsSet = new Set(savedContactIds);
-    const contacts = allSystemPersonas.sort((a, b) => {
-      const aSaved = contactsSet.has(String(a._id));
-      const bSaved = contactsSet.has(String(b._id));
-      if (aSaved && !bSaved) return -1;
-      if (!aSaved && bSaved) return 1;
+    const contacts = allSystemPersonas.map(p => ({
+      ...p,
+      isContact: contactsSet.has(String(p._id))
+    })).sort((a, b) => {
+      if (a.isContact && !b.isContact) return -1;
+      if (!a.isContact && b.isContact) return 1;
       return 0;
     });
 
-    res.json({ success: true, contacts });
+    res.json({ success: true, contacts, savedContactIds });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch contacts', error: error.message });
   }

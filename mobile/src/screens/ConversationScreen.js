@@ -22,6 +22,7 @@ import AvatarViewerModal from '../components/AvatarViewerModal';
 import PrivacyModeModal from '../components/PrivacyModeModal';
 import CallModal from '../components/CallModal';
 import IncomingCallModal from '../components/IncomingCallModal';
+import StatusViewerModal from '../components/status/StatusViewerModal';
 import { playIncomingRingtone, playRingback, playCallConnected, playCallEnded, stopAllSFX } from '../lib/callSFX';
 import {
   ArrowLeft, Bot, Zap, Info, Lock, Flame, Plus, Phone, Video as VideoIcon,
@@ -158,6 +159,24 @@ export default function ConversationScreen({ route, navigation }) {
   const [currentIsLocked, setCurrentIsLocked] = useState(!!isLocked);
   const [passcodeUnlocked, setPasscodeUnlocked] = useState(!isLocked);
   const [partnerPersona, setPartnerPersona] = useState(null);
+  const [partnerStatusGroup, setPartnerStatusGroup] = useState(route.params?.statusGroup || null);
+  const [showStatusViewer, setShowStatusViewer] = useState(false);
+
+  useEffect(() => {
+    if (spaceId || !otherPersonaId) return;
+    // Check if partner has an active status story
+    api.get('/statuses/feed').then(res => {
+      if (res.data?.success) {
+        const oId = String(otherPersonaId);
+        const recent = (res.data.recentStatuses || []).find(g => String(g.persona?._id || g.persona?.id) === oId);
+        const viewed = !recent && (res.data.viewedStatuses || []).find(g => String(g.persona?._id || g.persona?.id) === oId);
+        const found = recent || viewed;
+        if (found) {
+          setPartnerStatusGroup(found);
+        }
+      }
+    }).catch(() => {});
+  }, [spaceId, otherPersonaId]);
 
   // Real-time WebRTC Calling State & Ref Tracking
   const [activeCall, setActiveCall] = useState(null);
@@ -1457,6 +1476,32 @@ export default function ConversationScreen({ route, navigation }) {
             </View>
           ) : null}
 
+          {/* Status Story Reply Card */}
+          {item.statusReply ? (
+            <View style={[styles.statusReplyCard, isMe ? styles.statusReplyCardMe : [styles.statusReplyCardOther, { backgroundColor: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }]]}>
+              <Text style={[styles.statusReplyHeaderLabel, { color: isMe ? 'rgba(255,255,255,0.9)' : dynamicColors.primary }]}>
+                💬 Replying to story
+              </Text>
+              {item.statusReply.mediaUrl ? (
+                <View style={styles.statusReplyMediaRow}>
+                  <Image
+                    source={{ uri: getMediaUrl(item.statusReply.mediaUrl) }}
+                    style={styles.statusReplyThumb}
+                  />
+                  {item.statusReply.caption ? (
+                    <Text style={[styles.statusReplyCaptionText, { color: isMe ? 'rgba(255,255,255,0.85)' : dynamicColors.textSecondary }]} numberOfLines={2}>
+                      {item.statusReply.caption}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : item.statusReply.text ? (
+                <Text style={[styles.statusReplyTextSnippet, { color: isMe ? 'rgba(255,255,255,0.85)' : dynamicColors.textSecondary }]} numberOfLines={2}>
+                  "{item.statusReply.text}"
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
           {/* Group / Space / Anonymous sender handle */}
           {!isMe && (spaceId || isAnonymous) && (
             <TouchableOpacity onPress={() => !isAnonymous && handleOpenProfile(item.senderPersonaId)}>
@@ -1617,16 +1662,35 @@ export default function ConversationScreen({ route, navigation }) {
           <TouchableOpacity
             style={styles.avatarContainer}
             onPress={() => {
-              const partnerObj = messages.find(m => {
-                const sId = String(m.senderPersonaId?._id || m.senderPersonaId || '');
-                return sId && sId !== String(activePersona?._id);
-              })?.senderPersonaId;
-              handleOpenProfile(partnerObj || { avatar, displayName: title, bio: route.params?.bio });
+              if (partnerStatusGroup) {
+                setShowStatusViewer(true);
+              } else {
+                const partnerObj = messages.find(m => {
+                  const sId = String(m.senderPersonaId?._id || m.senderPersonaId || '');
+                  return sId && sId !== String(activePersona?._id);
+                })?.senderPersonaId;
+                handleOpenProfile(partnerObj || { avatar, displayName: title, bio: route.params?.bio });
+              }
             }}
             activeOpacity={0.8}
           >
-            <Image source={{ uri: getMediaUrl(avatar) || DEFAULT_AVATAR }} style={styles.avatarImg} />
-            {partnerStatusColor ? <View style={[styles.onlineDot, { backgroundColor: partnerStatusColor }]} /> : null}
+            <View
+              style={[
+                styles.headerAvatarRing,
+                partnerStatusGroup && (
+                  partnerStatusGroup.hasUnseen
+                    ? [styles.headerRingUnseen, { borderColor: dynamicColors.primary || '#6366f1' }]
+                    : [styles.headerRingViewed, { borderColor: dynamicColors.cardBorder || 'rgba(148, 163, 184, 0.45)' }]
+                )
+              ]}
+            >
+              <Image source={{ uri: getMediaUrl(avatar) || DEFAULT_AVATAR }} style={styles.avatarImg} />
+            </View>
+            {partnerStatusGroup ? (
+              <View style={[styles.storyActiveDotHeader, { backgroundColor: partnerStatusGroup.hasUnseen ? (dynamicColors.primary || '#6366f1') : '#94a3b8' }]} />
+            ) : partnerStatusColor ? (
+              <View style={[styles.onlineDot, { backgroundColor: partnerStatusColor }]} />
+            ) : null}
           </TouchableOpacity>
         )}
 
@@ -1649,6 +1713,16 @@ export default function ConversationScreen({ route, navigation }) {
             <Text style={[styles.headerTitle, { color: dynamicColors.text }]} numberOfLines={1}>
               {spaceData?.title || title || (spaceId ? 'Fluid Space' : 'Conversation')}
             </Text>
+            {partnerStatusGroup && (
+              <TouchableOpacity
+                style={[styles.headerStoryPill, { backgroundColor: partnerStatusGroup.hasUnseen ? 'rgba(99, 102, 241, 0.18)' : 'rgba(148, 163, 184, 0.12)' }]}
+                onPress={() => setShowStatusViewer(true)}
+              >
+                <Text style={[styles.headerStoryPillText, { color: partnerStatusGroup.hasUnseen ? (dynamicColors.primary || '#818cf8') : dynamicColors.textMuted }]}>
+                  {partnerStatusGroup.hasUnseen ? '⚡ STORY' : 'VIEWED'}
+                </Text>
+              </TouchableOpacity>
+            )}
             {currentIsLocked && (
               <TouchableOpacity style={styles.headerLockBadge} onPress={handleToggleLockThisChat}>
                 <Lock size={12} color="#f59e0b" />
@@ -1913,6 +1987,28 @@ export default function ConversationScreen({ route, navigation }) {
         isMicMuted={isMicMuted}
         isCameraOff={isCameraOff}
       />
+
+      {/* Partner Status Story Viewer Modal */}
+      {partnerStatusGroup && (
+        <StatusViewerModal
+          visible={showStatusViewer}
+          statusGroup={partnerStatusGroup}
+          activePersona={activePersona}
+          dynamicColors={dynamicColors}
+          themeMode={isLight ? 'light' : 'dark'}
+          onClose={() => setShowStatusViewer(false)}
+          onStatusViewed={() => {
+            if (partnerStatusGroup) {
+              setPartnerStatusGroup(prev => prev ? { ...prev, hasUnseen: false } : null);
+            }
+          }}
+          onReplySent={(msg) => {
+            if (msg) {
+              setMessages(prev => [...prev, msg]);
+            }
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -1944,6 +2040,40 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     position: 'relative',
+  },
+  headerAvatarRing: {
+    padding: 2,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerRingUnseen: {
+    borderWidth: 2.5,
+  },
+  headerRingViewed: {
+    borderWidth: 2,
+  },
+  storyActiveDotHeader: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    borderWidth: 2,
+    borderColor: colors.card,
+  },
+  headerStoryPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  headerStoryPillText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   avatarImg: {
     width: 36,
@@ -2061,6 +2191,46 @@ const styles = StyleSheet.create({
   replyQuoteText: {
     fontSize: 10,
     color: colors.white,
+  },
+  statusReplyCard: {
+    padding: 8,
+    borderRadius: 10,
+    marginBottom: 6,
+    borderLeftWidth: 3,
+  },
+  statusReplyCardMe: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderLeftColor: '#ffffff',
+  },
+  statusReplyCardOther: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderLeftColor: colors.primary,
+  },
+  statusReplyHeaderLabel: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    marginBottom: 4,
+    letterSpacing: 0.2,
+  },
+  statusReplyMediaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusReplyThumb: {
+    width: 38,
+    height: 38,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    marginRight: 8,
+  },
+  statusReplyCaptionText: {
+    flex: 1,
+    fontSize: 11,
+    fontStyle: 'italic',
+  },
+  statusReplyTextSnippet: {
+    fontSize: 11,
+    fontStyle: 'italic',
   },
   reactionsRow: {
     flexDirection: 'row',

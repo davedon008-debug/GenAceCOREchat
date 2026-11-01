@@ -6,6 +6,7 @@ import { useSocket } from '../context/SocketContext';
 import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar, SpaceIcon } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
 import Logo from './Logo';
+import StatusBar from './StatusBar';
 import { usePWA } from '../context/PWAContext';
 import { 
   MessageSquare, Zap, Users, Compass, Bell, Settings, Crown, 
@@ -233,6 +234,13 @@ export default function Sidebar({
                 );
               })}
             </div>
+
+            {/* Stories & Status Rail (WhatsApp & Telegram style) */}
+            {!searchQuery.trim() && (
+              <StatusBar
+                onSelectConversation={onSelectConversation}
+              />
+            )}
 
             {/* Welcome Hero & 2x2 Feature Cards Grid (Mobile View) */}
             {isMobileView && filterCategory === 'all' && !searchQuery.trim() && (

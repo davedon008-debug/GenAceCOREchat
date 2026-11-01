@@ -43,6 +43,7 @@ export const getDetectedIps = () => {
   }
 
   // Active detected PC IP adapters (Prioritize LAN / Hotspot IPs for mobile clients)
+  if (!ips.includes('192.168.0.3')) ips.push('192.168.0.3');
   if (!ips.includes('10.18.24.36')) ips.push('10.18.24.36');
   if (!ips.includes('192.168.137.1')) ips.push('192.168.137.1');
   if (Platform.OS === 'android' && !ips.includes('10.0.2.2')) ips.push('10.0.2.2');
@@ -123,7 +124,7 @@ export const getMediaUrl = (url, name = 'User') => {
 };
 
 export const testIpConnection = async (ip) => {
-  const target = ip ? ip.trim() : '10.4.234.175';
+  const target = ip ? ip.trim() : '192.168.0.3';
   const url = `http://${target}:5005/api/health`;
   try {
     const res = await axios.get(url, { timeout: 1500 });

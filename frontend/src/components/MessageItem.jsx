@@ -470,6 +470,31 @@ export default function MessageItem({
               </div>
             )}
 
+            {/* Status Story Reply Quote Card */}
+            {message.statusReply && (
+              <div className={`mb-2 p-2 rounded-xl border text-xs ${
+                isMe ? 'bg-white/10 border-white/20 text-white' : 'bg-black/20 border-white/10 text-gray-200'
+              }`}>
+                <div className="flex items-center gap-1.5 font-bold text-[10px] text-indigo-400 mb-1">
+                  <span>💬 Replying to story</span>
+                </div>
+                {message.statusReply.mediaUrl ? (
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={getMediaUrl(message.statusReply.mediaUrl)}
+                      alt="Story"
+                      className="w-9 h-9 rounded-md object-cover bg-black/40 shrink-0"
+                    />
+                    {message.statusReply.caption && (
+                      <p className="text-[11px] line-clamp-2 italic">{message.statusReply.caption}</p>
+                    )}
+                  </div>
+                ) : message.statusReply.text ? (
+                  <p className="text-[11px] line-clamp-2 italic">"{message.statusReply.text}"</p>
+                ) : null}
+              </div>
+            )}
+
             {/* Display Sender Handle in Group/Space chats for incoming messages */}
             {!isMe && message.spaceId && (
               <span

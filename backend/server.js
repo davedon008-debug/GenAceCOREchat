@@ -21,6 +21,7 @@ import adminRoutes from './routes/admin.routes.js';
 import secretLoversRoutes from './routes/secretLovers.routes.js';
 import iceRoutes from './routes/ice.routes.js';
 import callRoutes from './routes/call.routes.js';
+import statusRoutes from './routes/status.routes.js';
 
 // Enforce JWT secret verification
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.includes('super_secure')) {
@@ -120,6 +121,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/games/secret-lovers', secretLoversRoutes);
 app.use('/api/ice-servers', iceRoutes);
 app.use('/api/calls', callRoutes);
+app.use('/api/statuses', statusRoutes);
 
 app.get(['/', '/api'], (req, res) => {
   res.json({

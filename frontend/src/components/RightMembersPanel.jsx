@@ -129,7 +129,7 @@ export default function RightMembersPanel({
   const safeOnlineIds = Array.isArray(onlineUserIds) ? onlineUserIds.map(String) : [];
 
   const formattedMembers = (allContacts || [])
-    .filter(c => c && typeof c === 'object')
+    .filter(c => c && typeof c === 'object' && c.isContact !== false)
     .map((c) => {
       const contactId = String(c._id || c.id || '');
       const selfId = activePersona?._id ? String(activePersona._id) : null;
@@ -362,7 +362,7 @@ export default function RightMembersPanel({
                       className="relative shrink-0 cursor-pointer group/avatar"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setAvatarViewerTarget({ isOpen: true, avatarUrl: member.avatar, name: member.name, handle: member.handle });
+                        setAvatarViewerTarget({ isOpen: true, avatarUrl: member.avatar, name: member.name, handle: member.handle, id: member._id, isContact: true });
                       }}
                       title="Click to view profile picture"
                     >
@@ -470,7 +470,7 @@ export default function RightMembersPanel({
                         className="relative shrink-0 cursor-pointer group/avatar"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setAvatarViewerTarget({ isOpen: true, avatarUrl: member.avatar, name: member.name, handle: member.handle });
+                          setAvatarViewerTarget({ isOpen: true, avatarUrl: member.avatar, name: member.name, handle: member.handle, id: member._id, isContact: true });
                         }}
                         title="Click to view profile picture"
                       >
@@ -525,7 +525,7 @@ export default function RightMembersPanel({
                           className="relative shrink-0 cursor-pointer group/avatar"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setAvatarViewerTarget({ isOpen: true, avatarUrl: member.avatar, name: member.name, handle: member.handle });
+                            setAvatarViewerTarget({ isOpen: true, avatarUrl: member.avatar, name: member.name, handle: member.handle, id: member._id, isContact: true });
                           }}
                           title="Click to view profile picture"
                         >
@@ -624,6 +624,12 @@ export default function RightMembersPanel({
       avatarUrl={avatarViewerTarget.avatarUrl}
       name={avatarViewerTarget.name}
       handle={avatarViewerTarget.handle}
+      targetPersonaId={avatarViewerTarget.id}
+      isContact={true}
+      onStartDM={(id) => {
+        setAvatarViewerTarget(prev => ({ ...prev, isOpen: false }));
+        if (onStartDM) onStartDM(id);
+      }}
     />
 
     {/* Edit Space Settings Modal */}

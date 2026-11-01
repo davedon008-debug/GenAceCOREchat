@@ -127,10 +127,11 @@ export const createConversation = async (req, res) => {
 
       if (existingConv) {
         // If it was deleted by current user, restore it
-        if (existingConv.deletedBy && existingConv.deletedBy.includes(req.personaId)) {
+        if (existingConv.deletedBy && existingConv.deletedBy.some(id => String(id) === String(req.personaId))) {
           await Conversation.findByIdAndUpdate(existingConv._id, {
             $pull: { deletedBy: req.personaId }
           });
+          existingConv.deletedBy = (existingConv.deletedBy || []).filter(id => String(id) !== String(req.personaId));
         }
 
         // Add each other to contacts

@@ -7,8 +7,17 @@ const MessageSchema = new mongoose.Schema({
   content: { type: String, default: '' },
   contentType: { 
     type: String, 
-    enum: ['text', 'voice', 'image', 'video', 'file', 'document', 'poll', 'task_card', 'secret_lovers_invite', 'secret_lovers_summary'], 
+    enum: ['text', 'voice', 'image', 'video', 'file', 'document', 'poll', 'task_card', 'secret_lovers_invite', 'secret_lovers_summary', 'status_reply'], 
     default: 'text' 
+  },
+  statusReply: {
+    statusId: { type: mongoose.Schema.Types.ObjectId, ref: 'Status', default: null },
+    mediaUrl: { type: String, default: '' },
+    mediaType: { type: String, default: 'text' },
+    caption: { type: String, default: '' },
+    text: { type: String, default: '' },
+    authorPersonaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Persona', default: null },
+    authorName: { type: String, default: '' }
   },
   gameId: { type: mongoose.Schema.Types.ObjectId, ref: 'SecretLoversGame', default: null },
   mediaUrl: { type: String, default: '' },

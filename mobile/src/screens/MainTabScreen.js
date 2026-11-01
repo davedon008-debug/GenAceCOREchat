@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
@@ -25,11 +26,17 @@ import AvatarViewerModal from '../components/AvatarViewerModal';
 import IncomingCallModal from '../components/IncomingCallModal';
 import InviteFriendsModal from '../components/InviteFriendsModal';
 import PrivacySetupModal from '../components/PrivacySetupModal';
+import StatusRail from '../components/status/StatusRail';
+import StatusComposerModal from '../components/status/StatusComposerModal';
+import StatusViewerModal from '../components/status/StatusViewerModal';
+import StatusPrivacyModal from '../components/status/StatusPrivacyModal';
+import StatusUpdatesListModal from '../components/status/StatusUpdatesListModal';
 import { playIncomingRingtone, stopAllSFX } from '../lib/callSFX';
 import Logo from '../components/Logo';
 import {
   Menu, Search, MessageSquare, Zap, Users, Settings, Compass,
-  Globe, Info, Plus, Shield, Crown, Lock, ChevronRight, X, User, Camera, Share2
+  Globe, Info, Plus, Shield, Crown, Lock, ChevronRight, X, User, Camera, Share2,
+  UserPlus, UserMinus, UserX
 } from 'lucide-react-native';
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80';
@@ -79,9 +86,16 @@ export default function MainTabScreen({ navigation }) {
   const [membersDrawerVisible, setMembersDrawerVisible] = useState(false);
   const [previewSpaceId, setPreviewSpaceId] = useState(null);
   const [setPasscodeVisible, setSetPasscodeVisible] = useState(false);
-  const [avatarViewerTarget, setAvatarViewerTarget] = useState({ visible: false, avatarUrl: '', name: '', handle: '', bio: '', customStatus: '' });
+  const [avatarViewerTarget, setAvatarViewerTarget] = useState({ visible: false, avatarUrl: '', name: '', handle: '', bio: '', customStatus: '', targetPersonaId: null });
   const [incomingCall, setIncomingCall] = useState(null);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
+
+  // Friends Tab Sub-tabs & Optimistic State
+  const [friendsSubTab, setFriendsSubTab] = useState('suggested'); // 'suggested' | 'contacts' | 'requests'
+  const [addedContactIds, setAddedContactIds] = useState([]);
+  const [removedContactIds, setRemovedContactIds] = useState([]);
+  const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState([]);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
 
   useEffect(() => {
     if (activePersona?._id) {
@@ -119,9 +133,79 @@ export default function MainTabScreen({ navigation }) {
     unreadMap, getUnreadCount
   } = useNotification();
 
+  // Status Stories State
+  const [statusData, setStatusData] = useState({
+    myStatuses: [],
+    recentStatuses: [],
+    viewedStatuses: [],
+    mutedStatuses: []
+  });
+  const [statusPrivacySettings, setStatusPrivacySettings] = useState(null);
+  const [showStatusComposer, setShowStatusComposer] = useState(false);
+  const [showStatusViewer, setShowStatusViewer] = useState(false);
+  const [activeStatusGroup, setActiveStatusGroup] = useState(null);
+  const [showStatusPrivacyModal, setShowStatusPrivacyModal] = useState(false);
+  const [showStatusUpdatesListModal, setShowStatusUpdatesListModal] = useState(false);
+
+  // Instant local cache restore for statuses (0ms instant UI load)
+  useEffect(() => {
+    if (!activePersona?._id) return;
+    const cacheKey = `@donchat_status_feed_${activePersona._id}`;
+    AsyncStorage.getItem(cacheKey).then(cached => {
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && typeof parsed === 'object') {
+            setStatusData(parsed);
+          }
+        } catch (e) {}
+      }
+    }).catch(() => {});
+  }, [activePersona?._id]);
+
+  const fetchStatuses = useCallback(async () => {
+    try {
+      const feedRes = await api.get('/statuses/feed').catch(() => ({ data: { success: false } }));
+
+      if (feedRes.data?.success) {
+        const newStatusData = {
+          myStatuses: feedRes.data.myStatuses || [],
+          recentStatuses: feedRes.data.recentStatuses || [],
+          viewedStatuses: feedRes.data.viewedStatuses || [],
+          mutedStatuses: feedRes.data.mutedStatuses || []
+        };
+        setStatusData(newStatusData);
+        if (activePersona?._id) {
+          AsyncStorage.setItem(
+            `@donchat_status_feed_${activePersona._id}`,
+            JSON.stringify(newStatusData)
+          ).catch(() => {});
+        }
+      }
+    } catch (err) {
+      console.error('[MainTabScreen] fetchStatuses error:', err);
+    }
+  }, [activePersona?._id]);
+
+  const fetchStatusPrivacy = useCallback(async () => {
+    try {
+      const privacyRes = await api.get('/statuses/privacy').catch(() => ({ data: { success: false } }));
+      if (privacyRes.data?.success) {
+        setStatusPrivacySettings(privacyRes.data.statusPrivacy);
+      }
+    } catch (err) {
+      console.error('[MainTabScreen] fetchStatusPrivacy error:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatusPrivacy();
+  }, [fetchStatusPrivacy]);
+
   const fetchData = async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true);
+      fetchStatuses();
       const [convRes, spaceRes, pubSpaceRes, contactRes, passRes, searchRes] = await Promise.all([
         api.get('/conversations').catch(() => ({ data: { conversations: [] } })),
         api.get('/spaces').catch(() => ({ data: { spaces: [] } })),
@@ -214,6 +298,9 @@ export default function MainTabScreen({ navigation }) {
     socket.on('call:incoming', handleIncomingCall);
     socket.on('call:ended', handleCallEnded);
     socket.on('call:answered-elsewhere', handleAnsweredElsewhere);
+    socket.on('status:created', fetchStatuses);
+    socket.on('status:viewed', fetchStatuses);
+    socket.on('status:deleted', fetchStatuses);
 
     return () => {
       socket.off('message:new', handleRealtimeUpdate);
@@ -223,8 +310,11 @@ export default function MainTabScreen({ navigation }) {
       socket.off('call:incoming', handleIncomingCall);
       socket.off('call:ended', handleCallEnded);
       socket.off('call:answered-elsewhere', handleAnsweredElsewhere);
+      socket.off('status:created', fetchStatuses);
+      socket.off('status:viewed', fetchStatuses);
+      socket.off('status:deleted', fetchStatuses);
     };
-  }, [socket, activePersona]);
+  }, [socket, activePersona, fetchStatuses]);
 
   const handleAcceptIncomingCall = (callData) => {
     stopAllSFX();
@@ -278,6 +368,130 @@ export default function MainTabScreen({ navigation }) {
     } catch (e) {
       console.error('Failed to start DM:', e);
     }
+  };
+
+  const selfId = String(activePersona?._id || activePersona?.id || '');
+
+  // Extract saved contact IDs from activePersona.contacts or contacts where isContact === true
+  const mySavedContactIds = Array.isArray(activePersona?.contacts)
+    ? activePersona.contacts.map(c => String(c?._id || c?.id || c))
+    : [];
+
+  const serverContactIds = new Set([
+    ...mySavedContactIds,
+    ...(contacts || [])
+      .filter(c => c && (c.isContact === true || mySavedContactIds.includes(String(c._id || c.id))))
+      .map(c => String(c._id || c.id))
+  ]);
+
+  const isUserContact = (uId) => {
+    const idStr = String(uId || '');
+    if (!idStr) return false;
+    if (removedContactIds.includes(idStr)) return false;
+    if (addedContactIds.includes(idStr)) return true;
+    return serverContactIds.has(idStr);
+  };
+
+  // Combine all known personas across contacts, foundUsers, and activePersona.contacts
+  const allKnownUsersMap = new Map();
+  (contacts || []).forEach(u => {
+    if (u && (u._id || u.id)) allKnownUsersMap.set(String(u._id || u.id), u);
+  });
+  (foundUsers || []).forEach(u => {
+    if (u && (u._id || u.id)) {
+      const id = String(u._id || u.id);
+      if (!allKnownUsersMap.has(id)) allKnownUsersMap.set(id, u);
+    }
+  });
+  if (Array.isArray(activePersona?.contacts)) {
+    activePersona.contacts.forEach(u => {
+      if (u && typeof u === 'object' && (u._id || u.id)) {
+        const id = String(u._id || u.id);
+        if (!allKnownUsersMap.has(id)) allKnownUsersMap.set(id, u);
+      }
+    });
+  }
+  const allKnownUsers = Array.from(allKnownUsersMap.values());
+
+  const friendsList = allKnownUsers.filter(c => {
+    const cId = String(c._id || c.id || '');
+    return cId && cId !== selfId && isUserContact(cId);
+  });
+
+  const suggestedList = allKnownUsers.filter(u => {
+    const uId = String(u._id || u.id || '');
+    if (!uId || uId === selfId) return false;
+    if (isUserContact(uId)) return false;
+    if (!searchQuery.trim() && dismissedSuggestionIds.includes(uId)) return false;
+    return true;
+  });
+
+  const filterFriendsByQuery = (list) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return list;
+    return list.filter(item => {
+      const name = (item.displayName || item.username || '').toLowerCase();
+      const handle = (item.username || '').toLowerCase();
+      return name.includes(q) || handle.includes(q);
+    });
+  };
+
+  const handleAddFriend = async (targetPersonaId, name = 'User') => {
+    const idStr = String(targetPersonaId || '');
+    if (!idStr) return;
+    setActionLoadingId(idStr);
+    // Optimistic UI: instantly becomes contact, removed from suggestions
+    setAddedContactIds(prev => [...prev.filter(x => x !== idStr), idStr]);
+    setRemovedContactIds(prev => prev.filter(x => x !== idStr));
+    setDismissedSuggestionIds(prev => prev.filter(x => x !== idStr));
+    try {
+      const res = await api.post(`/personas/contacts/add/${idStr}`);
+      if (res.data?.success) {
+        fetchData(true);
+      }
+    } catch (err) {
+      setAddedContactIds(prev => prev.filter(x => x !== idStr));
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to add friend');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleRemoveSuggestion = (targetPersonaId) => {
+    const idStr = String(targetPersonaId || '');
+    if (!idStr) return;
+    setDismissedSuggestionIds(prev => Array.from(new Set([...prev, idStr])));
+  };
+
+  const handleRemoveContact = (targetPersonaId, name = 'this contact') => {
+    const idStr = String(targetPersonaId || '');
+    if (!idStr) return;
+    Alert.alert(
+      'Remove Contact',
+      `Remove ${name} from your friends list?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setActionLoadingId(idStr);
+            setRemovedContactIds(prev => [...prev.filter(x => x !== idStr), idStr]);
+            setAddedContactIds(prev => prev.filter(x => x !== idStr));
+            setDismissedSuggestionIds(prev => Array.from(new Set([...prev, idStr])));
+            try {
+              await api.post('/personas/contacts/delete', { targetPersonaId: idStr });
+              fetchData(true);
+            } catch (err) {
+              setRemovedContactIds(prev => prev.filter(x => x !== idStr));
+              Alert.alert('Error', err?.response?.data?.message || 'Failed to remove contact');
+            } finally {
+              setActionLoadingId(null);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleToggleChatLock = async () => {
@@ -707,6 +921,35 @@ export default function MainTabScreen({ navigation }) {
               </TouchableOpacity>
             </ScrollView>
 
+            {/* STATUS Stories Horizontal Rail (WhatsApp & Telegram Style) */}
+            {!searchQuery.trim() && (
+              <StatusRail
+                myStatuses={statusData.myStatuses}
+                recentStatuses={statusData.recentStatuses}
+                viewedStatuses={statusData.viewedStatuses}
+                activePersona={activePersona}
+                dynamicColors={dynamicColors}
+                themeMode={themeMode}
+                onPressMyStatus={() => {
+                  if (statusData.myStatuses?.length > 0) {
+                    setActiveStatusGroup({
+                      persona: activePersona,
+                      statuses: statusData.myStatuses
+                    });
+                    setShowStatusViewer(true);
+                  } else {
+                    setShowStatusComposer(true);
+                  }
+                }}
+                onPressAddStatus={() => setShowStatusComposer(true)}
+                onPressOtherStatus={(group) => {
+                  setActiveStatusGroup(group);
+                  setShowStatusViewer(true);
+                }}
+                onPressSeeAll={() => setShowStatusUpdatesListModal(true)}
+              />
+            )}
+
             {/* Web-Style Welcome Hero, 2x2 Action Cards Grid & Featured Banner */}
             {filterCategory === 'all' && !searchQuery.trim() && (
               <View style={styles.webActionContainer}>
@@ -907,6 +1150,17 @@ export default function MainTabScreen({ navigation }) {
                     const partnerId = partner?._id ? String(partner._id) : null;
                     const partnerStatusColor = getStatusColor(partnerId);
 
+                    // Check if DM partner has an active status story
+                    const partnerRecentGroup = (statusData.recentStatuses || []).find(
+                      g => String(g.persona?._id || g.persona?.id) === partnerId
+                    );
+                    const partnerViewedGroup = !partnerRecentGroup && (statusData.viewedStatuses || []).find(
+                      g => String(g.persona?._id || g.persona?.id) === partnerId
+                    );
+                    const partnerStatusGroup = partnerRecentGroup || partnerViewedGroup;
+                    const hasUnseenStatus = Boolean(partnerRecentGroup);
+                    const hasActiveStatus = Boolean(partnerStatusGroup);
+
                     return (
                       <TouchableOpacity
                         key={c._id}
@@ -916,17 +1170,48 @@ export default function MainTabScreen({ navigation }) {
                           title: name,
                           avatar,
                           otherPersonaId: partner?._id,
-                          isLocked: c.isLocked || false
+                          isLocked: c.isLocked || false,
+                          statusGroup: partnerStatusGroup
                         })}
                         onLongPress={() => handleToggleLockChat(c._id)}
                       >
                         <TouchableOpacity
                           style={styles.avatarWrapper}
-                          onPress={() => setAvatarViewerTarget({ visible: true, avatarUrl: partner?.avatar, name, handle: partner?.username, bio: partner?.bio, customStatus: partner?.customStatus })}
+                          onPress={() => {
+                            if (hasActiveStatus) {
+                              setActiveStatusGroup(partnerStatusGroup);
+                              setShowStatusViewer(true);
+                            } else {
+                              setAvatarViewerTarget({
+                                visible: true,
+                                avatarUrl: partner?.avatar,
+                                name,
+                                handle: partner?.username,
+                                bio: partner?.bio,
+                                customStatus: partner?.customStatus,
+                                targetPersonaId: partner?._id || partner?.id
+                              });
+                            }
+                          }}
                           activeOpacity={0.8}
                         >
-                          <Image source={{ uri: avatar }} style={styles.chatAvatar} />
-                          {partnerStatusColor ? <View style={[styles.onlineDot, { backgroundColor: partnerStatusColor }]} /> : null}
+                          <View
+                            style={[
+                              styles.dmAvatarStoryContainer,
+                              hasActiveStatus && (
+                                hasUnseenStatus
+                                  ? [styles.dmAvatarRingUnseen, { borderColor: dynamicColors.primary || '#6366f1' }]
+                                  : [styles.dmAvatarRingViewed, { borderColor: dynamicColors.cardBorder || 'rgba(148, 163, 184, 0.45)' }]
+                              )
+                            ]}
+                          >
+                            <Image source={{ uri: avatar }} style={styles.chatAvatar} />
+                          </View>
+                          {hasActiveStatus ? (
+                            <View style={[styles.storyActiveDot, { backgroundColor: hasUnseenStatus ? (dynamicColors.primary || '#6366f1') : '#94a3b8' }]} />
+                          ) : partnerStatusColor ? (
+                            <View style={[styles.onlineDot, { backgroundColor: partnerStatusColor }]} />
+                          ) : null}
                           {unreadCount > 0 && <View style={styles.unreadDotBadge} />}
                         </TouchableOpacity>
 
@@ -934,7 +1219,14 @@ export default function MainTabScreen({ navigation }) {
                           <View style={styles.chatHeaderRow}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
                               <Text style={[styles.chatNameText, { color: dynamicColors.text }]} numberOfLines={1}>{name}</Text>
-                              {partnerStatusColor ? (
+                              {hasActiveStatus && (
+                                <View style={[styles.storyPillBadge, { backgroundColor: hasUnseenStatus ? 'rgba(99, 102, 241, 0.15)' : 'rgba(148, 163, 184, 0.12)' }]}>
+                                  <Text style={[styles.storyPillText, { color: hasUnseenStatus ? (dynamicColors.primary || '#818cf8') : dynamicColors.textMuted }]}>
+                                    {hasUnseenStatus ? 'STORY' : 'VIEWED'}
+                                  </Text>
+                                </View>
+                              )}
+                              {!hasActiveStatus && partnerStatusColor ? (
                                 <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 6 }}>
                                   <Text style={{ fontSize: 8, fontWeight: 'bold', color: partnerStatusColor }}>ONLINE</Text>
                                 </View>
@@ -1160,7 +1452,7 @@ export default function MainTabScreen({ navigation }) {
 
             {/* ONLINE FRIENDS CAROUSEL STRIP */}
             {(() => {
-              const onlineFriends = (contacts || []).filter(c => c && safeOnlineIds.includes(String(c._id || c.id)));
+              const onlineFriends = (friendsList || []).filter(c => c && safeOnlineIds.includes(String(c._id || c.id)));
               if (onlineFriends.length === 0) return null;
               return (
                 <View style={{ marginBottom: 16 }}>
@@ -1196,10 +1488,102 @@ export default function MainTabScreen({ navigation }) {
               );
             })()}
 
+            {/* Sub-Tabs: Suggested, Contacts, Requests */}
+            <View style={styles.friendsSubTabsBar}>
+              <TouchableOpacity
+                style={[
+                  styles.friendsSubTabPill,
+                  friendsSubTab === 'suggested' && { backgroundColor: dynamicColors.primary }
+                ]}
+                onPress={() => setFriendsSubTab('suggested')}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.friendsSubTabTitle,
+                    { color: friendsSubTab === 'suggested' ? '#ffffff' : dynamicColors.textSecondary }
+                  ]}
+                >
+                  Suggested
+                </Text>
+                <View
+                  style={[
+                    styles.subTabBadgePill,
+                    {
+                      backgroundColor: friendsSubTab === 'suggested' ? 'rgba(255,255,255,0.28)' : (themeMode === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)')
+                    }
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.subTabBadgeNumber,
+                      { color: friendsSubTab === 'suggested' ? '#ffffff' : dynamicColors.textMuted }
+                    ]}
+                  >
+                    {suggestedList.length}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.friendsSubTabPill,
+                  friendsSubTab === 'contacts' && { backgroundColor: dynamicColors.primary }
+                ]}
+                onPress={() => setFriendsSubTab('contacts')}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.friendsSubTabTitle,
+                    { color: friendsSubTab === 'contacts' ? '#ffffff' : dynamicColors.textSecondary }
+                  ]}
+                >
+                  Contacts
+                </Text>
+                <View
+                  style={[
+                    styles.subTabBadgePill,
+                    {
+                      backgroundColor: friendsSubTab === 'contacts' ? 'rgba(255,255,255,0.28)' : (themeMode === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)')
+                    }
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.subTabBadgeNumber,
+                      { color: friendsSubTab === 'contacts' ? '#ffffff' : dynamicColors.textMuted }
+                    ]}
+                  >
+                    {friendsList.length}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.friendsSubTabPill,
+                  friendsSubTab === 'requests' && { backgroundColor: dynamicColors.primary }
+                ]}
+                onPress={() => setFriendsSubTab('requests')}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.friendsSubTabTitle,
+                    { color: friendsSubTab === 'requests' ? '#ffffff' : dynamicColors.textSecondary }
+                  ]}
+                >
+                  Requests
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Input */}
             <View style={styles.searchContainer}>
               <TextInput
                 style={[styles.searchInput, { backgroundColor: dynamicColors.inputBg, borderColor: dynamicColors.inputBorder, color: dynamicColors.text }]}
-                placeholder="Search username (@handle)..."
+                placeholder={friendsSubTab === 'contacts' ? "Search contacts (@handle)..." : "Search username (@handle)..."}
                 placeholderTextColor={dynamicColors.textMuted}
                 value={searchQuery}
                 onChangeText={handleSearchUsers}
@@ -1208,12 +1592,26 @@ export default function MainTabScreen({ navigation }) {
 
             {searching ? (
               <ActivityIndicator color={dynamicColors.primary} style={{ marginTop: 20 }} />
+            ) : friendsSubTab === 'requests' ? (
+              <View style={styles.emptyRequestsBox}>
+                <View style={[styles.emptyRequestsIconCircle, { backgroundColor: themeMode === 'light' ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.15)' }]}>
+                  <Users size={32} color={dynamicColors.primary} />
+                </View>
+                <Text style={[styles.emptyRequestsTitle, { color: dynamicColors.text }]}>No Pending Requests</Text>
+                <Text style={[styles.emptyRequestsSubtitle, { color: dynamicColors.textMuted }]}>
+                  Incoming friend requests will appear here. You are all caught up!
+                </Text>
+              </View>
             ) : (
               <FlatList
-                data={foundUsers.length > 0 ? foundUsers : contacts}
-                keyExtractor={item => item._id}
+                data={friendsSubTab === 'contacts' ? filterFriendsByQuery(friendsList) : filterFriendsByQuery(suggestedList)}
+                keyExtractor={item => String(item._id || item.id)}
                 renderItem={({ item }) => {
-                  const statusInfo = getStatusInfo(item._id);
+                  const itemId = String(item._id || item.id);
+                  const statusInfo = getStatusInfo(itemId);
+                  const isCurrentContact = isUserContact(itemId);
+                  const isActing = actionLoadingId === itemId;
+
                   return (
                     <View style={[styles.friendCard, { backgroundColor: dynamicColors.card }]}>
                       <TouchableOpacity
@@ -1226,33 +1624,103 @@ export default function MainTabScreen({ navigation }) {
                           bio: item.bio,
                           customStatus: item.customStatus,
                           status: statusInfo.label,
-                          targetPersonaId: item._id
+                          targetPersonaId: itemId
                         })}
                         activeOpacity={0.8}
                       >
-                        <Image source={{ uri: getMediaUrl(item.avatar, item.displayName || item.username) }} style={styles.contactAvatar} />
+                        <Image
+                          source={{ uri: getMediaUrl(item.avatar, item.displayName || item.username) }}
+                          style={styles.contactAvatar}
+                        />
                         {statusInfo.color ? <View style={[styles.onlineDot, { backgroundColor: statusInfo.color }]} /> : null}
                       </TouchableOpacity>
-                      <View style={{ flex: 1 }}>
+
+                      <View style={{ flex: 1, marginRight: 8 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={[styles.contactName, { color: dynamicColors.text }]}>{item.displayName || item.username}</Text>
+                          <Text style={[styles.contactName, { color: dynamicColors.text }]} numberOfLines={1}>
+                            {item.displayName || item.username}
+                          </Text>
                           {statusInfo.isOnline && (
-                            <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                            <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 8 }}>
                               <Text style={{ fontSize: 9, fontWeight: 'bold', color: statusInfo.color || '#10b981' }}>{statusInfo.label}</Text>
                             </View>
                           )}
                         </View>
-                        <Text style={[styles.contactHandle, { color: dynamicColors.textMuted }]}>@{item.username}{!statusInfo.isOnline ? ' • Offline' : ''}</Text>
+                        <Text style={[styles.contactHandle, { color: dynamicColors.textMuted }]} numberOfLines={1}>
+                          @{item.username}{!statusInfo.isOnline ? ' • Offline' : ''}
+                        </Text>
                       </View>
-                      <TouchableOpacity
-                        style={[styles.addBtn, { backgroundColor: dynamicColors.primary }]}
-                        onPress={() => handleStartDM(item._id)}
-                      >
-                        <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>Message</Text>
-                      </TouchableOpacity>
+
+                      {/* Action buttons matching tab and contact state */}
+                      <View style={styles.friendCardActions}>
+                        {isCurrentContact ? (
+                          <>
+                            <TouchableOpacity
+                              style={[styles.friendActionBtn, { backgroundColor: dynamicColors.primary }]}
+                              onPress={() => handleStartDM(itemId)}
+                              activeOpacity={0.8}
+                            >
+                              <MessageSquare size={12} color="#ffffff" />
+                              <Text style={styles.friendActionBtnText}>Message</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.friendActionBtn, styles.friendRemoveBtn]}
+                              onPress={() => handleRemoveContact(itemId, item.displayName || item.username)}
+                              disabled={isActing}
+                              activeOpacity={0.8}
+                            >
+                              {isActing ? (
+                                <ActivityIndicator size="small" color="#f87171" />
+                              ) : (
+                                <>
+                                  <UserMinus size={12} color="#f87171" />
+                                  <Text style={styles.friendRemoveBtnText}>Remove</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          </>
+                        ) : (
+                          <>
+                            <TouchableOpacity
+                              style={[styles.friendActionBtn, { backgroundColor: dynamicColors.primary }]}
+                              onPress={() => handleAddFriend(itemId, item.displayName || item.username)}
+                              disabled={isActing}
+                              activeOpacity={0.8}
+                            >
+                              {isActing ? (
+                                <ActivityIndicator size="small" color="#ffffff" />
+                              ) : (
+                                <>
+                                  <UserPlus size={12} color="#ffffff" />
+                                  <Text style={styles.friendActionBtnText}>Add Friends</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.friendActionBtn, styles.friendRemoveBtn]}
+                              onPress={() => handleRemoveSuggestion(itemId)}
+                              activeOpacity={0.8}
+                            >
+                              <UserX size={12} color="#f87171" />
+                              <Text style={styles.friendRemoveBtnText}>Remove</Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
+                      </View>
                     </View>
                   );
                 }}
+                ListEmptyComponent={
+                  <View style={styles.emptyFriendsListBox}>
+                    <Text style={[styles.emptyFriendsListText, { color: dynamicColors.textMuted }]}>
+                      {friendsSubTab === 'contacts'
+                        ? (searchQuery.trim() ? "No contacts match your search." : "No contacts added yet. Explore the Suggested tab to add friends!")
+                        : (searchQuery.trim() ? "No suggestions match your search." : "No suggestions found. Try searching for a username above.")}
+                    </Text>
+                  </View>
+                }
                 ListFooterComponent={
                   <TouchableOpacity
                     style={[
@@ -2095,6 +2563,13 @@ export default function MainTabScreen({ navigation }) {
         handle={avatarViewerTarget.handle}
         bio={avatarViewerTarget.bio}
         customStatus={avatarViewerTarget.customStatus}
+        targetPersonaId={avatarViewerTarget.targetPersonaId}
+        isContact={isUserContact(avatarViewerTarget.targetPersonaId)}
+        isSelf={String(activePersona?._id || activePersona?.id) === String(avatarViewerTarget.targetPersonaId)}
+        onStartDM={handleStartDM}
+        onAddContact={(id) => handleAddFriend(id, avatarViewerTarget.name)}
+        onDeleteContact={() => handleRemoveContact(avatarViewerTarget.targetPersonaId, avatarViewerTarget.name)}
+        onBlockUser={() => fetchData(true)}
       />
 
       <InviteFriendsModal
@@ -2116,6 +2591,87 @@ export default function MainTabScreen({ navigation }) {
         onUpdated={(updated) => {
           setActivePersona(updated);
           fetchData();
+        }}
+      />
+
+      {/* Status Composer Modal (Text / Image / Video) */}
+      <StatusComposerModal
+        visible={showStatusComposer}
+        onClose={() => setShowStatusComposer(false)}
+        onStatusPosted={() => {
+          fetchStatuses();
+        }}
+        activePersona={activePersona}
+        privacySettings={statusPrivacySettings}
+        onOpenPrivacyModal={() => setShowStatusPrivacyModal(true)}
+      />
+
+      {/* Status Fullscreen Story Viewer (WhatsApp & Telegram style) */}
+      <StatusViewerModal
+        visible={showStatusViewer}
+        onClose={() => {
+          setShowStatusViewer(false);
+          setActiveStatusGroup(null);
+          fetchStatuses();
+        }}
+        statusGroup={activeStatusGroup}
+        activePersona={activePersona}
+        onStatusDeleted={() => fetchStatuses()}
+        onMuteToggled={() => fetchStatuses()}
+        onStatusViewed={() => fetchStatuses()}
+        onOpenDirectChat={(convId) => {
+          setShowStatusViewer(false);
+          navigation.navigate('Conversation', { conversationId: convId });
+        }}
+      />
+
+      {/* Status Privacy & Muting Settings Modal */}
+      <StatusPrivacyModal
+        visible={showStatusPrivacyModal}
+        onClose={() => setShowStatusPrivacyModal(false)}
+        activePersona={activePersona}
+        dynamicColors={dynamicColors}
+        themeMode={themeMode}
+        onPrivacyUpdated={(updatedPrivacy) => {
+          setStatusPrivacySettings(updatedPrivacy);
+          fetchStatuses();
+        }}
+      />
+
+      {/* Full Status Updates List Modal (See updates >) */}
+      <StatusUpdatesListModal
+        visible={showStatusUpdatesListModal}
+        onClose={() => setShowStatusUpdatesListModal(false)}
+        myStatuses={statusData.myStatuses}
+        recentStatuses={statusData.recentStatuses}
+        viewedStatuses={statusData.viewedStatuses}
+        mutedStatuses={statusData.mutedStatuses}
+        activePersona={activePersona}
+        dynamicColors={dynamicColors}
+        themeMode={themeMode}
+        onPressMyStatus={() => {
+          setShowStatusUpdatesListModal(false);
+          if (statusData.myStatuses?.length > 0) {
+            setActiveStatusGroup({ persona: activePersona, statuses: statusData.myStatuses });
+            setShowStatusViewer(true);
+          } else {
+            setShowStatusComposer(true);
+          }
+        }}
+        onPressAddStatus={() => {
+          setShowStatusUpdatesListModal(false);
+          setShowStatusComposer(true);
+        }}
+        onPressGroup={(group) => {
+          setShowStatusUpdatesListModal(false);
+          setActiveStatusGroup(group);
+          setShowStatusViewer(true);
+        }}
+        onToggleUnmute={async (targetId) => {
+          try {
+            await api.post(`/statuses/mute/${targetId}`, { mute: false });
+            fetchStatuses();
+          } catch (e) {}
         }}
       />
     </SafeAreaView>
@@ -2356,6 +2912,40 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.card,
   },
+  dmAvatarStoryContainer: {
+    padding: 2,
+    borderRadius: 26,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dmAvatarRingUnseen: {
+    borderWidth: 2.5,
+  },
+  dmAvatarRingViewed: {
+    borderWidth: 2,
+  },
+  storyActiveDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    borderWidth: 2,
+    borderColor: colors.card,
+  },
+  storyPillBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  storyPillText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   chatInfoMain: {
     flex: 1,
     gap: 4,
@@ -2564,6 +3154,98 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 11,
     fontWeight: 'bold',
+  },
+  friendsSubTabsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  friendsSubTabPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  friendsSubTabTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  subTabBadgePill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+  },
+  subTabBadgeNumber: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  friendCardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  friendActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  friendActionBtnText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  friendRemoveBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: 'rgba(239, 68, 68, 0.28)',
+    borderWidth: 1,
+  },
+  friendRemoveBtnText: {
+    color: '#f87171',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  emptyRequestsBox: {
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  emptyRequestsIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  emptyRequestsTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  emptyRequestsSubtitle: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 240,
+  },
+  emptyFriendsListBox: {
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyFriendsListText: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   settingsCard: {
     backgroundColor: colors.card,

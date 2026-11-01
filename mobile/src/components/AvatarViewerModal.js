@@ -3,7 +3,7 @@ import {
   Modal, View, Text, StyleSheet, Image, TouchableOpacity,
   Pressable, ScrollView, Dimensions, Alert, ActivityIndicator
 } from 'react-native';
-import { X, User, Quote, Sparkles, ShieldAlert, UserMinus } from 'lucide-react-native';
+import { X, User, Quote, Sparkles, ShieldAlert, UserMinus, MessageSquare, UserPlus } from 'lucide-react-native';
 import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar } from '../config/api';
 import { colors } from '../theme/colors';
 
@@ -19,7 +19,10 @@ export default function AvatarViewerModal({
   status,
   customStatus,
   targetPersonaId,
+  isContact = false,
   isSelf = false,
+  onStartDM,
+  onAddContact,
   onBlockUser,
   onDeleteContact
 }) {
@@ -98,6 +101,23 @@ export default function AvatarViewerModal({
     );
   };
 
+  const handleAddContact = async () => {
+    if (!targetPersonaId) return;
+    try {
+      setLoadingAction(true);
+      const res = await api.post(`/personas/contacts/add/${targetPersonaId}`);
+      if (res.data?.success) {
+        if (onAddContact) onAddContact(targetPersonaId);
+        Alert.alert('Friend Added!', `${name || 'User'} has been added to your contacts.`);
+        onClose();
+      }
+    } catch (err) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to add friend');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
   return (
     <Modal
       visible={visible}
@@ -164,32 +184,62 @@ export default function AvatarViewerModal({
             ) : null}
           </Pressable>
 
-          {/* Action Buttons: Block / Delete Contact */}
-          {!isSelf && (targetPersonaId || onBlockUser || onDeleteContact) && (
+          {/* Action Buttons: Message, Add Friend, Remove, Block */}
+          {!isSelf && (
             <View style={styles.actionsRow} onStartShouldSetResponder={() => true}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.removeBtn]}
-                onPress={handleRemoveContact}
-                disabled={loadingAction}
-              >
-                <UserMinus size={15} color="#f87171" />
-                <Text style={styles.removeBtnText}>Remove Contact</Text>
-              </TouchableOpacity>
+              {isContact ? (
+                <>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.messageBtn]}
+                    onPress={() => {
+                      onClose();
+                      if (onStartDM) onStartDM(targetPersonaId);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <MessageSquare size={15} color="#ffffff" />
+                    <Text style={styles.messageBtnText}>Message</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.blockBtn]}
-                onPress={handleBlock}
-                disabled={loadingAction}
-              >
-                {loadingAction ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.removeBtn]}
+                    onPress={handleRemoveContact}
+                    disabled={loadingAction}
+                    activeOpacity={0.8}
+                  >
+                    <UserMinus size={15} color="#f87171" />
+                    <Text style={styles.removeBtnText}>Remove</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.addFriendBtn]}
+                    onPress={handleAddContact}
+                    disabled={loadingAction}
+                    activeOpacity={0.8}
+                  >
+                    {loadingAction ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <>
+                        <UserPlus size={15} color="#ffffff" />
+                        <Text style={styles.addFriendBtnText}>Add Friends</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.blockBtn]}
+                    onPress={handleBlock}
+                    disabled={loadingAction}
+                    activeOpacity={0.8}
+                  >
                     <ShieldAlert size={15} color="#ffffff" />
-                    <Text style={styles.blockBtnText}>Block User</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+                    <Text style={styles.blockBtnText}>Block</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           )}
 
@@ -356,6 +406,24 @@ const styles = StyleSheet.create({
     color: '#f87171',
     fontSize: 13,
     fontWeight: '600',
+  },
+  messageBtn: {
+    backgroundColor: colors.primary || '#6366f1',
+    borderColor: colors.primary || '#6366f1',
+  },
+  messageBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  addFriendBtn: {
+    backgroundColor: colors.primary || '#6366f1',
+    borderColor: colors.primary || '#6366f1',
+  },
+  addFriendBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   blockBtn: {
     backgroundColor: '#dc2626',

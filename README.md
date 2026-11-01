@@ -32,6 +32,7 @@ For in-depth code architecture, data models, Socket.IO network events, and WebRT
 
 📖 **[Full Architecture & Implementation Guide](GENACE_FULL_ARCHITECTURE_GUIDE.md)**  
 ⚖️ **[Web vs. Mobile Feature Parity Matrix](GENACE_FULL_ARCHITECTURE_GUIDE.md#11-platform-feature-parity--gap-analysis-web-vs-mobile)**  
+📝 **[Mobile Feature Gaps & Notes](MOBILE_FEATURE_GAPS.md)**  
 📱 **[Mobile Publishing Guide](PUBLISHING_GUIDE.md)**
 
 ---

@@ -1,9 +1,22 @@
 'use client';
 
-import { X, Download } from 'lucide-react';
+import { X, Download, MessageSquare, UserMinus, UserPlus } from 'lucide-react';
 import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 
-export default function AvatarViewerModal({ isOpen, onClose, avatarUrl, name, handle, bio, customStatus }) {
+export default function AvatarViewerModal({ 
+  isOpen, 
+  onClose, 
+  avatarUrl, 
+  name, 
+  handle, 
+  bio, 
+  customStatus,
+  targetPersonaId,
+  isContact = false,
+  onStartDM,
+  onToggleContact,
+  isSelf = false
+}) {
   if (!isOpen) return null;
 
   const resolvedUrl = getMediaUrl(avatarUrl, name) || DEFAULT_AVATAR;
@@ -61,7 +74,7 @@ export default function AvatarViewerModal({ isOpen, onClose, avatarUrl, name, ha
           <img
             src={resolvedUrl}
             alt={name || 'User Profile Picture'}
-            className="max-w-full max-h-[50vh] sm:max-h-[60vh] w-auto h-auto rounded-3xl object-contain border-2 border-cyan-500/30 shadow-2xl shadow-cyan-500/20 transition-all duration-300 transform group-hover:scale-[1.02]"
+            className="max-w-full max-h-[45vh] sm:max-h-[50vh] w-auto h-auto rounded-3xl object-contain border-2 border-cyan-500/30 shadow-2xl shadow-cyan-500/20 transition-all duration-300 transform group-hover:scale-[1.02]"
             onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
           />
         </div>
@@ -82,6 +95,51 @@ export default function AvatarViewerModal({ isOpen, onClose, avatarUrl, name, ha
             {bio && bio.trim() ? bio.trim() : 'No bio written yet.'}
           </p>
         </div>
+
+        {/* Quick Action Buttons (Message & Add/Remove Contact) */}
+        {!isSelf && (targetPersonaId || onStartDM || onToggleContact) && (
+          <div className="w-full flex items-center gap-3">
+            {isContact ? (
+              <>
+                {onStartDM && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onStartDM(targetPersonaId);
+                    }}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2 active:scale-95"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>Message</span>
+                  </button>
+                )}
+
+                {onToggleContact && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleContact(targetPersonaId, name)}
+                    className="py-2.5 px-4 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-2 active:scale-95 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border-rose-500/30"
+                  >
+                    <UserMinus className="w-4 h-4 text-rose-400" />
+                    <span>Remove Friend</span>
+                  </button>
+                )}
+              </>
+            ) : (
+              onToggleContact && (
+                <button
+                  type="button"
+                  onClick={() => onToggleContact(targetPersonaId, name)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 border border-indigo-400/30 transition flex items-center justify-center gap-2 active:scale-95"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Add Friends</span>
+                </button>
+              )
+            )}
+          </div>
+        )}
       </div>
 
       {/* Bottom Hint */}

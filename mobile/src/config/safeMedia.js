@@ -35,5 +35,14 @@ try {
   // Handle missing native module
 }
 
+let RawVideo = null;
+try {
+  const expoAv = require('expo-av');
+  if (expoAv && expoAv.Video) {
+    RawVideo = expoAv.Video;
+  }
+} catch (e) {}
+
 export const Audio = RawAudio;
+export const Video = RawVideo;
 export { ImagePicker, DocumentPicker };

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSocket } from '../context/SocketContext';
-import { Search, Share2, ChevronRight, Menu, ArrowLeft } from 'lucide-react';
+import { Search, Share2, ChevronRight, Menu, ArrowLeft, UserPlus, UserMinus, UserX, MessageSquare } from 'lucide-react';
 
 import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
@@ -15,8 +15,34 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('suggested'); // 'suggested' | 'contacts' | 'requests'
-  const [addedHandles, setAddedHandles] = useState([]);
-  const [avatarViewerTarget, setAvatarViewerTarget] = useState({ isOpen: false, avatarUrl: '', name: '', handle: '' });
+  const [addedIds, setAddedIds] = useState([]);
+  const [removedIds, setRemovedIds] = useState([]);
+  const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('genace_dismissed_suggestions');
+        return saved ? JSON.parse(saved) : [];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+  const [loadingActionId, setLoadingActionId] = useState(null);
+  const [loadingDMId, setLoadingDMId] = useState(null);
+  const [avatarViewerTarget, setAvatarViewerTarget] = useState({ isOpen: false, avatarUrl: '', name: '', handle: '', bio: '', customStatus: '', id: null, isContact: false });
+
+  const dismissSuggestion = (idStr) => {
+    setDismissedSuggestionIds(prev => {
+      const next = Array.from(new Set([...prev, idStr]));
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('genace_dismissed_suggestions', JSON.stringify(next));
+        }
+      } catch {}
+      return next;
+    });
+  };
 
   const socketCtx = useSocket();
   const onlineUserIds = socketCtx?.onlineUserIds || [];
@@ -29,7 +55,7 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
     const fetchUsers = async () => {
       try {
         const res = await api.get(`/personas/search?query=${encodeURIComponent(searchQuery.trim())}`);
-        if (res.data.success) {
+        if (res.data?.success) {
           setGlobalUsers(res.data.personas || []);
         }
       } catch (err) {
@@ -39,68 +65,204 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
     fetchUsers();
   }, [searchQuery]);
 
-  const contactIds = new Set((allContacts || []).map(c => String(c._id || c.id)));
+  // Extract saved contact IDs from activePersona.contacts or allContacts where isContact === true
+  const mySavedContactIds = Array.isArray(activePersona?.contacts)
+    ? activePersona.contacts.map(c => String(c?._id || c?.id || c))
+    : [];
 
-  const friendsList = allContacts.map(c => {
-    const contactId = String(c._id || c.id || '');
-    const isOnline = safeOnlineIds.includes(contactId);
-    const rawStatus = personaStatuses[contactId] || c.status || 'online';
-    const effectiveStatus = isOnline ? (rawStatus === 'offline' ? 'online' : rawStatus) : 'offline';
+  const serverContactIds = new Set([
+    ...mySavedContactIds,
+    ...(allContacts || [])
+      .filter(c => c && (c.isContact === true || mySavedContactIds.includes(String(c._id || c.id))))
+      .map(c => String(c._id || c.id))
+  ]);
 
-    const statusLabel = effectiveStatus === 'away' ? 'Away' : effectiveStatus === 'dnd' ? 'Do Not Disturb' : effectiveStatus === 'online' ? 'Online' : 'Offline';
-    const statusDotColor = effectiveStatus === 'away' ? 'bg-amber-400' : effectiveStatus === 'dnd' ? 'bg-rose-500' : effectiveStatus === 'online' ? 'bg-emerald-500' : 'bg-gray-500';
+  const isUserContact = (uId) => {
+    const idStr = String(uId || '');
+    if (!idStr) return false;
+    if (removedIds.includes(idStr)) return false;
+    if (addedIds.includes(idStr)) return true;
+    return serverContactIds.has(idStr);
+  };
 
-    return {
-      id: c._id,
-      name: c.displayName || c.username,
-      handle: c.username,
-      status: statusLabel,
-      statusDotColor,
-      avatar: getMediaUrl(c.avatar, c.displayName || c.username) || DEFAULT_AVATAR,
-      online: isOnline,
-      bio: c.bio,
-      customStatus: c.customStatus,
-      isContact: true
-    };
+  const selfId = String(activePersona?._id || activePersona?.id || '');
+
+  // Combine all known personas across allContacts, globalUsers, and activePersona.contacts
+  const allKnownUsersMap = new Map();
+  (allContacts || []).forEach(u => {
+    if (u && (u._id || u.id)) allKnownUsersMap.set(String(u._id || u.id), u);
   });
-
-  const formattedGlobalUsers = globalUsers.map(u => {
-    const uId = String(u._id || u.id || '');
-    const isOnline = safeOnlineIds.includes(uId);
-    const isContact = contactIds.has(uId) || addedHandles.includes(u._id);
-
-    return {
-      id: u._id,
-      name: u.displayName || u.username,
-      handle: u.username,
-      status: isOnline ? 'Online' : 'Offline',
-      statusDotColor: isOnline ? 'bg-emerald-500' : 'bg-gray-500',
-      avatar: getMediaUrl(u.avatar, u.displayName || u.username) || DEFAULT_AVATAR,
-      online: isOnline,
-      bio: u.bio,
-      customStatus: u.customStatus,
-      isContact
-    };
+  (globalUsers || []).forEach(u => {
+    if (u && (u._id || u.id)) {
+      const id = String(u._id || u.id);
+      if (!allKnownUsersMap.has(id)) allKnownUsersMap.set(id, u);
+    }
   });
+  if (Array.isArray(activePersona?.contacts)) {
+    activePersona.contacts.forEach(u => {
+      if (u && typeof u === 'object' && (u._id || u.id)) {
+        const id = String(u._id || u.id);
+        if (!allKnownUsersMap.has(id)) allKnownUsersMap.set(id, u);
+      }
+    });
+  }
+
+  const allKnownUsers = Array.from(allKnownUsersMap.values());
+
+  // 1. Friends/Contacts list: users who are actual contacts
+  const friendsList = allKnownUsers
+    .filter(c => {
+      const cId = String(c._id || c.id || '');
+      return cId && cId !== selfId && isUserContact(cId);
+    })
+    .map(c => {
+      const contactId = String(c._id || c.id || '');
+      const isOnline = safeOnlineIds.includes(contactId);
+      const rawStatus = personaStatuses[contactId] || c.status || 'online';
+      const effectiveStatus = isOnline ? (rawStatus === 'offline' ? 'online' : rawStatus) : 'offline';
+
+      const statusLabel = effectiveStatus === 'away' ? 'Away' : effectiveStatus === 'dnd' ? 'Do Not Disturb' : effectiveStatus === 'online' ? 'Online' : 'Offline';
+      const statusDotColor = effectiveStatus === 'away' ? 'bg-amber-400' : effectiveStatus === 'dnd' ? 'bg-rose-500' : effectiveStatus === 'online' ? 'bg-emerald-500' : 'bg-gray-500';
+
+      return {
+        id: c._id || c.id,
+        name: c.displayName || c.username,
+        handle: c.username,
+        status: statusLabel,
+        statusDotColor,
+        avatar: getMediaUrl(c.avatar, c.displayName || c.username) || DEFAULT_AVATAR,
+        online: isOnline,
+        bio: c.bio,
+        customStatus: c.customStatus,
+        isContact: true
+      };
+    });
+
+  // 2. Global suggested users pool: users who are NOT yet contacts and NOT self
+  const pool = allKnownUsers;
+  const suggestedList = pool
+    .filter(u => {
+      const uId = String(u._id || u.id || '');
+      if (!uId || uId === selfId) return false;
+      // Do not include users who are already friends/contacts
+      if (isUserContact(uId)) return false;
+      // Filter out dismissed suggestions unless actively searching
+      if (!searchQuery.trim() && dismissedSuggestionIds.includes(uId)) return false;
+      return true;
+    })
+    .map(u => {
+      const uId = String(u._id || u.id || '');
+      const isOnline = safeOnlineIds.includes(uId);
+
+      return {
+        id: u._id || u.id,
+        name: u.displayName || u.username,
+        handle: u.username,
+        status: isOnline ? 'Online' : 'Offline',
+        statusDotColor: isOnline ? 'bg-emerald-500' : 'bg-gray-500',
+        avatar: getMediaUrl(u.avatar, u.displayName || u.username) || DEFAULT_AVATAR,
+        online: isOnline,
+        bio: u.bio,
+        customStatus: u.customStatus,
+        isContact: false
+      };
+    });
+
+  const queryLower = searchQuery.toLowerCase().trim();
+  const searchFilter = (list) => {
+    if (!queryLower) return list;
+    return list.filter(item =>
+      (item.name || '').toLowerCase().includes(queryLower) ||
+      (item.handle || '').toLowerCase().includes(queryLower)
+    );
+  };
 
   const filteredFriends = activeTab === 'contacts'
-    ? friendsList.filter(f => (f.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || (f.handle || '').toLowerCase().includes(searchQuery.toLowerCase()))
+    ? searchFilter(friendsList)
     : activeTab === 'requests'
-    ? formattedGlobalUsers.filter(u => u.isContact)
-    : (formattedGlobalUsers.length > 0 ? formattedGlobalUsers : friendsList);
+    ? []
+    : searchFilter(suggestedList);
 
-  const toggleAdd = async (id) => {
+  // Add friend: makes them a friend, removes from suggestions, and adds to contacts
+  const handleAddFriend = async (id, name = 'User') => {
+    const idStr = String(id || '');
+    if (!idStr) return;
+    setLoadingActionId(idStr);
+
+    // 0ms Optimistic UI update: becomes contact immediately
+    setAddedIds(prev => [...prev.filter(x => x !== idStr), idStr]);
+    setRemovedIds(prev => prev.filter(x => x !== idStr));
+    setDismissedSuggestionIds(prev => prev.filter(x => x !== idStr));
+
     try {
-      if (addedHandles.includes(id) || contactIds.has(String(id))) {
-        await api.delete(`/personas/contacts/remove/${id}`);
-        setAddedHandles(addedHandles.filter(h => h !== id));
-      } else {
-        await api.post(`/personas/contacts/add/${id}`);
-        setAddedHandles([...addedHandles, id]);
-      }
+      await api.post(`/personas/contacts/add/${idStr}`);
       if (onRefreshContacts) onRefreshContacts();
     } catch (err) {
-      console.error('Failed to toggle contact:', err);
+      setAddedIds(prev => prev.filter(x => x !== idStr));
+      console.error('Failed to add contact:', err);
+    } finally {
+      setLoadingActionId(null);
+    }
+  };
+
+  // Remove suggestion from suggested list
+  const handleRemoveSuggestion = (id) => {
+    const idStr = String(id || '');
+    if (!idStr) return;
+    dismissSuggestion(idStr);
+    if (isUserContact(idStr)) {
+      setRemovedIds(prev => [...prev.filter(x => x !== idStr), idStr]);
+      setAddedIds(prev => prev.filter(x => x !== idStr));
+      api.delete(`/personas/contacts/remove/${idStr}`).catch(() => {});
+      if (onRefreshContacts) onRefreshContacts();
+    }
+  };
+
+  // Remove friend from saved contacts
+  const handleRemoveFriend = async (id, name = 'User') => {
+    const idStr = String(id || '');
+    if (!idStr) return;
+    setLoadingActionId(idStr);
+
+    // 0ms Optimistic UI update: removed from contacts immediately
+    setRemovedIds(prev => [...prev.filter(x => x !== idStr), idStr]);
+    setAddedIds(prev => prev.filter(x => x !== idStr));
+    // Also dismiss from suggestions so they are removed from suggestion of friends
+    dismissSuggestion(idStr);
+
+    try {
+      await api.delete(`/personas/contacts/remove/${idStr}`);
+      if (onRefreshContacts) onRefreshContacts();
+    } catch (err) {
+      setRemovedIds(prev => prev.filter(x => x !== idStr));
+      console.error('Failed to remove contact:', err);
+    } finally {
+      setLoadingActionId(null);
+    }
+  };
+
+  const handleToggleContactFromModal = async (id, name = 'User') => {
+    const idStr = String(id || '');
+    if (!idStr) return;
+    const isContactNow = isUserContact(idStr);
+    if (isContactNow) {
+      await handleRemoveFriend(idStr, name);
+      setAvatarViewerTarget(prev => ({ ...prev, isContact: false }));
+    } else {
+      await handleAddFriend(idStr, name);
+      setAvatarViewerTarget(prev => ({ ...prev, isContact: true }));
+    }
+  };
+
+  const handleStartChat = async (userId) => {
+    if (!userId || !onStartDM) return;
+    setLoadingDMId(String(userId));
+    try {
+      await onStartDM(userId);
+    } catch (err) {
+      console.error('DM initiation failed:', err);
+    } finally {
+      setLoadingDMId(null);
     }
   };
 
@@ -148,21 +310,29 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
       <div className="flex items-center gap-3 sm:gap-6 border-b border-[#1d273e] text-xs font-semibold overflow-x-auto no-scrollbar scrollbar-none whitespace-nowrap">
         <button
           onClick={() => setActiveTab('suggested')}
-          className={`pb-3 transition relative shrink-0 ${activeTab === 'suggested' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-400 hover:text-white'}`}
+          className={`pb-3 transition relative shrink-0 flex items-center gap-1.5 ${activeTab === 'suggested' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-400 hover:text-white'}`}
         >
-          Suggested
+          <span>Suggested</span>
+          {suggestedList.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              {suggestedList.length}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setActiveTab('contacts')}
-          className={`pb-3 transition relative shrink-0 ${activeTab === 'contacts' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-400 hover:text-white'}`}
+          className={`pb-3 transition relative shrink-0 flex items-center gap-1.5 ${activeTab === 'contacts' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-400 hover:text-white'}`}
         >
-          Contacts ({friendsList.length})
+          <span>Contacts</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/10 text-gray-300">
+            {friendsList.length}
+          </span>
         </button>
         <button
           onClick={() => setActiveTab('requests')}
           className={`pb-3 transition relative flex items-center gap-1.5 shrink-0 ${activeTab === 'requests' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-400 hover:text-white'}`}
         >
-          Requests
+          <span>Requests</span>
         </button>
       </div>
 
@@ -170,11 +340,19 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
       <div className="space-y-2 max-w-2xl w-full">
         {filteredFriends.length === 0 ? (
           <div className="p-8 rounded-3xl bg-[#101625] border border-[#1d273e] text-center">
-            <p className="text-xs text-gray-400">No contacts or suggested friends found.</p>
+            <p className="text-xs text-gray-400">
+              {activeTab === 'contacts'
+                ? 'You have no saved contacts yet. Add friends from the Suggested tab above!'
+                : activeTab === 'requests'
+                ? 'No pending friend requests.'
+                : 'No suggested friends available right now. Search for users above!'}
+            </p>
           </div>
         ) : (
           filteredFriends.map((user) => {
-            const isAdded = addedHandles.includes(user.id);
+            const isContact = isUserContact(user.id);
+            const isActing = loadingActionId === String(user.id);
+            const isDMing = loadingDMId === String(user.id);
 
             return (
               <div
@@ -186,9 +364,18 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
                     className="relative cursor-pointer group/avatar shrink-0"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setAvatarViewerTarget({ isOpen: true, avatarUrl: user.avatar, name: user.name, handle: user.handle, bio: user.bio, customStatus: user.customStatus });
+                      setAvatarViewerTarget({ 
+                        isOpen: true, 
+                        avatarUrl: user.avatar, 
+                        name: user.name, 
+                        handle: user.handle, 
+                        bio: user.bio, 
+                        customStatus: user.customStatus,
+                        id: user.id,
+                        isContact
+                      });
                     }}
-                    title="Click to view profile picture"
+                    title="Click to view profile picture & info"
                   >
                     <img
                       src={user.avatar}
@@ -211,26 +398,73 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
                 </div>
 
                 <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                  <button
-                    onClick={() => {
-                      if (onStartDM && user.id) onStartDM(user.id);
-                    }}
-                    className="px-2.5 py-1.5 sm:px-3.5 sm:py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-[11px] sm:text-xs shadow-md shadow-indigo-600/25 transition shrink-0"
-                  >
-                    Message
-                  </button>
+                  {isContact ? (
+                    <>
+                      <button
+                        onClick={() => handleStartChat(user.id)}
+                        disabled={isDMing}
+                        className="px-2.5 py-1.5 sm:px-3.5 sm:py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-[11px] sm:text-xs shadow-md shadow-indigo-600/25 transition shrink-0 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                      >
+                        {isDMing ? (
+                          <>
+                            <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>Opening...</span>
+                          </>
+                        ) : (
+                          <>
+                            <MessageSquare className="w-3.5 h-3.5 hidden sm:inline" />
+                            <span>Message</span>
+                          </>
+                        )}
+                      </button>
 
-                  <button
-                    onClick={() => toggleAdd(user.id)}
-                    className={`px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl border text-[11px] sm:text-xs font-semibold transition shrink-0 ${
-                      user.isContact
-                        ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/20'
-                        : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                    }`}
-                    title={user.isContact ? 'Remove from contacts' : 'Add to contacts'}
-                  >
-                    {user.isContact ? 'Remove' : '+ Add Friend'}
-                  </button>
+                      <button
+                        onClick={() => handleRemoveFriend(user.id, user.name)}
+                        disabled={isActing}
+                        className="px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[11px] sm:text-xs font-semibold transition shrink-0 flex items-center gap-1 active:scale-95 disabled:opacity-50"
+                        title="Remove friend"
+                      >
+                        {isActing ? (
+                          <span className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <UserMinus className="w-3 h-3 hidden sm:inline text-rose-400" />
+                            <span>Remove</span>
+                          </>
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleAddFriend(user.id, user.name)}
+                        disabled={isActing}
+                        className="px-3 py-1.5 sm:px-4 sm:py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-[11px] sm:text-xs shadow-md shadow-indigo-600/25 transition shrink-0 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                        title="Add friend"
+                      >
+                        {isActing ? (
+                          <>
+                            <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>Adding...</span>
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="w-3.5 h-3.5" />
+                            <span>Add Friends</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => handleRemoveSuggestion(user.id)}
+                        className="px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-white/10 hover:border-rose-500/30 bg-white/5 hover:bg-rose-500/10 text-gray-400 hover:text-rose-400 text-[11px] sm:text-xs font-semibold transition shrink-0 flex items-center gap-1 active:scale-95"
+                        title="Remove from suggestions"
+                      >
+                        <UserX className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Remove</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             );
@@ -277,6 +511,10 @@ export default function FriendsView({ allContacts = [], onStartDM, onOpenMobileS
         handle={avatarViewerTarget.handle}
         bio={avatarViewerTarget.bio}
         customStatus={avatarViewerTarget.customStatus}
+        targetPersonaId={avatarViewerTarget.id}
+        isContact={avatarViewerTarget.isContact}
+        onStartDM={handleStartChat}
+        onToggleContact={handleToggleContactFromModal}
       />
     </div>
   );

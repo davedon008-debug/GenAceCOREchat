@@ -1417,6 +1417,7 @@ export default function ChatPage() {
 
       setActiveId(convId);
       setActiveType('conversation');
+      setActiveNavView('chats');
       setSpaceTab('chat');
       setActiveObject(conv);
 
@@ -1874,16 +1875,19 @@ export default function ChatPage() {
 
   const startNewDirectMessage = async (targetPersonaId) => {
     try {
+      setActiveNavView('chats');
+      setMobileSidebarOpen(false);
+      setShowNewChatModal(false);
       const res = await api.post('/conversations', { targetPersonaId, type: 'direct' });
       if (res.data.success) {
         const conv = res.data.conversation;
         await fetchConversations();
         await fetchContacts();
-        selectConversation(conv._id, conv);
-        setShowNewChatModal(false);
+        await selectConversation(conv._id, conv);
       }
     } catch (err) {
       console.error('Failed to start DM:', err);
+      showToast(err.response?.data?.message || 'Failed to start message conversation', 'error');
     }
   };
 

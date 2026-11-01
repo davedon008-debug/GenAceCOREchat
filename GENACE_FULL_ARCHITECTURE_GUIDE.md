@@ -393,6 +393,8 @@ This section provides a granular comparison between the **Web Platform (Next.js 
 
 | Feature / Architectural Vector | Web Platform (`frontend`) | Mobile App (`mobile`) | Parity Status & Technical Reason |
 | :--- | :---: | :---: | :--- |
+| **24-Hour WhatsApp / Instagram Status Stories** | **Full Stories Suite** (`StatusBar.jsx`, text, image, video, privacy) | **Full Stories Suite** (`StatusRail.js`, `StatusViewerModal.js`, DM rings, 0ms cache) | ✅ **Full Parity**: Complete text, image, and video status stories with pause/play, video-completion auto-advance, privacy controls, and story rings on DM avatars. |
+| **Segmented Friends Hub & Social Actions** | **3-Segment Hub** (Suggested, Contacts, Requests) | **3-Segment Hub** (`MainTabScreen.js`, contextual actions) | ✅ **Full Parity**: Segmented friend discovery with add, remove, and block capabilities. |
 | **P2P WebRTC Video & Audio Calls** | **Full Native WebRTC** (`RTCPeerConnection`, `<video>`, `<audio>`) | **Web Fallback Only** (`Platform.OS === 'web'`) | ⚠️ **Web Exclusive**: Native iOS/Android builds require bare prebuild with `react-native-webrtc` drivers. |
 | **Secret Lovers Interactive Card Game** | **Full Engine + Procedural SFX** (`secretLoversSFX.js`, interactive cards) | **Not Implemented** | ❌ **Web Exclusive**: Card flip animations, matchmaking cards, and game SFX have not been ported to React Native. |
 | **Progressive Web App (PWA) Engine** | **Full PWA** (`InstallPromptModal`, `sw.js`, VAPID WebPush) | **N/A (Native App)** | ℹ️ **Web Specific**: Mobile uses native OS packaging (Expo/EAS, APNs, FCM). |
