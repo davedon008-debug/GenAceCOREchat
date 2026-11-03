@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   MessageSquare, Users, UserPlus, Compass, Zap, Search, Sun, Bell, 
-  ChevronRight, Shield, Wifi, Menu, X, Loader2
+  ChevronRight, Shield, Wifi, Menu, X, Loader2, Check
 } from 'lucide-react';
 import api, { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
@@ -19,6 +19,8 @@ export default function WelcomeScreen({
   onOpenMobileSidebar,
   conversations = [],
   spaces = [],
+  allContacts = [],
+  onRefreshContacts,
   onSelectConversation,
   onSelectSpace,
   onStartDM,
@@ -28,9 +30,33 @@ export default function WelcomeScreen({
   const [searchFocused, setSearchFocused] = useState(false);
   const [peopleResults, setPeopleResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [addedContactIds, setAddedContactIds] = useState([]);
+  const [addingContactId, setAddingContactId] = useState(null);
   const [avatarViewerTarget, setAvatarViewerTarget] = useState({ isOpen: false, avatarUrl: '', name: '', handle: '' });
   const searchRef = useRef(null);
   const debounceRef = useRef(null);
+
+  const contactIdSet = new Set([
+    ...(allContacts || []).map(c => String(c?._id || c?.id || c)),
+    ...addedContactIds
+  ]);
+
+  const handleAddContact = async (e, targetPersonaId) => {
+    e.stopPropagation();
+    const idStr = String(targetPersonaId || '');
+    if (!idStr) return;
+    setAddingContactId(idStr);
+    setAddedContactIds(prev => [...prev, idStr]);
+    try {
+      await api.post(`/personas/contacts/add/${idStr}`);
+      if (onRefreshContacts) onRefreshContacts();
+    } catch (err) {
+      setAddedContactIds(prev => prev.filter(x => x !== idStr));
+      console.error('Failed to add friend:', err);
+    } finally {
+      setAddingContactId(null);
+    }
+  };
 
   // Filter conversations locally
   const convResults = searchQuery.trim()
@@ -238,35 +264,67 @@ export default function WelcomeScreen({
                   <p className="px-3 pt-2 pb-1 text-[9px] font-bold uppercase tracking-widest text-emerald-400/80 font-mono">
                     👥 People {isSearching && <Loader2 className="inline w-2.5 h-2.5 ml-1 animate-spin" />}
                   </p>
-                  {peopleResults.map(p => (
-                    <button
-                      key={p._id}
-                      onClick={() => { onStartDM && onStartDM(p._id); clearSearch(); setSearchFocused(false); }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-emerald-500/10 transition text-left"
-                    >
-                      <img
-                        src={getMediaUrl(p.avatar) || DEFAULT_AVATAR}
-                        alt=""
-                        className="w-7 h-7 rounded-full object-cover border border-white/10 shrink-0 hover:scale-110 transition-transform cursor-pointer"
-                        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAvatarViewerTarget({
-                            isOpen: true,
-                            avatarUrl: p.avatar,
-                            name: p.displayName || p.username,
-                            handle: p.username
-                          });
-                        }}
-                        title="Click to view profile picture"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-white truncate">{p.displayName || p.username}</p>
-                        <p className="text-[10px] text-indigo-400 font-mono truncate">@{p.username}</p>
+                  {peopleResults.map(p => {
+                    const isContact = p.isContact || contactIdSet.has(String(p._id));
+                    const isAdding = addingContactId === String(p._id);
+
+                    return (
+                      <div
+                        key={p._id}
+                        onClick={() => { onStartDM && onStartDM(p._id); clearSearch(); setSearchFocused(false); }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-emerald-500/10 transition text-left cursor-pointer group"
+                      >
+                        <img
+                          src={getMediaUrl(p.avatar, p.displayName || p.username) || DEFAULT_AVATAR}
+                          alt=""
+                          className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0 hover:scale-110 transition-transform cursor-pointer"
+                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAvatarViewerTarget({
+                              isOpen: true,
+                              avatarUrl: p.avatar,
+                              name: p.displayName || p.username,
+                              handle: p.username
+                            });
+                          }}
+                          title="Click to view profile picture"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-white group-hover:text-emerald-300 transition truncate">{p.displayName || p.username}</p>
+                          <p className="text-[10px] text-indigo-400 font-mono truncate">@{p.username}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
+                          {isContact ? (
+                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 font-semibold border border-indigo-500/25 flex items-center gap-1">
+                              <Check className="w-2.5 h-2.5 text-indigo-400" /> Friend
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(e) => handleAddContact(e, p._id)}
+                              disabled={isAdding}
+                              className="text-[9px] px-2.5 py-1 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold transition flex items-center gap-1 shadow-sm shadow-indigo-600/30 active:scale-95 disabled:opacity-50"
+                              title="Add as Friend"
+                            >
+                              {isAdding ? (
+                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              ) : (
+                                <UserPlus className="w-2.5 h-2.5" />
+                              )}
+                              <span>Add Friend</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => { onStartDM && onStartDM(p._id); clearSearch(); setSearchFocused(false); }}
+                            className="text-[9px] px-2.5 py-1 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-semibold border border-emerald-500/30 transition flex items-center gap-1 active:scale-95"
+                          >
+                            <MessageSquare className="w-2.5 h-2.5" />
+                            <span>Chat</span>
+                          </button>
+                        </div>
                       </div>
-                      <span className="ml-auto text-[9px] px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold shrink-0">Message</span>
-                    </button>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

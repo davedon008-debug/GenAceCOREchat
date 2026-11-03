@@ -234,6 +234,12 @@ export default function StatusBar({ onSelectConversation }) {
     }
   }, [isPaused, currentIdx]);
 
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+    }
+  }, [currentIdx]);
+
   // Keyboard Navigation (Arrows, Space, Escape)
   useEffect(() => {
     if (!showViewer) return;
@@ -278,7 +284,12 @@ export default function StatusBar({ onSelectConversation }) {
       return;
     }
     if (direction === 'prev') {
-      if (currentIdx > 0) setCurrentIdx(prev => prev - 1);
+      if (currentIdx > 0) {
+        setCurrentIdx(prev => prev - 1);
+      } else if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+        videoRef.current.play().catch(() => {});
+      }
     } else {
       if (currentIdx < (activeGroup?.statuses?.length || 1) - 1) {
         setCurrentIdx(prev => prev + 1);
@@ -469,7 +480,8 @@ export default function StatusBar({ onSelectConversation }) {
               key={author?._id || idx}
               onClick={() => {
                 setActiveGroup(group);
-                setCurrentIdx(0);
+                const firstUnseen = (group.statuses || []).findIndex(s => !s.isSeen);
+                setCurrentIdx(firstUnseen >= 0 ? firstUnseen : 0);
                 setShowViewer(true);
               }}
               className="flex flex-col items-center w-[58px] shrink-0 cursor-pointer group"
@@ -779,9 +791,12 @@ export default function StatusBar({ onSelectConversation }) {
                       return (
                         <div className="w-full h-full flex items-center justify-center bg-black relative">
                           <video
+                            key={`vid_${curr._id || curr.mediaUrl}_${currentIdx}`}
                             ref={videoRef}
                             src={getMediaUrl(curr.mediaUrl)}
                             autoPlay
+                            playsInline
+                            preload="auto"
                             muted={isMuted}
                             className="max-h-full max-w-full object-contain"
                             onTimeUpdate={(e) => {
@@ -1144,7 +1159,8 @@ export default function StatusBar({ onSelectConversation }) {
                             onClick={() => {
                               setShowUpdatesListModal(false);
                               setActiveGroup(group);
-                              setCurrentIdx(0);
+                              const firstUnseen = (group.statuses || []).findIndex(s => !s.isSeen);
+                              setCurrentIdx(firstUnseen >= 0 ? firstUnseen : 0);
                               setShowViewer(true);
                             }}
                             className="flex items-center gap-3 p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 cursor-pointer border border-white/5 transition"
@@ -1176,7 +1192,8 @@ export default function StatusBar({ onSelectConversation }) {
                             onClick={() => {
                               setShowUpdatesListModal(false);
                               setActiveGroup(group);
-                              setCurrentIdx(0);
+                              const firstUnseen = (group.statuses || []).findIndex(s => !s.isSeen);
+                              setCurrentIdx(firstUnseen >= 0 ? firstUnseen : 0);
                               setShowViewer(true);
                             }}
                             className="flex items-center gap-3 p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 cursor-pointer border border-white/5 transition"

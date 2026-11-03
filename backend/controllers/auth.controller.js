@@ -46,7 +46,14 @@ export const registerUser = async (req, res) => {
       username: cleanUsername,
       displayName: displayName || masterName,
       type: personaType || 'personal',
-      isDefault: true
+      isDefault: true,
+      privacySettings: {
+        setupCompleted: true,
+        whoCanFindMe: 'everyone',
+        onlineVisibility: 'everyone',
+        newAccountAnnouncements: true,
+        agreedAt: new Date()
+      }
     });
 
     user.personas.push(defaultPersona._id);

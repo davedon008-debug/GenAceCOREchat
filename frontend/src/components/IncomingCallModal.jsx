@@ -5,7 +5,15 @@ import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 import { playIncomingRingtone, stopAllSFX } from '../lib/callSFX';
 import { getRingtoneSettings, stopRingtoneAudio, stopCallVibration } from '../lib/ringtoneManager';
 
-export default function IncomingCallModal({ call, onAccept, onDecline }) {
+export default function IncomingCallModal({
+  call,
+  incomingCall,
+  onAccept,
+  onAcceptCall,
+  onDecline,
+  onDeclineCall
+}) {
+  const activeCall = call || incomingCall;
   const [silenced, setSilenced] = useState(false);
   const [ringtoneInfo, setRingtoneInfo] = useState({ mode: 'phone_default', customFileName: null });
 
@@ -23,15 +31,18 @@ export default function IncomingCallModal({ call, onAccept, onDecline }) {
     stopCallVibration();
   };
 
-  if (!call) return null;
+  if (!activeCall) return null;
 
-  const { callerPersona, isVideo } = call;
-  const name = callerPersona?.displayName || 'Unknown Caller';
-  const handle = callerPersona?.handle ? `@${callerPersona.handle}` : '';
-  const avatar = getMediaUrl(callerPersona?.avatarUrl, name) || DEFAULT_AVATAR;
+  const handleAcceptAction = onAccept || onAcceptCall || (() => {});
+  const handleDeclineAction = onDecline || onDeclineCall || (() => {});
+
+  const { callerPersona, isVideo } = activeCall;
+  const name = callerPersona?.displayName || callerPersona?.username || 'Unknown Caller';
+  const handle = callerPersona?.handle || callerPersona?.username ? `@${callerPersona.handle || callerPersona.username}` : '';
+  const avatar = getMediaUrl(callerPersona?.avatar || callerPersona?.avatarUrl, name) || DEFAULT_AVATAR;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fadeIn">
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fadeIn">
       <div className="relative w-full max-w-sm bg-[#101625] border border-indigo-500/30 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center overflow-hidden">
         {/* Top bar with quick silence button */}
         <div className="w-full flex items-center justify-between mb-2">
@@ -95,7 +106,7 @@ export default function IncomingCallModal({ call, onAccept, onDecline }) {
           <button
             onClick={() => {
               stopAllSFX();
-              onDecline();
+              handleDeclineAction();
             }}
             className="flex-1 py-3.5 px-4 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 transition hover:scale-105 active:scale-95"
           >
@@ -107,7 +118,7 @@ export default function IncomingCallModal({ call, onAccept, onDecline }) {
           <button
             onClick={() => {
               stopAllSFX();
-              onAccept();
+              handleAcceptAction();
             }}
             className="flex-1 py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition hover:scale-105 active:scale-95"
           >

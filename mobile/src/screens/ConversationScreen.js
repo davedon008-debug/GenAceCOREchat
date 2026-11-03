@@ -25,7 +25,7 @@ import IncomingCallModal from '../components/IncomingCallModal';
 import StatusViewerModal from '../components/status/StatusViewerModal';
 import { playIncomingRingtone, playRingback, playCallConnected, playCallEnded, stopAllSFX } from '../lib/callSFX';
 import {
-  ArrowLeft, Bot, Zap, Info, Lock, Flame, Plus, Phone, Video as VideoIcon,
+  ArrowLeft, Bot, Zap, Info, Lock, Flame, Plus, Phone, PhoneOff, Video as VideoIcon,
   Image as ImageIcon, Mic, Send, Play, Pause, CheckCheck, Check, X,
   FileText, Download, Camera
 } from 'lucide-react-native';
@@ -598,12 +598,6 @@ export default function ConversationScreen({ route, navigation }) {
     }
   };
 
-  // If navigated here after tapping Accept on MainTabScreen incoming call popup
-  useEffect(() => {
-    if (route.params?.autoAcceptCall) {
-      handleAcceptCall(route.params.autoAcceptCall);
-    }
-  }, [route.params?.autoAcceptCall]);
 
   const handleDeclineCall = () => {
     if (incomingCall && socket) {
@@ -1477,7 +1471,11 @@ export default function ConversationScreen({ route, navigation }) {
           ) : null}
 
           {/* Status Story Reply Card */}
-          {item.statusReply ? (
+          {Boolean(
+            item.statusReply &&
+            (item.contentType === 'status_reply' || item.statusReply.statusId) &&
+            (item.statusReply.statusId || item.statusReply.mediaUrl || item.statusReply.text || item.statusReply.caption)
+          ) ? (
             <View style={[styles.statusReplyCard, isMe ? styles.statusReplyCardMe : [styles.statusReplyCardOther, { backgroundColor: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }]]}>
               <Text style={[styles.statusReplyHeaderLabel, { color: isMe ? 'rgba(255,255,255,0.9)' : dynamicColors.primary }]}>
                 💬 Replying to story
@@ -1796,6 +1794,58 @@ export default function ConversationScreen({ route, navigation }) {
         </View>
       </View>
 
+      {/* Real-time In-Chat Incoming Call Banner */}
+      {incomingCall && (
+        <View style={{
+          marginHorizontal: 16,
+          marginTop: 8,
+          marginBottom: 8,
+          padding: 12,
+          borderRadius: 20,
+          backgroundColor: '#0f172a',
+          borderColor: '#10b981',
+          borderWidth: 1.5,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          elevation: 10,
+          shadowColor: '#10b981',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 10,
+          zIndex: 999,
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+            <Image
+              source={{ uri: getMediaUrl(incomingCall.callerPersona?.avatar || incomingCall.callerPersona?.avatarUrl, incomingCall.callerPersona?.displayName) || DEFAULT_AVATAR }}
+              style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: '#10b981' }}
+            />
+            <View style={{ marginLeft: 10, flex: 1 }}>
+              <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }} numberOfLines={1}>
+                {incomingCall.callerPersona?.displayName || incomingCall.callerPersona?.username || 'Incoming Call'}
+              </Text>
+              <Text style={{ color: '#34d399', fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+                {incomingCall.isVideo ? '📹 Incoming Video Call...' : '📞 Incoming Voice Call...'}
+              </Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity
+              onPress={handleDeclineCall}
+              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <PhoneOff size={18} color="#ffffff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleAcceptCall()}
+              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#10b981', alignItems: 'center', justifyContent: 'center' }}
+            >
+              {incomingCall.isVideo ? <VideoIcon size={18} color="#ffffff" /> : <Phone size={18} color="#ffffff" />}
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* Messages Feed */}
       <KeyboardAvoidingView
         style={styles.chatArea}
@@ -1972,6 +2022,7 @@ export default function ConversationScreen({ route, navigation }) {
       {/* Real-time WebRTC Calling Overlays */}
       <IncomingCallModal
         incomingCall={incomingCall}
+        call={incomingCall}
         onAcceptCall={handleAcceptCall}
         onDeclineCall={handleDeclineCall}
       />

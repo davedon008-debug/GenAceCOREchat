@@ -11,13 +11,17 @@ const MessageSchema = new mongoose.Schema({
     default: 'text' 
   },
   statusReply: {
-    statusId: { type: mongoose.Schema.Types.ObjectId, ref: 'Status', default: null },
-    mediaUrl: { type: String, default: '' },
-    mediaType: { type: String, default: 'text' },
-    caption: { type: String, default: '' },
-    text: { type: String, default: '' },
-    authorPersonaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Persona', default: null },
-    authorName: { type: String, default: '' }
+    type: {
+      statusId: { type: mongoose.Schema.Types.ObjectId, ref: 'Status', default: null },
+      mediaUrl: { type: String, default: '' },
+      mediaType: { type: String, default: 'text' },
+      caption: { type: String, default: '' },
+      text: { type: String, default: '' },
+      authorPersonaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Persona', default: null },
+      authorName: { type: String, default: '' }
+    },
+    default: null,
+    _id: false
   },
   gameId: { type: mongoose.Schema.Types.ObjectId, ref: 'SecretLoversGame', default: null },
   mediaUrl: { type: String, default: '' },

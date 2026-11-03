@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Search, Plus, MessageSquare, Zap, Edit3, CheckCheck, Users, Lock } from 'lucide-react';
-import { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar, SpaceIcon } from '../lib/api';
+import { useState, useEffect } from 'react';
+import { Search, Plus, MessageSquare, Zap, Edit3, CheckCheck, Users, Lock, UserPlus, Check, Loader2 } from 'lucide-react';
+import api, { getMediaUrl, DEFAULT_AVATAR, createInitialsAvatar, SpaceIcon } from '../lib/api';
 import { useSocket } from '../context/SocketContext';
 import AvatarViewerModal from './AvatarViewerModal';
 
@@ -14,11 +14,15 @@ export default function ChatsListView({
   onSelectSpace,
   onStartDM,
   onOpenNewChat,
-  onOpenCreateSpace
+  onOpenCreateSpace,
+  onRefreshContacts
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'dms' | 'spaces'
   const [avatarViewerTarget, setAvatarViewerTarget] = useState({ isOpen: false, avatarUrl: '', name: '', handle: '' });
+  const [globalPeople, setGlobalPeople] = useState([]);
+  const [addedContactIds, setAddedContactIds] = useState([]);
+  const [addingContactId, setAddingContactId] = useState(null);
 
   const socketCtx = useSocket() || {};
   const onlineUserIds = socketCtx.onlineUserIds || [];
@@ -125,6 +129,44 @@ export default function ChatsListView({
     }));
 
   const combinedItems = [...convChatList, ...contactOnlyList];
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setGlobalPeople([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get(`/personas/search?query=${encodeURIComponent(searchQuery.trim())}`);
+        if (res.data?.success) {
+          const knownIds = new Set([
+            ...combinedItems.map(i => String(i.targetPersonaId || i._id)),
+            String(activePersona?._id)
+          ]);
+          setGlobalPeople((res.data.personas || []).filter(p => !knownIds.has(String(p._id))));
+        }
+      } catch (e) {
+        setGlobalPeople([]);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, activePersona]);
+
+  const handleAddFriend = async (targetPersonaId) => {
+    const idStr = String(targetPersonaId || '');
+    if (!idStr) return;
+    setAddingContactId(idStr);
+    setAddedContactIds(prev => [...prev, idStr]);
+    try {
+      await api.post(`/personas/contacts/add/${idStr}`);
+      if (onRefreshContacts) onRefreshContacts();
+    } catch (e) {
+      setAddedContactIds(prev => prev.filter(x => x !== idStr));
+      console.error('Failed to add contact:', e);
+    } finally {
+      setAddingContactId(null);
+    }
+  };
 
   const filteredDMs = combinedItems.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -296,6 +338,86 @@ export default function ChatsListView({
                 ))}
               </div>
             )}
+          </section>
+        )}
+
+        {/* People around the world section when searching */}
+        {searchQuery.trim() && globalPeople.length > 0 && (
+          <section className="space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400 font-mono flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-emerald-400" /> People Around The World ({globalPeople.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {globalPeople.map((p) => {
+                const isContact = addedContactIds.includes(String(p._id));
+                const isAdding = addingContactId === String(p._id);
+
+                return (
+                  <div
+                    key={p._id}
+                    onClick={() => onStartDM && onStartDM(p._id)}
+                    className="p-4 rounded-3xl bg-[#101625] border border-emerald-500/30 hover:border-emerald-400/60 flex items-center justify-between cursor-pointer group transition shadow-xl"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="relative cursor-pointer group/avatar shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAvatarViewerTarget({
+                            isOpen: true,
+                            avatarUrl: p.avatar,
+                            name: p.displayName || p.username,
+                            handle: p.username
+                          });
+                        }}
+                        title="Click to view profile picture"
+                      >
+                        <img 
+                          src={getMediaUrl(p.avatar, p.displayName || p.username)} 
+                          alt="" 
+                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = createInitialsAvatar(p.displayName || p.username); }}
+                          className="w-10 h-10 rounded-full object-cover border border-white/10 group-hover/avatar:scale-110 transition-transform" 
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-white group-hover:text-emerald-300 transition truncate flex items-center gap-1">
+                          <span>{p.displayName || p.username}</span>
+                        </h4>
+                        <p className="text-[11px] text-gray-400 truncate">@{p.username}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
+                      {isContact ? (
+                        <span className="text-[10px] px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-300 font-semibold border border-emerald-500/30 flex items-center gap-1">
+                          <Check className="w-2.5 h-2.5 text-emerald-400" /> Friend
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleAddFriend(p._id)}
+                          disabled={isAdding}
+                          className="text-[10px] px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold transition flex items-center gap-1 shadow-md shadow-indigo-600/25 active:scale-95 disabled:opacity-50"
+                        >
+                          {isAdding ? (
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                          ) : (
+                            <UserPlus className="w-3 h-3" />
+                          )}
+                          <span>Add Friend</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onStartDM && onStartDM(p._id)}
+                        className="text-[10px] px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold border border-emerald-500/30 transition flex items-center gap-1"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        <span>Chat</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </section>
         )}
       </div>

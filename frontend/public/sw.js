@@ -146,7 +146,8 @@ self.addEventListener('notificationclick', (event) => {
           client.postMessage({
             type: 'GENACE_NOTIFICATION_CLICK',
             action: event.action || 'open',
-            callId: notifData.callId
+            callId: notifData.callId,
+            data: notifData
           });
           return client.focus();
         }

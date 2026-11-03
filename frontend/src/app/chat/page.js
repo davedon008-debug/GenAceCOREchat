@@ -50,7 +50,7 @@ import {
   clearMessageCache
 } from '../../lib/messageCache';
 
-import { Plus, Search, User, X, Bell, UserX } from 'lucide-react';
+import { Plus, Search, User, X, Bell, UserX, UserPlus, Check, MessageSquare, Loader2, Phone, PhoneOff, Video } from 'lucide-react';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -366,6 +366,9 @@ export default function ChatPage() {
           callNotif.onclick = () => {
             if (typeof window !== 'undefined') window.focus();
             callNotif.close();
+            if (data?.callId) {
+              setIncomingCall(data);
+            }
           };
         }
       } catch (err) {
@@ -656,12 +659,13 @@ export default function ChatPage() {
           setIncomingCall(null);
         }
       } else if (msg.type === 'GENACE_NOTIFICATION_CLICK') {
-        const notifData = msg.data;
-        if (notifData?.type === 'call') {
+        const notifData = msg.data || (msg.callId ? { type: 'call', callId: msg.callId } : null);
+        const isCallNotif = notifData?.type === 'call' || !!msg.callId;
+        if (isCallNotif) {
           console.log('[SW Message] Call notification clicked:', msg.action, notifData);
           if (msg.action === 'answer' && incomingCallRef.current) {
             handleAcceptCall();
-          } else if (!incomingCallRef.current && socket) {
+          } else if (socket) {
             socket.emit('call:query-pending');
           }
         }
@@ -1873,6 +1877,23 @@ export default function ChatPage() {
     }
   };
 
+  const [addingFriendId, setAddingFriendId] = useState(null);
+  const handleAddFriendFromModal = async (targetPersonaId, name = 'User') => {
+    if (!targetPersonaId) return;
+    setAddingFriendId(String(targetPersonaId));
+    try {
+      const res = await api.post(`/personas/contacts/add/${targetPersonaId}`);
+      if (res.data?.success) {
+        showToast(`Added ${name} to your friends!`, 'success');
+        await fetchContacts();
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to add friend', 'error');
+    } finally {
+      setAddingFriendId(null);
+    }
+  };
+
   const startNewDirectMessage = async (targetPersonaId) => {
     try {
       setActiveNavView('chats');
@@ -2155,6 +2176,55 @@ export default function ChatPage() {
             </div>
           )}
 
+          {/* Real-time In-Chat Incoming Call Banner */}
+          {incomingCall && (
+            <div className="bg-gradient-to-r from-emerald-950/95 via-indigo-950/95 to-slate-900 border-b-2 border-emerald-500/70 px-4 py-3 flex items-center justify-between text-xs shrink-0 select-none z-40 shadow-2xl animate-pulse">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative">
+                  <img
+                    src={getMediaUrl(incomingCall.callerPersona?.avatar || incomingCall.callerPersona?.avatarUrl, incomingCall.callerPersona?.displayName) || DEFAULT_AVATAR}
+                    alt=""
+                    className="w-10 h-10 rounded-full object-cover border-2 border-emerald-400 shadow-md"
+                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                  />
+                  <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border border-black flex items-center justify-center text-[10px] text-black font-bold">
+                    {incomingCall.isVideo ? '📹' : '📞'}
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-white text-sm truncate">
+                      {incomingCall.callerPersona?.displayName || incomingCall.callerPersona?.username || 'Incoming Call'}
+                    </p>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-semibold border border-emerald-500/30">
+                      {incomingCall.isVideo ? 'VIDEO CALL' : 'VOICE CALL'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-300/90 font-mono flex items-center gap-1.5 mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                    Incoming call... Click Answer or Decline
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 shrink-0 ml-3">
+                <button
+                  onClick={handleDeclineCall}
+                  className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-rose-600/30 transition hover:scale-105 active:scale-95"
+                >
+                  <PhoneOff className="w-3.5 h-3.5" />
+                  <span>Decline</span>
+                </button>
+                <button
+                  onClick={handleAcceptCall}
+                  className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition hover:scale-105 active:scale-95"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>Answer</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {activeId ? (
             <div className="flex-1 flex flex-col h-full overflow-hidden">
               {/* Header Bar */}
@@ -2314,6 +2384,7 @@ export default function ChatPage() {
               onOpenCreateSpace={() => setShowCreateSpaceModal(true)}
               onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
               onBack={() => setActiveNavView('chats')}
+              onRefreshSpaces={fetchSpaces}
             />
           ) : activeNavView === 'discover' ? (
             <DiscoverView
@@ -2323,6 +2394,7 @@ export default function ChatPage() {
               onStartDM={(id) => startNewDirectMessage(id)}
               onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
               onBack={() => setActiveNavView('chats')}
+              onRefreshSpaces={fetchSpaces}
             />
           ) : activeNavView === 'friends' ? (
             <FriendsView
@@ -2358,6 +2430,8 @@ export default function ChatPage() {
                   onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
                   conversations={conversations}
                   spaces={spaces}
+                  allContacts={allContacts}
+                  onRefreshContacts={fetchContacts}
                   onSelectConversation={(id) => handleSelectConversationWithLock(id)}
                   onSelectSpace={(id) => selectSpace(id)}
                   onStartDM={(id) => startNewDirectMessage(id)}
@@ -2400,6 +2474,8 @@ export default function ChatPage() {
               onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
               conversations={conversations}
               spaces={spaces}
+              allContacts={allContacts}
+              onRefreshContacts={fetchContacts}
               onSelectConversation={(id) => handleSelectConversationWithLock(id)}
               onSelectSpace={(id) => selectSpace(id)}
               onStartDM={(id) => startNewDirectMessage(id)}
@@ -2561,13 +2637,18 @@ export default function ChatPage() {
         />
       )}
 
-      {/* New Conversation Modal */}
+      {/* New Conversation & Friend Search Modal */}
       {showNewChatModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-white/15 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
             <div className="flex items-center justify-between pb-2 border-b border-white/10">
-              <h3 className="text-base font-bold text-white">Start New Conversation</h3>
-              <button onClick={() => setShowNewChatModal(false)} className="text-gray-400 hover:text-white">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <UserPlus className="w-4 h-4 text-cyan-400" /> Find Friends & Chat
+                </h3>
+                <p className="text-[11px] text-gray-400">Search people around the world and connect</p>
+              </div>
+              <button onClick={() => setShowNewChatModal(false)} className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -2576,37 +2657,72 @@ export default function ChatPage() {
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
               <input
                 type="text"
-                placeholder="Search handle (@username only)..."
+                placeholder="Search people around the world by name or @handle..."
                 value={searchUsersQuery}
                 onChange={e => handleSearchUsers(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
-            <div className="max-h-60 overflow-y-auto space-y-1">
-              {foundUsers.map(u => (
-                <button
-                  key={u._id}
-                  onClick={() => startNewDirectMessage(u._id)}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 text-left text-xs transition"
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={getMediaUrl(u.avatar, u.displayName || u.username)}
-                      alt={u.displayName || u.username}
-                      className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10"
-                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = createInitialsAvatar(u.displayName || u.username); }}
-                    />
-                    <div>
-                      <p className="font-semibold text-white">{u.displayName}</p>
-                      <p className="text-[10px] text-gray-400">@{u.username}</p>
+            <div className="max-h-72 overflow-y-auto space-y-1.5 custom-scrollbar">
+              {foundUsers.map(u => {
+                const isContact = (allContacts || []).some(c => String(c?._id || c?.id || c) === String(u._id));
+                const isAdding = addingFriendId === String(u._id);
+
+                return (
+                  <div
+                    key={u._id}
+                    onClick={() => startNewDirectMessage(u._id)}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 text-left text-xs transition border border-transparent hover:border-white/10 cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <img
+                        src={getMediaUrl(u.avatar, u.displayName || u.username)}
+                        alt={u.displayName || u.username}
+                        className="w-9 h-9 rounded-full object-cover shrink-0 border border-white/10 group-hover:scale-105 transition-transform"
+                        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = createInitialsAvatar(u.displayName || u.username); }}
+                      />
+                      <div className="min-w-0 truncate">
+                        <p className="font-semibold text-white group-hover:text-cyan-300 transition truncate">{u.displayName}</p>
+                        <p className="text-[10px] text-gray-400 font-mono truncate">@{u.username}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
+                      {isContact ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 font-semibold border border-emerald-500/30 flex items-center gap-1">
+                          <Check className="w-2.5 h-2.5 text-emerald-400" /> Friend
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleAddFriendFromModal(u._id, u.displayName || u.username)}
+                          disabled={isAdding}
+                          className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-[10px] shadow transition flex items-center gap-1 active:scale-95 disabled:opacity-50"
+                          title="Add Friend"
+                        >
+                          {isAdding ? (
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                          ) : (
+                            <UserPlus className="w-2.5 h-2.5" />
+                          )}
+                          <span>Add Friend</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => startNewDirectMessage(u._id)}
+                        className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-[10px] transition flex items-center gap-1 active:scale-95"
+                        title="Chat"
+                      >
+                        <MessageSquare className="w-2.5 h-2.5" />
+                        <span>Chat</span>
+                      </button>
                     </div>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 capitalize">{u.type}</span>
-                </button>
-              ))}
+                );
+              })}
               {searchUsersQuery && foundUsers.length === 0 && (
-                <p className="text-xs text-gray-400 text-center py-4">No matching user handles found.</p>
+                <p className="text-xs text-gray-400 text-center py-6">No matching users found around the world.</p>
               )}
             </div>
           </div>
@@ -2690,8 +2806,11 @@ export default function ChatPage() {
       {incomingCall && (
         <IncomingCallModal
           call={incomingCall}
+          incomingCall={incomingCall}
           onAccept={handleAcceptCall}
+          onAcceptCall={handleAcceptCall}
           onDecline={handleDeclineCall}
+          onDeclineCall={handleDeclineCall}
         />
       )}
 

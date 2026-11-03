@@ -32,7 +32,7 @@ import {
   Play,
   VolumeX as MuteIcon
 } from 'lucide-react-native';
-import { Video } from '../../config/safeMedia';
+import { Video, Audio, ResizeMode } from '../../config/safeMedia';
 import api, { getMediaUrl, createInitialsAvatar } from '../../config/api';
 
 const STORY_DURATION = 5000; // 5 seconds per text/image story
@@ -47,14 +47,10 @@ export default function StatusViewerModal({
   onOpenDirectChat,
   onStatusViewed
 }) {
-  if (!visible || !statusGroup || !statusGroup.statuses || statusGroup.statuses.length === 0) {
-    return null;
-  }
-
   const { width, height } = useWindowDimensions();
-  const statuses = statusGroup.statuses;
-  const author = statusGroup.persona;
-  const isMe = String(author?._id) === String(activePersona?._id);
+  const statuses = statusGroup?.statuses || [];
+  const author = statusGroup?.persona;
+  const isMe = String(author?._id || '') === String(activePersona?._id || '');
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -64,6 +60,14 @@ export default function StatusViewerModal({
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [showViewersSheet, setShowViewersSheet] = useState(false);
   const [replySentFeedback, setReplySentFeedback] = useState(null);
+  const [isVideoLoading, setIsVideoLoading] = useState(false);
+  const [videoError, setVideoError] = useState(null);
+  const [videoInstanceKey, setVideoInstanceKey] = useState(0);
+
+  const videoRef = useRef(null);
+  const hasVideoStartedRef = useRef(false);
+  const videoFinishedRef = useRef(false);
+  const wasVisibleRef = useRef(false);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const currentProgressRef = useRef(0);
@@ -77,13 +81,28 @@ export default function StatusViewerModal({
   const activeAuthorIdRef = useRef('');
   const viewedIdsRef = useRef(new Set());
 
-  // Set initial index to first unseen status ONLY when modal opens or author changes
+  // Configure Audio session mode for video playback
+  useEffect(() => {
+    if (visible && Audio?.setAudioModeAsync) {
+      Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true
+      }).catch(() => {});
+    }
+  }, [visible]);
+
+  // Set initial index to first unseen status (or 0 if all viewed) when modal opens or author changes
   useEffect(() => {
     if (visible && statuses.length > 0) {
-      if (activeAuthorIdRef.current !== authorId) {
+      const isNewOpen = !wasVisibleRef.current;
+      const isNewAuthor = activeAuthorIdRef.current !== authorId;
+      if (isNewOpen || isNewAuthor) {
+        wasVisibleRef.current = true;
         activeAuthorIdRef.current = authorId;
         const firstUnseenIdx = statuses.findIndex(s => !s.isSeen);
-        setCurrentIndex(firstUnseenIdx >= 0 ? firstUnseenIdx : 0);
+        const targetIdx = firstUnseenIdx >= 0 ? firstUnseenIdx : 0;
+        setCurrentIndex(targetIdx);
         currentProgressRef.current = 0;
         progressAnim.setValue(0);
         setIsPaused(false);
@@ -91,14 +110,37 @@ export default function StatusViewerModal({
         setShowViewersSheet(false);
         setReplyText('');
         setReplySentFeedback(null);
+        setVideoError(null);
+        setIsVideoLoading(statuses[targetIdx]?.type === 'video');
+        hasVideoStartedRef.current = false;
+        videoFinishedRef.current = false;
+        setVideoInstanceKey(prev => prev + 1);
       }
     } else if (!visible) {
+      wasVisibleRef.current = false;
       activeAuthorIdRef.current = '';
       setIsPaused(false);
       setIsHolding(false);
       setShowViewersSheet(false);
+      setVideoError(null);
+      setIsVideoLoading(false);
     }
-  }, [visible, authorId]);
+  }, [visible, authorId, statuses]);
+
+  // Reset video playback trackers on story index change
+  useEffect(() => {
+    currentProgressRef.current = 0;
+    progressAnim.setValue(0);
+    hasVideoStartedRef.current = false;
+    videoFinishedRef.current = false;
+    setVideoError(null);
+    if (currentItem?.type === 'video') {
+      setIsVideoLoading(true);
+      setVideoInstanceKey(prev => prev + 1);
+    } else {
+      setIsVideoLoading(false);
+    }
+  }, [currentIndex]);
 
   // Mark current status as viewed when viewing someone else's story (tracked via viewedIdsRef to prevent re-triggering loops)
   useEffect(() => {
@@ -127,18 +169,49 @@ export default function StatusViewerModal({
     }
   }, [showViewersSheet, currentItem?._id, isMe]);
 
-  // Video playback status callback: drives progress and triggers auto-advance only when video finishes
+  // Video playback status callback: drives progress and triggers auto-advance only when video genuinely finishes
   const handleVideoPlaybackStatusUpdate = (playbackStatus) => {
-    if (!playbackStatus || !playbackStatus.isLoaded || isCurrentlyPaused) return;
+    if (!playbackStatus) return;
 
-    if (playbackStatus.durationMillis && playbackStatus.durationMillis > 0) {
-      const progress = playbackStatus.positionMillis / playbackStatus.durationMillis;
-      currentProgressRef.current = progress;
-      progressAnim.setValue(Math.min(1, Math.max(0, progress)));
+    if (playbackStatus.error) {
+      console.warn('Video playback error:', playbackStatus.error);
+      setIsVideoLoading(false);
+      setVideoError('Unable to play video');
+      return;
     }
 
-    // Video must complete playing before switching to the next status
-    if (playbackStatus.didJustFinish && !isCurrentlyPaused) {
+    if (!playbackStatus.isLoaded) {
+      setIsVideoLoading(true);
+      return;
+    }
+
+    if (playbackStatus.isBuffering) {
+      setIsVideoLoading(true);
+    } else {
+      setIsVideoLoading(false);
+    }
+
+    // Mark that the video genuinely began playing past initial frame
+    if (playbackStatus.positionMillis > 150) {
+      hasVideoStartedRef.current = true;
+    }
+
+    // Drive progress bar smoothly with valid duration
+    if (playbackStatus.durationMillis && playbackStatus.durationMillis > 0) {
+      const progress = playbackStatus.positionMillis / playbackStatus.durationMillis;
+      const safeProgress = Math.min(1, Math.max(0, isNaN(progress) ? 0 : progress));
+      currentProgressRef.current = safeProgress;
+      progressAnim.setValue(safeProgress);
+    }
+
+    // Advance ONLY when video genuinely finishes playing (prevent stale instant auto-advance)
+    if (
+      playbackStatus.didJustFinish &&
+      !isCurrentlyPaused &&
+      !videoFinishedRef.current &&
+      hasVideoStartedRef.current
+    ) {
+      videoFinishedRef.current = true;
       currentProgressRef.current = 0;
       progressAnim.setValue(0);
       handleNext();
@@ -181,6 +254,8 @@ export default function StatusViewerModal({
   const handleNext = () => {
     currentProgressRef.current = 0;
     progressAnim.setValue(0);
+    hasVideoStartedRef.current = false;
+    videoFinishedRef.current = false;
     if (currentIndex < statuses.length - 1) {
       setCurrentIndex(prev => prev + 1);
     } else {
@@ -191,10 +266,16 @@ export default function StatusViewerModal({
   const handlePrev = () => {
     currentProgressRef.current = 0;
     progressAnim.setValue(0);
+    hasVideoStartedRef.current = false;
+    videoFinishedRef.current = false;
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
     } else {
       progressAnim.setValue(0);
+      if (currentItem?.type === 'video') {
+        setIsVideoLoading(true);
+        setVideoInstanceKey(prev => prev + 1);
+      }
     }
   };
 
@@ -323,6 +404,10 @@ export default function StatusViewerModal({
     return 'Today';
   };
 
+  if (!visible || !statusGroup || statuses.length === 0 || !currentItem) {
+    return null;
+  }
+
   return (
     <Modal
       visible={visible}
@@ -360,19 +445,55 @@ export default function StatusViewerModal({
             ) : currentItem.type === 'video' ? (
               /* Video Status */
               <View style={styles.videoStatusWrapper}>
-                {Video ? (
-                  <Video
-                    source={{ uri: getMediaUrl(currentItem.mediaUrl) }}
-                    style={styles.fullscreenMedia}
-                    resizeMode="contain"
-                    shouldPlay={!isCurrentlyPaused}
-                    isLooping={false}
-                    isMuted={isMuted}
-                    onPlaybackStatusUpdate={handleVideoPlaybackStatusUpdate}
-                  />
+                {Video && currentItem.mediaUrl ? (
+                  <>
+                    <Video
+                      key={`video_${currentItem._id || currentItem.mediaUrl}_${currentIndex}_${videoInstanceKey}`}
+                      ref={videoRef}
+                      source={{ uri: getMediaUrl(currentItem.mediaUrl) }}
+                      style={styles.fullscreenMedia}
+                      resizeMode={ResizeMode ? ResizeMode.CONTAIN : 'contain'}
+                      shouldPlay={!isCurrentlyPaused && !videoError}
+                      isLooping={false}
+                      isMuted={isMuted}
+                      progressUpdateIntervalMillis={50}
+                      onPlaybackStatusUpdate={handleVideoPlaybackStatusUpdate}
+                      onError={(err) => {
+                        console.warn('Video error callback:', err);
+                        setIsVideoLoading(false);
+                        setVideoError('Unable to play video');
+                      }}
+                    />
+
+                    {/* Buffering / Loading Indicator */}
+                    {isVideoLoading && !videoError && (
+                      <View style={styles.videoLoaderOverlay} pointerEvents="none">
+                        <ActivityIndicator size="large" color="#ffffff" />
+                        <Text style={styles.videoLoaderText}>Loading video...</Text>
+                      </View>
+                    )}
+
+                    {/* Video Load / Playback Error Fallback */}
+                    {videoError && (
+                      <View style={styles.videoErrorOverlay}>
+                        <ShieldAlert size={36} color="#f87171" style={{ marginBottom: 8 }} />
+                        <Text style={styles.videoErrorText}>{videoError}</Text>
+                        <TouchableOpacity
+                          style={styles.retryVideoBtn}
+                          onPress={() => {
+                            setVideoError(null);
+                            setIsVideoLoading(true);
+                            setVideoInstanceKey(k => k + 1);
+                          }}
+                        >
+                          <Text style={styles.retryVideoText}>Tap to Retry</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </>
                 ) : (
                   <View style={styles.textStatusWrapper}>
-                    <Text style={{ color: '#ffffff', fontSize: 16 }}>Video playback active</Text>
+                    <Text style={{ color: '#ffffff', fontSize: 16 }}>Video player unavailable</Text>
                   </View>
                 )}
                 {currentItem.content ? (
@@ -918,5 +1039,47 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: 'bold',
     letterSpacing: 1,
+  },
+  videoLoaderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 15
+  },
+  videoLoaderText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 10,
+    letterSpacing: 0.5
+  },
+  videoErrorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    zIndex: 20
+  },
+  videoErrorText: {
+    color: '#f87171',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 12
+  },
+  retryVideoBtn: {
+    backgroundColor: '#6366f1',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)'
+  },
+  retryVideoText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700'
   }
 });

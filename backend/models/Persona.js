@@ -34,22 +34,22 @@ const PersonaSchema = new mongoose.Schema({
     mutedViewers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Persona' }]
   },
   privacySettings: {
-    setupCompleted: { type: Boolean, default: false },
+    setupCompleted: { type: Boolean, default: true },
     whoCanFindMe: { 
       type: String, 
       enum: ['everyone', 'friends', 'nobody'], 
-      default: 'friends' 
+      default: 'everyone' 
     },
     onlineVisibility: { 
       type: String, 
       enum: ['everyone', 'friends', 'nobody'], 
-      default: 'nobody' 
+      default: 'everyone' 
     },
     newAccountAnnouncements: { 
       type: Boolean, 
-      default: false 
+      default: true 
     },
-    agreedAt: { type: Date, default: null }
+    agreedAt: { type: Date, default: Date.now }
   }
 }, { timestamps: true });
 

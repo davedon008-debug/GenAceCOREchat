@@ -36,7 +36,7 @@ import Logo from '../components/Logo';
 import {
   Menu, Search, MessageSquare, Zap, Users, Settings, Compass,
   Globe, Info, Plus, Shield, Crown, Lock, ChevronRight, X, User, Camera, Share2,
-  UserPlus, UserMinus, UserX
+  UserPlus, UserMinus, UserX, Phone, PhoneOff, Video
 } from 'lucide-react-native';
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80';
@@ -92,6 +92,7 @@ export default function MainTabScreen({ navigation }) {
 
   // Friends Tab Sub-tabs & Optimistic State
   const [friendsSubTab, setFriendsSubTab] = useState('suggested'); // 'suggested' | 'contacts' | 'requests'
+  const [spacesSubTab, setSpacesSubTab] = useState('all'); // 'all' | 'popular' | 'my' | 'joined'
   const [addedContactIds, setAddedContactIds] = useState([]);
   const [removedContactIds, setRemovedContactIds] = useState([]);
   const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState([]);
@@ -758,9 +759,30 @@ export default function MainTabScreen({ navigation }) {
     return name.includes(queryLower) || handle.includes(queryLower) || lastMsg.includes(queryLower);
   });
 
+  const isOwnerOrAdminOfSpace = (space) => {
+    if (!space || !activePersona?._id) return false;
+    const myId = String(activePersona._id);
+    const ownerId = space.ownerPersonaId
+      ? String(space.ownerPersonaId._id || space.ownerPersonaId.id || space.ownerPersonaId)
+      : '';
+    if (ownerId && ownerId === myId) return true;
+
+    if (Array.isArray(space.members)) {
+      const memberEntry = space.members.find(m => {
+        const mId = typeof m.personaId === 'object' && m.personaId
+          ? String(m.personaId._id || m.personaId.id)
+          : String(m.personaId || '');
+        return mId === myId;
+      });
+      return memberEntry && ['owner', 'admin'].includes(memberEntry.role);
+    }
+    return false;
+  };
+
   const filteredSpaces = (spaces || []).filter(s => {
     if (!s) return false;
     if (filterCategory === 'locked' && !s.isLocked) return false;
+    if (spacesSubTab === 'my' && !isOwnerOrAdminOfSpace(s)) return false;
     if (!queryLower) return true;
     const title = (s.title || '').toLowerCase();
     const desc = (s.description || '').toLowerCase();
@@ -771,7 +793,13 @@ export default function MainTabScreen({ navigation }) {
     !spaces.some(my => String(my._id) === String(pub._id))
   );
 
-  const filteredPublicSpaces = unjoinedPublicSpaces.filter(pub => {
+  const sortedPublicSpaces = [...unjoinedPublicSpaces].sort((a, b) => {
+    const countA = Array.isArray(a.members) ? a.members.length : 0;
+    const countB = Array.isArray(b.members) ? b.members.length : 0;
+    return countB - countA;
+  });
+
+  const filteredPublicSpaces = sortedPublicSpaces.filter(pub => {
     if (!pub) return false;
     if (!queryLower) return true;
     const title = (pub.title || '').toLowerCase();
@@ -847,6 +875,56 @@ export default function MainTabScreen({ navigation }) {
 
       {/* Main Body View based on Tab */}
       <View style={[styles.body, { backgroundColor: dynamicColors.background }]}>
+        {/* Real-time In-App Incoming Call Banner */}
+        {incomingCall && (
+          <View style={{
+            marginHorizontal: 16,
+            marginTop: 8,
+            marginBottom: 8,
+            padding: 12,
+            borderRadius: 20,
+            backgroundColor: '#0f172a',
+            borderColor: '#10b981',
+            borderWidth: 1.5,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            elevation: 10,
+            shadowColor: '#10b981',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 10,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+              <Image
+                source={{ uri: getMediaUrl(incomingCall.callerPersona?.avatar || incomingCall.callerPersona?.avatarUrl, incomingCall.callerPersona?.displayName) || DEFAULT_AVATAR }}
+                style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: '#10b981' }}
+              />
+              <View style={{ marginLeft: 10, flex: 1 }}>
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }} numberOfLines={1}>
+                  {incomingCall.callerPersona?.displayName || incomingCall.callerPersona?.username || 'Incoming Call'}
+                </Text>
+                <Text style={{ color: '#34d399', fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+                  {incomingCall.isVideo ? '📹 Incoming Video Call...' : '📞 Incoming Voice Call...'}
+                </Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity
+                onPress={() => handleDeclineIncomingCall(incomingCall)}
+                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <PhoneOff size={18} color="#ffffff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleAcceptIncomingCall(incomingCall)}
+                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#10b981', alignItems: 'center', justifyContent: 'center' }}
+              >
+                {incomingCall.isVideo ? <Video size={18} color="#ffffff" /> : <Phone size={18} color="#ffffff" />}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         {activeTab === 'chats' && (
           <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 32 }}>
             {/* Search Bar */}
@@ -1286,7 +1364,7 @@ export default function MainTabScreen({ navigation }) {
             </View>
 
             {/* Search Bar for Spaces */}
-            <View style={[styles.searchBarContainer, { backgroundColor: dynamicColors.inputBg, borderColor: dynamicColors.inputBorder, marginBottom: 16 }]}>
+            <View style={[styles.searchBarContainer, { backgroundColor: dynamicColors.inputBg, borderColor: dynamicColors.inputBorder, marginBottom: 12 }]}>
               <Text style={styles.searchIcon}>🔍</Text>
               <TextInput
                 style={[styles.mainSearchInput, { color: dynamicColors.text }]}
@@ -1302,7 +1380,42 @@ export default function MainTabScreen({ navigation }) {
               )}
             </View>
 
+            {/* Spaces Sub-tabs Filter Pills: All | Popular | My Spaces | Joined */}
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'popular', label: '🔥 Popular' },
+                { id: 'my', label: '👑 My Spaces' },
+                { id: 'joined', label: '👥 Joined' }
+              ].map(sub => {
+                const isActive = spacesSubTab === sub.id;
+                return (
+                  <TouchableOpacity
+                    key={sub.id}
+                    onPress={() => setSpacesSubTab(sub.id)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 16,
+                      backgroundColor: isActive ? (dynamicColors.primary || '#6366f1') : (dynamicColors.card || 'rgba(255,255,255,0.05)'),
+                      borderWidth: 1,
+                      borderColor: isActive ? (dynamicColors.primary || '#6366f1') : (dynamicColors.cardBorder || 'rgba(255,255,255,0.1)')
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 11,
+                      fontWeight: 'bold',
+                      color: isActive ? '#ffffff' : (dynamicColors.textMuted || '#94a3b8')
+                    }}>
+                      {sub.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
             {/* Public Space Discovery Section */}
+            {(spacesSubTab === 'all' || spacesSubTab === 'popular') && (
             <View style={{ marginBottom: 24 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <Text style={[styles.sectionTitle, { color: dynamicColors.textMuted }]}>🌐 DISCOVER PUBLIC SPACES ({filteredPublicSpaces.length})</Text>
@@ -1391,15 +1504,23 @@ export default function MainTabScreen({ navigation }) {
                 })
               )}
             </View>
+            )}
 
             {/* My Joined Spaces Section */}
+            {(spacesSubTab === 'all' || spacesSubTab === 'my' || spacesSubTab === 'joined') && (
             <View style={{ marginBottom: 20 }}>
-              <Text style={[styles.sectionTitle, { color: dynamicColors.textMuted }]}>MY JOINED SPACES ({filteredSpaces.length})</Text>
+              <Text style={[styles.sectionTitle, { color: dynamicColors.textMuted }]}>
+                {spacesSubTab === 'my' ? `MY CREATED / ADMIN SPACES (${filteredSpaces.length})` : spacesSubTab === 'joined' ? `MY JOINED SPACES (${filteredSpaces.length})` : `MY JOINED SPACES (${filteredSpaces.length})`}
+              </Text>
               {filteredSpaces.length === 0 ? (
                 <View style={[styles.emptyCard, { backgroundColor: dynamicColors.card, borderColor: dynamicColors.cardBorder, marginTop: 8 }]}>
-                  <Text style={[styles.emptyTitle, { color: dynamicColors.text }]}>⚡ No Joined Spaces</Text>
+                  <Text style={[styles.emptyTitle, { color: dynamicColors.text }]}>
+                    {spacesSubTab === 'my' ? '👑 No Created Spaces' : '⚡ No Joined Spaces'}
+                  </Text>
                   <Text style={[styles.emptySubtext, { color: dynamicColors.textMuted }]}>
-                    Create your first space or join public communities above!
+                    {spacesSubTab === 'my'
+                      ? 'You have not created any spaces yet. Tap "+ New Space" above to start your own community!'
+                      : 'Create your first space or join public communities above!'}
                   </Text>
                 </View>
               ) : (
@@ -1434,6 +1555,7 @@ export default function MainTabScreen({ navigation }) {
                 })
               )}
             </View>
+            )}
           </ScrollView>
         )}
 
@@ -2579,6 +2701,7 @@ export default function MainTabScreen({ navigation }) {
       />
 
       <IncomingCallModal
+        incomingCall={incomingCall}
         call={incomingCall}
         onAcceptCall={() => handleAcceptIncomingCall(incomingCall)}
         onDeclineCall={() => handleDeclineIncomingCall(incomingCall)}

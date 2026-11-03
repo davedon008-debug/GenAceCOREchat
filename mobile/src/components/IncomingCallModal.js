@@ -15,12 +15,19 @@ const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69
 
 export default function IncomingCallModal({
   incomingCall,
+  call,
   onAcceptCall,
-  onDeclineCall
+  onAccept,
+  onDeclineCall,
+  onDecline
 }) {
-  if (!incomingCall) return null;
+  const activeCall = incomingCall || call;
+  if (!activeCall) return null;
 
-  const { callerPersona, isVideo } = incomingCall;
+  const handleAccept = onAcceptCall || onAccept;
+  const handleDecline = onDeclineCall || onDecline;
+
+  const { callerPersona, isVideo } = activeCall;
   const callerName = callerPersona?.displayName || callerPersona?.username || 'Incoming Call';
   const callerAvatar = getMediaUrl(callerPersona?.avatar || callerPersona?.avatarUrl, callerName) || DEFAULT_AVATAR;
 
@@ -29,7 +36,7 @@ export default function IncomingCallModal({
       visible={true}
       animationType="slide"
       transparent={true}
-      onRequestClose={onDeclineCall}
+      onRequestClose={handleDecline}
     >
       <SafeAreaView style={styles.overlayContainer}>
         <View style={styles.cardContainer}>
@@ -55,7 +62,7 @@ export default function IncomingCallModal({
             {/* Decline Button */}
             <TouchableOpacity
               style={[styles.actionBtn, styles.declineBtn]}
-              onPress={onDeclineCall}
+              onPress={handleDecline}
               activeOpacity={0.8}
             >
               <PhoneOff size={24} color="#ffffff" />
@@ -65,7 +72,7 @@ export default function IncomingCallModal({
             {/* Accept Button */}
             <TouchableOpacity
               style={[styles.actionBtn, styles.acceptBtn]}
-              onPress={onAcceptCall}
+              onPress={handleAccept}
               activeOpacity={0.8}
             >
               {isVideo ? <Video size={24} color="#ffffff" /> : <Phone size={24} color="#ffffff" />}

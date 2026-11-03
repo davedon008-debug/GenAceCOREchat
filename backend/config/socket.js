@@ -462,6 +462,14 @@ export const initSocketServer = (httpServer) => {
 
       io.to(targetRoom).emit('call:incoming', payload);
 
+      // Direct fail-safe emission to any connected sockets active for target persona
+      const pIdStr = String(targetPersonaId);
+      for (const [sId, connectedId] of connectedPersonas.entries()) {
+        if (connectedId === pIdStr) {
+          io.to(sId).emit('call:incoming', payload);
+        }
+      }
+
       // Dispatch Web Push Notification so device receives call alert in background/locked screen
       const callerName = callerPersona?.displayName || callerPersona?.username || 'Someone';
       const callTypeStr = isVideo ? 'Video' : 'Voice';

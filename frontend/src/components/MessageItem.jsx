@@ -471,7 +471,11 @@ export default function MessageItem({
             )}
 
             {/* Status Story Reply Quote Card */}
-            {message.statusReply && (
+            {Boolean(
+              message.statusReply &&
+              (message.contentType === 'status_reply' || message.statusReply.statusId) &&
+              (message.statusReply.statusId || message.statusReply.mediaUrl || message.statusReply.text || message.statusReply.caption)
+            ) && (
               <div className={`mb-2 p-2 rounded-xl border text-xs ${
                 isMe ? 'bg-white/10 border-white/20 text-white' : 'bg-black/20 border-white/10 text-gray-200'
               }`}>

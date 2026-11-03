@@ -116,7 +116,7 @@ export default function CallModal({
   // Render Minimized Floating Call Bar
   if (isMinimized) {
     return (
-      <div onClick={handleResumeAudio} className="fixed bottom-6 right-6 z-[100] bg-[#101625] border border-indigo-500/40 rounded-2xl p-3 shadow-2xl flex items-center gap-4 animate-bounce">
+      <div onClick={handleResumeAudio} className="fixed bottom-6 right-6 z-[999999] bg-[#101625] border border-indigo-500/40 rounded-2xl p-3 shadow-2xl flex items-center gap-4 animate-bounce">
         <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
         <div className="relative">
           <img
@@ -154,7 +154,7 @@ export default function CallModal({
   }
 
   return (
-    <div onClick={handleResumeAudio} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-xl p-3 sm:p-6 animate-fadeIn select-none">
+    <div onClick={handleResumeAudio} className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/85 backdrop-blur-xl p-3 sm:p-6 animate-fadeIn select-none">
       {/* Dedicated Audio element ensuring remote voice stream plays through speakers */}
       <audio
         ref={remoteAudioRef}

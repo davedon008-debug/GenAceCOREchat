@@ -54,7 +54,14 @@ export const createPersona = async (req, res) => {
       type: type || 'personal',
       bio: bio || '',
       avatar: (avatar && typeof avatar === 'string' && avatar.trim()) ? sanitizeAvatarUrl(avatar) : '',
-      isDefault: false
+      isDefault: false,
+      privacySettings: {
+        setupCompleted: true,
+        whoCanFindMe: 'everyone',
+        onlineVisibility: 'everyone',
+        newAccountAnnouncements: true,
+        agreedAt: new Date()
+      }
     });
 
     await User.findByIdAndUpdate(req.userId, { $push: { personas: newPersona._id } });
@@ -116,18 +123,23 @@ export const searchPersonas = async (req, res) => {
     }
 
     // Privacy gating:
-    // Only return personas if:
+    // Personas around the world can be searched and added as friends if:
     // 1. They are already in the requester's saved contacts
-    // 2. OR they have completed privacy setup AND chose 'everyone' for whoCanFindMe
-    const privacyCondition = {
-      $or: [
-        { _id: { $in: savedContactIds } },
-        {
-          'privacySettings.setupCompleted': true,
-          'privacySettings.whoCanFindMe': 'everyone'
+    // 2. OR when searching (cleanQuery), they have not hidden themselves with 'nobody'
+    // 3. OR when browsing (no cleanQuery), they have not restricted discovery to 'nobody' or 'friends'
+    const privacyCondition = cleanQuery
+      ? {
+          $or: [
+            { _id: { $in: savedContactIds } },
+            { 'privacySettings.whoCanFindMe': { $ne: 'nobody' } }
+          ]
         }
-      ]
-    };
+      : {
+          $or: [
+            { _id: { $in: savedContactIds } },
+            { 'privacySettings.whoCanFindMe': { $nin: ['nobody', 'friends'] } }
+          ]
+        };
 
     const filterConditions = [baseFilter, privacyCondition];
 
@@ -177,16 +189,12 @@ export const getAllContacts = async (req, res) => {
     }
 
     // Privacy gating:
-    // Only display someone publicly in the friends column if:
-    // 1. They are already in the requester's saved contacts
-    // 2. OR they have completed privacy setup AND set whoCanFindMe to 'everyone'
+    // Include user's saved contacts plus suggested people around the world
+    // (excluding users who chose 'nobody' or 'friends')
     const privacyCondition = {
       $or: [
         { _id: { $in: savedContactIds } },
-        {
-          'privacySettings.setupCompleted': true,
-          'privacySettings.whoCanFindMe': 'everyone'
-        }
+        { 'privacySettings.whoCanFindMe': { $nin: ['nobody', 'friends'] } }
       ]
     };
 

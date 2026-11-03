@@ -43,6 +43,15 @@ try {
   }
 } catch (e) {}
 
+let RawResizeMode = { CONTAIN: 'contain', COVER: 'cover', STRETCH: 'stretch' };
+try {
+  const expoAv = require('expo-av');
+  if (expoAv && expoAv.ResizeMode) {
+    RawResizeMode = expoAv.ResizeMode;
+  }
+} catch (e) {}
+
 export const Audio = RawAudio;
 export const Video = RawVideo;
+export const ResizeMode = RawResizeMode;
 export { ImagePicker, DocumentPicker };

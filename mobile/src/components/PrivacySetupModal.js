@@ -13,13 +13,13 @@ import { colors } from '../theme/colors';
 
 export default function PrivacySetupModal({ visible, onClose, activePersona, onUpdated }) {
   const [whoCanFindMe, setWhoCanFindMe] = useState(
-    activePersona?.privacySettings?.whoCanFindMe || 'friends'
+    activePersona?.privacySettings?.whoCanFindMe || 'everyone'
   );
   const [onlineVisibility, setOnlineVisibility] = useState(
-    activePersona?.privacySettings?.onlineVisibility || 'nobody'
+    activePersona?.privacySettings?.onlineVisibility || 'everyone'
   );
   const [newAccountAnnouncements, setNewAccountAnnouncements] = useState(
-    activePersona?.privacySettings?.newAccountAnnouncements || false
+    activePersona?.privacySettings?.newAccountAnnouncements ?? true
   );
 
   const [saving, setSaving] = useState(false);
