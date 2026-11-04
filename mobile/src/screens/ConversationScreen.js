@@ -1475,30 +1475,90 @@ export default function ConversationScreen({ route, navigation }) {
             item.statusReply &&
             (item.contentType === 'status_reply' || item.statusReply.statusId) &&
             (item.statusReply.statusId || item.statusReply.mediaUrl || item.statusReply.text || item.statusReply.caption)
-          ) ? (
-            <View style={[styles.statusReplyCard, isMe ? styles.statusReplyCardMe : [styles.statusReplyCardOther, { backgroundColor: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }]]}>
-              <Text style={[styles.statusReplyHeaderLabel, { color: isMe ? 'rgba(255,255,255,0.9)' : dynamicColors.primary }]}>
-                💬 Replying to story
-              </Text>
-              {item.statusReply.mediaUrl ? (
-                <View style={styles.statusReplyMediaRow}>
-                  <Image
-                    source={{ uri: getMediaUrl(item.statusReply.mediaUrl) }}
-                    style={styles.statusReplyThumb}
-                  />
-                  {item.statusReply.caption ? (
-                    <Text style={[styles.statusReplyCaptionText, { color: isMe ? 'rgba(255,255,255,0.85)' : dynamicColors.textSecondary }]} numberOfLines={2}>
-                      {item.statusReply.caption}
+          ) ? (() => {
+            const isVideoStory = Boolean(
+              item.statusReply.mediaType === 'video' ||
+              /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(item.statusReply.mediaUrl || '')
+            );
+            const isImageStory = Boolean(
+              !isVideoStory && (
+                item.statusReply.mediaType === 'image' ||
+                /\.(png|jpe?g|gif|webp|svg|bmp)(\?.*)?$/i.test(item.statusReply.mediaUrl || '') ||
+                (item.statusReply.mediaUrl && !item.statusReply.text)
+              )
+            );
+
+            return (
+              <View style={[styles.statusReplyCard, isMe ? styles.statusReplyCardMe : [styles.statusReplyCardOther, { backgroundColor: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }]]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={[styles.statusReplyHeaderLabel, { color: isMe ? 'rgba(255,255,255,0.9)' : dynamicColors.primary }]}>
+                    💬 Replying to story
+                  </Text>
+                  {item.statusReply.authorName ? (
+                    <Text style={{ fontSize: 9, color: isMe ? 'rgba(255,255,255,0.6)' : dynamicColors.textSecondary, marginLeft: 4 }}>
+                      • {item.statusReply.authorName}
                     </Text>
                   ) : null}
                 </View>
-              ) : item.statusReply.text ? (
-                <Text style={[styles.statusReplyTextSnippet, { color: isMe ? 'rgba(255,255,255,0.85)' : dynamicColors.textSecondary }]} numberOfLines={2}>
-                  "{item.statusReply.text}"
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
+
+                {isVideoStory ? (
+                  <View style={styles.statusReplyMediaRow}>
+                    <View style={styles.statusReplyVideoThumb}>
+                      <VideoIcon size={18} color="#ffffff" />
+                      <View style={styles.statusReplyPlayBadge}>
+                        <Play size={8} color="#ffffff" fill="#ffffff" />
+                      </View>
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.statusReplyTypeBadge, { color: isMe ? '#e0e7ff' : dynamicColors.primary }]}>
+                        Video Story
+                      </Text>
+                      {item.statusReply.caption ? (
+                        <Text style={[styles.statusReplyCaptionText, { color: isMe ? 'rgba(255,255,255,0.85)' : dynamicColors.textSecondary }]} numberOfLines={1}>
+                          {item.statusReply.caption}
+                        </Text>
+                      ) : (
+                        <Text style={[styles.statusReplyCaptionText, { color: isMe ? 'rgba(255,255,255,0.6)' : dynamicColors.textSecondary, fontStyle: 'italic' }]}>
+                          Story video update
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                ) : isImageStory ? (
+                  <View style={styles.statusReplyMediaRow}>
+                    <Image
+                      source={{ uri: getMediaUrl(item.statusReply.mediaUrl) }}
+                      style={styles.statusReplyThumb}
+                    />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.statusReplyTypeBadge, { color: isMe ? '#e0e7ff' : dynamicColors.primary }]}>
+                        Photo Story
+                      </Text>
+                      {item.statusReply.caption ? (
+                        <Text style={[styles.statusReplyCaptionText, { color: isMe ? 'rgba(255,255,255,0.85)' : dynamicColors.textSecondary }]} numberOfLines={1}>
+                          {item.statusReply.caption}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.statusReplyMediaRow}>
+                    <View style={styles.statusReplyTextIconBox}>
+                      <Text style={{ color: '#c7d2fe', fontSize: 13, fontWeight: 'bold' }}>Aa</Text>
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.statusReplyTypeBadge, { color: isMe ? '#e0e7ff' : dynamicColors.primary }]}>
+                        Text Story
+                      </Text>
+                      <Text style={[styles.statusReplyTextSnippet, { color: isMe ? 'rgba(255,255,255,0.85)' : dynamicColors.textSecondary }]} numberOfLines={2}>
+                        "{item.statusReply.text || item.statusReply.caption || 'Status update'}"
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            );
+          })() : null}
 
           {/* Group / Space / Anonymous sender handle */}
           {!isMe && (spaceId || isAnonymous) && (
@@ -2273,6 +2333,46 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: 'rgba(0,0,0,0.2)',
     marginRight: 8,
+  },
+  statusReplyVideoThumb: {
+    width: 38,
+    height: 38,
+    borderRadius: 6,
+    backgroundColor: '#312e81',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  statusReplyPlayBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#4f46e5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusReplyTextIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 6,
+    backgroundColor: 'rgba(79, 70, 229, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  statusReplyTypeBadge: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    marginBottom: 2,
+    letterSpacing: 0.2,
   },
   statusReplyCaptionText: {
     flex: 1,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Flame, Smile, Play, Pause, CheckCheck, Trash2, Copy, Reply, Check, X, Plus, FileText, Download, Lock, Clock, Shield, EyeOff, Ghost, Eye, Heart, Sparkles, Gamepad2 } from 'lucide-react';
+import { Flame, Smile, Play, Pause, CheckCheck, Trash2, Copy, Reply, Check, X, Plus, FileText, Download, Lock, Clock, Shield, EyeOff, Ghost, Eye, Heart, Sparkles, Gamepad2, Video, Image as ImageIcon, Type } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getMediaUrl, DEFAULT_AVATAR } from '../lib/api';
 import AvatarViewerModal from './AvatarViewerModal';
@@ -475,29 +475,104 @@ export default function MessageItem({
               message.statusReply &&
               (message.contentType === 'status_reply' || message.statusReply.statusId) &&
               (message.statusReply.statusId || message.statusReply.mediaUrl || message.statusReply.text || message.statusReply.caption)
-            ) && (
-              <div className={`mb-2 p-2 rounded-xl border text-xs ${
-                isMe ? 'bg-white/10 border-white/20 text-white' : 'bg-black/20 border-white/10 text-gray-200'
-              }`}>
-                <div className="flex items-center gap-1.5 font-bold text-[10px] text-indigo-400 mb-1">
-                  <span>💬 Replying to story</span>
-                </div>
-                {message.statusReply.mediaUrl ? (
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={getMediaUrl(message.statusReply.mediaUrl)}
-                      alt="Story"
-                      className="w-9 h-9 rounded-md object-cover bg-black/40 shrink-0"
-                    />
-                    {message.statusReply.caption && (
-                      <p className="text-[11px] line-clamp-2 italic">{message.statusReply.caption}</p>
+            ) && (() => {
+              const isVideoStory = Boolean(
+                message.statusReply.mediaType === 'video' ||
+                /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(message.statusReply.mediaUrl || '')
+              );
+              const isImageStory = Boolean(
+                !isVideoStory && (
+                  message.statusReply.mediaType === 'image' ||
+                  /\.(png|jpe?g|gif|webp|svg|bmp)(\?.*)?$/i.test(message.statusReply.mediaUrl || '') ||
+                  (message.statusReply.mediaUrl && !message.statusReply.text)
+                )
+              );
+
+              return (
+                <div className={`mb-2 p-2.5 rounded-xl border text-xs transition ${
+                  isMe ? 'bg-white/10 border-white/20 text-white' : 'bg-black/25 border-white/10 text-gray-200'
+                }`}>
+                  <div className="flex items-center gap-1.5 font-bold text-[10px] text-indigo-400 mb-1.5">
+                    <span>💬 Replying to story</span>
+                    {message.statusReply.authorName && (
+                      <span className="text-gray-400 font-normal">• {message.statusReply.authorName}</span>
                     )}
                   </div>
-                ) : message.statusReply.text ? (
-                  <p className="text-[11px] line-clamp-2 italic">"{message.statusReply.text}"</p>
-                ) : null}
-              </div>
-            )}
+
+                  {isVideoStory ? (
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative w-11 h-11 rounded-lg overflow-hidden bg-black shrink-0 border border-white/15 flex items-center justify-center shadow-inner">
+                        <video
+                          src={getMediaUrl(message.statusReply.mediaUrl)}
+                          className="w-full h-full object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <div className="w-5 h-5 rounded-full bg-indigo-600/90 text-white flex items-center justify-center shadow">
+                            <Play className="w-2.5 h-2.5 fill-white ml-0.5" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-300 mb-0.5">
+                          <Video className="w-3 h-3 text-indigo-400 shrink-0" />
+                          <span>Video story</span>
+                        </div>
+                        {message.statusReply.caption ? (
+                          <p className="text-[11px] line-clamp-1 text-white/90 font-medium">{message.statusReply.caption}</p>
+                        ) : (
+                          <p className="text-[10px] text-gray-400 italic">Story video update</p>
+                        )}
+                      </div>
+                    </div>
+                  ) : isImageStory ? (
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative w-11 h-11 rounded-lg overflow-hidden bg-black/40 shrink-0 border border-white/15 flex items-center justify-center">
+                        <img
+                          src={getMediaUrl(message.statusReply.mediaUrl)}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            if (e.currentTarget.nextElementSibling) {
+                              e.currentTarget.nextElementSibling.style.display = 'flex';
+                            }
+                          }}
+                        />
+                        <div className="hidden absolute inset-0 bg-indigo-950/60 items-center justify-center">
+                          <ImageIcon className="w-5 h-5 text-indigo-400" />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-300 mb-0.5">
+                          <ImageIcon className="w-3 h-3 text-indigo-400 shrink-0" />
+                          <span>Photo story</span>
+                        </div>
+                        {message.statusReply.caption ? (
+                          <p className="text-[11px] line-clamp-1 text-white/90 font-medium">{message.statusReply.caption}</p>
+                        ) : (
+                          <p className="text-[10px] text-gray-400 italic">Story photo update</p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-11 h-11 rounded-lg bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center shrink-0">
+                        <Type className="w-5 h-5 text-indigo-300" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] font-bold text-indigo-300 mb-0.5">Text story</div>
+                        <p className="text-[11px] line-clamp-2 text-white/90 italic font-medium">
+                          "{message.statusReply.text || message.statusReply.caption || 'Status update'}"
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Display Sender Handle in Group/Space chats for incoming messages */}
             {!isMe && message.spaceId && (
