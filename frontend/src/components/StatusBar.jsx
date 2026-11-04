@@ -23,7 +23,10 @@ import {
   Globe,
   Sparkles,
   Pause,
-  Play
+  Play,
+  Loader2,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import api, { getMediaUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -93,6 +96,9 @@ export default function StatusBar({ onSelectConversation }) {
   const [replyToast, setReplyToast] = useState('');
   const [showViewersSheet, setShowViewersSheet] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0);
+  const [isVideoBuffering, setIsVideoBuffering] = useState(true);
+  const [videoError, setVideoError] = useState(null);
+  const [isAutoplayBlocked, setIsAutoplayBlocked] = useState(false);
 
   const fileInputRef = useRef(null);
   const holdStartRef = useRef(0);
@@ -223,22 +229,99 @@ export default function StatusBar({ onSelectConversation }) {
     return () => clearInterval(interval);
   }, [showViewer, activeGroup, currentIdx, isPaused, showViewersSheet]);
 
-  // Pause / Resume Video element
+  // Synchronize muted DOM property with state
   useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted;
+    }
+  }, [isMuted]);
+
+  // Robust play helper with automatic muted fallback when browser autoplay policy blocks unmuted audio
+  const attemptPlayVideo = (forceMuted = false) => {
+    const vid = videoRef.current;
+    if (!vid) return;
+
+    if (forceMuted) {
+      vid.muted = true;
+      setIsMuted(true);
+    } else {
+      vid.muted = isMuted;
+    }
+
+    const playPromise = vid.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          setIsAutoplayBlocked(false);
+        })
+        .catch((err) => {
+          console.warn('Playback attempt rejected:', err?.name || err);
+          if (!forceMuted && !vid.muted) {
+            // Unmuted autoplay blocked by browser policy -> fallback to muted autoplay immediately!
+            vid.muted = true;
+            setIsMuted(true);
+            const retryPromise = vid.play();
+            if (retryPromise !== undefined) {
+              retryPromise
+                .then(() => {
+                  setIsAutoplayBlocked(false);
+                })
+                .catch((err2) => {
+                  console.warn('Muted playback also blocked:', err2?.name || err2);
+                  setIsAutoplayBlocked(true);
+                });
+            }
+          } else {
+            setIsAutoplayBlocked(true);
+          }
+        });
+    }
+  };
+
+  // Video playback control on viewer open / status index / pause / active group change
+  useEffect(() => {
+    if (!showViewer) return;
+    const curr = activeGroup?.statuses?.[currentIdx];
+    if (curr?.type !== 'video') return;
+
+    setIsVideoBuffering(true);
+    setVideoError(null);
+    setIsAutoplayBlocked(false);
+
     if (videoRef.current) {
       if (isPaused) {
         videoRef.current.pause();
       } else {
-        videoRef.current.play().catch(() => {});
+        attemptPlayVideo(false);
       }
     }
-  }, [isPaused, currentIdx]);
+  }, [showViewer, isPaused, currentIdx, activeGroup]);
 
+  // Reset video time on story slide change
   useEffect(() => {
     if (videoRef.current) {
-      videoRef.current.currentTime = 0;
+      try {
+        videoRef.current.currentTime = 0;
+      } catch (e) {}
     }
   }, [currentIdx]);
+
+  // Story Viewer Launcher Helper
+  const openStoryViewer = (group, initialIndex = null) => {
+    setActiveGroup(group);
+    let idx = initialIndex;
+    if (idx === null || idx === undefined) {
+      const firstUnseen = (group.statuses || []).findIndex(s => !s.isSeen);
+      idx = firstUnseen >= 0 ? firstUnseen : 0;
+    }
+    setCurrentIdx(idx);
+    setIsPaused(false);
+    setIsVideoBuffering(true);
+    setVideoError(null);
+    setIsAutoplayBlocked(false);
+    setProgressPercent(0);
+    setShowViewer(true);
+  };
 
   // Keyboard Navigation (Arrows, Space, Escape)
   useEffect(() => {
@@ -431,9 +514,7 @@ export default function StatusBar({ onSelectConversation }) {
         <div
           onClick={() => {
             if (hasMyStatus) {
-              setActiveGroup({ persona: activePersona, statuses: feed.myStatuses });
-              setCurrentIdx(0);
-              setShowViewer(true);
+              openStoryViewer({ persona: activePersona, statuses: feed.myStatuses }, 0);
             } else {
               setShowComposer(true);
             }
@@ -478,12 +559,7 @@ export default function StatusBar({ onSelectConversation }) {
           return (
             <div
               key={author?._id || idx}
-              onClick={() => {
-                setActiveGroup(group);
-                const firstUnseen = (group.statuses || []).findIndex(s => !s.isSeen);
-                setCurrentIdx(firstUnseen >= 0 ? firstUnseen : 0);
-                setShowViewer(true);
-              }}
+              onClick={() => openStoryViewer(group)}
               className="flex flex-col items-center w-[58px] shrink-0 cursor-pointer group"
             >
               <div className="relative w-12 h-12 mb-1 flex items-center justify-center">
@@ -788,17 +864,50 @@ export default function StatusBar({ onSelectConversation }) {
                       );
                     }
                     if (curr.type === 'video') {
+                      const videoSrc = getMediaUrl(curr.mediaUrl);
                       return (
-                        <div className="w-full h-full flex items-center justify-center bg-black relative">
+                        <div className="w-full h-full flex items-center justify-center bg-black relative select-none">
                           <video
                             key={`vid_${curr._id || curr.mediaUrl}_${currentIdx}`}
-                            ref={videoRef}
-                            src={getMediaUrl(curr.mediaUrl)}
+                            ref={(el) => {
+                              videoRef.current = el;
+                              if (el) {
+                                el.muted = isMuted;
+                              }
+                            }}
+                            src={videoSrc}
                             autoPlay
                             playsInline
                             preload="auto"
                             muted={isMuted}
-                            className="max-h-full max-w-full object-contain"
+                            className="max-h-full max-w-full object-contain cursor-pointer"
+                            onLoadStart={() => {
+                              setIsVideoBuffering(true);
+                              setVideoError(null);
+                            }}
+                            onLoadedMetadata={() => {
+                              if (!isPaused) {
+                                attemptPlayVideo(false);
+                              }
+                            }}
+                            onCanPlay={() => {
+                              setIsVideoBuffering(false);
+                              if (!isPaused && videoRef.current?.paused) {
+                                attemptPlayVideo(false);
+                              }
+                            }}
+                            onWaiting={() => {
+                              setIsVideoBuffering(true);
+                            }}
+                            onPlaying={() => {
+                              setIsVideoBuffering(false);
+                              setIsAutoplayBlocked(false);
+                            }}
+                            onError={(e) => {
+                              console.error('Video error:', e);
+                              setIsVideoBuffering(false);
+                              setVideoError('Unable to play video. Tap to retry.');
+                            }}
                             onTimeUpdate={(e) => {
                               if (e.currentTarget.duration) {
                                 const pct = (e.currentTarget.currentTime / e.currentTarget.duration) * 100;
@@ -815,14 +924,91 @@ export default function StatusBar({ onSelectConversation }) {
                               }
                             }}
                           />
+
+                          {/* Buffering Spinner */}
+                          {isVideoBuffering && !videoError && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[2px] z-20 pointer-events-none">
+                              <div className="w-12 h-12 border-4 border-white/20 border-t-indigo-500 rounded-full animate-spin mb-3 shadow-lg" />
+                              <span className="text-white text-xs font-semibold tracking-wide drop-shadow">Loading story video...</span>
+                            </div>
+                          )}
+
+                          {/* Blocked Autoplay / Tap to Play Overlay */}
+                          {isAutoplayBlocked && !isVideoBuffering && !videoError && (
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                attemptPlayVideo(false);
+                              }}
+                              className="absolute inset-0 flex flex-col items-center justify-center bg-black/55 z-20 cursor-pointer"
+                            >
+                              <div className="w-16 h-16 rounded-full bg-indigo-600/95 hover:bg-indigo-500 text-white flex items-center justify-center shadow-2xl transition transform hover:scale-105 mb-2">
+                                <Play className="w-8 h-8 fill-white ml-1" />
+                              </div>
+                              <span className="text-white text-xs font-bold tracking-wide bg-black/70 px-3.5 py-1.5 rounded-full border border-white/10">
+                                Tap to play video
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Video Error / Retry Overlay */}
+                          {videoError && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 z-25 p-6 text-center">
+                              <AlertCircle className="w-10 h-10 text-rose-500 mb-3" />
+                              <p className="text-white text-sm font-semibold mb-3">{videoError}</p>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setVideoError(null);
+                                  setIsVideoBuffering(true);
+                                  if (videoRef.current) {
+                                    videoRef.current.load();
+                                    attemptPlayVideo(false);
+                                  }
+                                }}
+                                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-2 shadow-lg"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" /> Tap to Retry
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Muted Indicator Pill (when audio was muted by browser autoplay policy) */}
+                          {isMuted && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsMuted(false);
+                                if (videoRef.current) {
+                                  videoRef.current.muted = false;
+                                  videoRef.current.play().catch(() => {});
+                                }
+                              }}
+                              className="absolute top-16 left-4 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/75 hover:bg-black/90 text-white text-xs font-medium backdrop-blur-md border border-white/20 shadow-lg transition"
+                            >
+                              <VolumeX className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Tap to unmute</span>
+                            </button>
+                          )}
+
+                          {/* Volume Toggle Icon in Top Right */}
                           <button
-                            onClick={() => setIsMuted(prev => !prev)}
-                            className="absolute top-16 right-4 p-2 rounded-full bg-black/60 text-white z-20"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const nextMuted = !isMuted;
+                              setIsMuted(nextMuted);
+                              if (videoRef.current) {
+                                videoRef.current.muted = nextMuted;
+                              }
+                            }}
+                            className="absolute top-16 right-4 p-2 rounded-full bg-black/60 hover:bg-black/80 text-white z-20 transition"
                           >
-                            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                            {isMuted ? <VolumeX className="w-4 h-4 text-amber-400" /> : <Volume2 className="w-4 h-4" />}
                           </button>
+
+                          {/* Video Caption */}
                           {curr.content && (
-                            <div className="absolute bottom-20 left-4 right-4 bg-black/70 backdrop-blur-sm rounded-xl p-3 text-center text-xs text-white">
+                            <div className="absolute bottom-20 left-4 right-4 bg-black/70 backdrop-blur-sm rounded-xl p-3 text-center text-xs text-white z-20">
                               {curr.content}
                             </div>
                           )}
@@ -845,15 +1031,33 @@ export default function StatusBar({ onSelectConversation }) {
                     );
                   })()}
 
-                  {/* Left / Right Tap Navigation Hotspots */}
+                  {/* Left / Center / Right Tap Navigation Hotspots */}
                   <div
-                    className="absolute inset-y-0 left-0 w-1/3 cursor-pointer z-10"
+                    className="absolute inset-y-0 left-0 w-1/4 cursor-pointer z-10"
                     onClick={() => handleHotspotClick('prev')}
                   />
                   <div
-                    className="absolute inset-y-0 right-0 w-2/3 cursor-pointer z-10"
+                    className="absolute inset-y-0 left-1/4 w-1/2 cursor-pointer z-10"
+                    onClick={() => {
+                      if (wasHoldRef.current) {
+                        wasHoldRef.current = false;
+                        return;
+                      }
+                      setIsPaused(prev => !prev);
+                    }}
+                  />
+                  <div
+                    className="absolute inset-y-0 right-0 w-1/4 cursor-pointer z-10"
                     onClick={() => handleHotspotClick('next')}
                   />
+
+                  {/* Center Paused Badge */}
+                  {isPaused && !isAutoplayBlocked && (
+                    <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-white text-[11px] font-bold tracking-wider uppercase pointer-events-none shadow-lg">
+                      <Pause className="w-3 h-3 fill-white" />
+                      <span>Paused</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Bottom Story Action Section */}
@@ -1126,9 +1330,7 @@ export default function StatusBar({ onSelectConversation }) {
                       onClick={() => {
                         setShowUpdatesListModal(false);
                         if (hasMyStatus) {
-                          setActiveGroup({ persona: activePersona, statuses: feed.myStatuses });
-                          setCurrentIdx(0);
-                          setShowViewer(true);
+                          openStoryViewer({ persona: activePersona, statuses: feed.myStatuses }, 0);
                         } else {
                           setShowComposer(true);
                         }
@@ -1158,10 +1360,7 @@ export default function StatusBar({ onSelectConversation }) {
                             key={group.persona?._id || idx}
                             onClick={() => {
                               setShowUpdatesListModal(false);
-                              setActiveGroup(group);
-                              const firstUnseen = (group.statuses || []).findIndex(s => !s.isSeen);
-                              setCurrentIdx(firstUnseen >= 0 ? firstUnseen : 0);
-                              setShowViewer(true);
+                              openStoryViewer(group);
                             }}
                             className="flex items-center gap-3 p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 cursor-pointer border border-white/5 transition"
                           >
@@ -1191,10 +1390,7 @@ export default function StatusBar({ onSelectConversation }) {
                             key={group.persona?._id || idx}
                             onClick={() => {
                               setShowUpdatesListModal(false);
-                              setActiveGroup(group);
-                              const firstUnseen = (group.statuses || []).findIndex(s => !s.isSeen);
-                              setCurrentIdx(firstUnseen >= 0 ? firstUnseen : 0);
-                              setShowViewer(true);
+                              openStoryViewer(group);
                             }}
                             className="flex items-center gap-3 p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 cursor-pointer border border-white/5 transition"
                           >
