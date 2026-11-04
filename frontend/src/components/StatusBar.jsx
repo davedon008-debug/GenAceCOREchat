@@ -92,6 +92,7 @@ export default function StatusBar({ onSelectConversation }) {
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [replyInput, setReplyInput] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [replyToast, setReplyToast] = useState('');
   const [showViewersSheet, setShowViewersSheet] = useState(false);
@@ -99,6 +100,9 @@ export default function StatusBar({ onSelectConversation }) {
   const [isVideoBuffering, setIsVideoBuffering] = useState(true);
   const [videoError, setVideoError] = useState(null);
   const [isAutoplayBlocked, setIsAutoplayBlocked] = useState(false);
+
+  const isReplyingActive = isReplying || (replyInput && replyInput.trim().length > 0) || isSendingReply;
+  const isStoryPaused = isPaused || isReplyingActive;
 
   const fileInputRef = useRef(null);
   const holdStartRef = useRef(0);
@@ -189,7 +193,7 @@ export default function StatusBar({ onSelectConversation }) {
 
   // Story Auto-Advance & Fluid Linear Progress (WhatsApp & Telegram Style)
   useEffect(() => {
-    if (!showViewer || !activeGroup || isPaused || showViewersSheet) return;
+    if (!showViewer || !activeGroup || isStoryPaused || showViewersSheet) return;
     const statuses = activeGroup.statuses || [];
     if (statuses.length === 0) return;
 
@@ -218,7 +222,7 @@ export default function StatusBar({ onSelectConversation }) {
             setCurrentIdx(c => c + 1);
             return 0;
           } else {
-            setShowViewer(false);
+            closeStoryViewer();
             return 100;
           }
         }
@@ -227,7 +231,7 @@ export default function StatusBar({ onSelectConversation }) {
     }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [showViewer, activeGroup, currentIdx, isPaused, showViewersSheet]);
+  }, [showViewer, activeGroup, currentIdx, isStoryPaused, showViewersSheet]);
 
   // Synchronize muted DOM property with state
   useEffect(() => {
@@ -289,13 +293,13 @@ export default function StatusBar({ onSelectConversation }) {
     setIsAutoplayBlocked(false);
 
     if (videoRef.current) {
-      if (isPaused) {
+      if (isStoryPaused) {
         videoRef.current.pause();
       } else {
         attemptPlayVideo(false);
       }
     }
-  }, [showViewer, isPaused, currentIdx, activeGroup]);
+  }, [showViewer, isStoryPaused, currentIdx, activeGroup]);
 
   // Reset video time on story slide change
   useEffect(() => {
@@ -316,11 +320,20 @@ export default function StatusBar({ onSelectConversation }) {
     }
     setCurrentIdx(idx);
     setIsPaused(false);
+    setReplyInput('');
+    setIsReplying(false);
     setIsVideoBuffering(true);
     setVideoError(null);
     setIsAutoplayBlocked(false);
     setProgressPercent(0);
     setShowViewer(true);
+  };
+
+  const closeStoryViewer = () => {
+    setShowViewer(false);
+    setReplyInput('');
+    setIsReplying(false);
+    setIsPaused(false);
   };
 
   // Keyboard Navigation (Arrows, Space, Escape)
@@ -452,6 +465,8 @@ export default function StatusBar({ onSelectConversation }) {
       });
       if (res.data?.success) {
         setReplyInput('');
+        setIsReplying(false);
+        setIsPaused(false);
         setReplyToast('✓ Sent privately to direct chat!');
         setTimeout(() => setReplyToast(''), 3000);
       }
@@ -838,7 +853,7 @@ export default function StatusBar({ onSelectConversation }) {
                       </button>
                     )}
                     <button
-                      onClick={() => setShowViewer(false)}
+                      onClick={closeStoryViewer}
                       className="p-1.5 rounded-full hover:bg-white/20 text-white transition"
                     >
                       <X className="w-5 h-5" />
@@ -1043,6 +1058,13 @@ export default function StatusBar({ onSelectConversation }) {
                         wasHoldRef.current = false;
                         return;
                       }
+                      if (isReplyingActive) {
+                        if (!replyInput.trim()) {
+                          setIsReplying(false);
+                          setIsPaused(false);
+                        }
+                        return;
+                      }
                       setIsPaused(prev => !prev);
                     }}
                   />
@@ -1052,10 +1074,10 @@ export default function StatusBar({ onSelectConversation }) {
                   />
 
                   {/* Center Paused Badge */}
-                  {isPaused && !isAutoplayBlocked && (
+                  {isStoryPaused && !isAutoplayBlocked && (
                     <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-white text-[11px] font-bold tracking-wider uppercase pointer-events-none shadow-lg">
                       <Pause className="w-3 h-3 fill-white" />
-                      <span>Paused</span>
+                      <span>{isReplyingActive ? 'Replying...' : 'Paused'}</span>
                     </div>
                   )}
                 </div>
@@ -1097,10 +1119,23 @@ export default function StatusBar({ onSelectConversation }) {
                         <input
                           type="text"
                           value={replyInput}
-                          onChange={(e) => setReplyInput(e.target.value)}
+                          onChange={(e) => {
+                            setReplyInput(e.target.value);
+                            if (e.target.value.trim().length > 0) {
+                              setIsReplying(true);
+                            }
+                          }}
                           onKeyDown={(e) => e.key === 'Enter' && handleSendReply()}
-                          onFocus={() => setIsPaused(true)}
-                          onBlur={() => setIsPaused(false)}
+                          onFocus={() => {
+                            setIsReplying(true);
+                            setIsPaused(true);
+                          }}
+                          onBlur={() => {
+                            if (!replyInput.trim() && !isSendingReply) {
+                              setIsReplying(false);
+                              setIsPaused(false);
+                            }
+                          }}
                           placeholder={`Reply privately to ${activeGroup.persona?.displayName || 'user'}...`}
                           className="flex-1 bg-white/10 border border-white/20 rounded-full px-4 py-2 text-xs text-white focus:outline-none focus:border-indigo-400 transition"
                         />

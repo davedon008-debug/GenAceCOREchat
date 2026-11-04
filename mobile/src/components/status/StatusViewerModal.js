@@ -14,6 +14,7 @@ import {
   FlatList,
   Platform,
   KeyboardAvoidingView,
+  Keyboard,
   useWindowDimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -57,6 +58,7 @@ export default function StatusViewerModal({
   const [isHolding, setIsHolding] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [showViewersSheet, setShowViewersSheet] = useState(false);
   const [replySentFeedback, setReplySentFeedback] = useState(null);
@@ -75,7 +77,8 @@ export default function StatusViewerModal({
   const wasLongPressRef = useRef(false);
   const currentItem = statuses[currentIndex] || statuses[0];
 
-  const isCurrentlyPaused = isPaused || isHolding || showViewersSheet;
+  const isReplyingActive = isReplying || (replyText && replyText.trim().length > 0) || isSendingReply;
+  const isCurrentlyPaused = isPaused || isHolding || showViewersSheet || isReplyingActive;
 
   const authorId = String(author?._id || '');
   const activeAuthorIdRef = useRef('');
@@ -109,6 +112,7 @@ export default function StatusViewerModal({
         setIsHolding(false);
         setShowViewersSheet(false);
         setReplyText('');
+        setIsReplying(false);
         setReplySentFeedback(null);
         setVideoError(null);
         setIsVideoLoading(statuses[targetIdx]?.type === 'video');
@@ -122,6 +126,8 @@ export default function StatusViewerModal({
       setIsPaused(false);
       setIsHolding(false);
       setShowViewersSheet(false);
+      setReplyText('');
+      setIsReplying(false);
       setVideoError(null);
       setIsVideoLoading(false);
     }
@@ -300,6 +306,15 @@ export default function StatusViewerModal({
       wasLongPressRef.current = false;
       return;
     }
+    // If replying or keyboard is visible, dismiss keyboard and keep replying pause if text exists
+    if (isReplyingActive) {
+      Keyboard.dismiss();
+      if (!replyText.trim()) {
+        setIsReplying(false);
+        setIsPaused(false);
+      }
+      return;
+    }
     // If paused, tap to resume!
     if (isPaused) {
       setIsPaused(false);
@@ -326,7 +341,10 @@ export default function StatusViewerModal({
       });
 
       if (res.data?.success) {
+        Keyboard.dismiss();
         setReplyText('');
+        setIsReplying(false);
+        setIsPaused(false);
         setReplySentFeedback('✓ Sent privately!');
         setTimeout(() => setReplySentFeedback(null), 2500);
 
@@ -522,7 +540,7 @@ export default function StatusViewerModal({
             {isCurrentlyPaused && (
               <View style={styles.pausedIndicatorPill} pointerEvents="none">
                 <Pause size={12} color="#ffffff" fill="#ffffff" />
-                <Text style={styles.pausedIndicatorText}>PAUSED</Text>
+                <Text style={styles.pausedIndicatorText}>{isReplyingActive ? 'REPLYING...' : 'PAUSED'}</Text>
               </View>
             )}
           </View>
@@ -665,9 +683,22 @@ export default function StatusViewerModal({
                       placeholder={`Reply to ${author?.displayName || 'status'}...`}
                       placeholderTextColor="rgba(255, 255, 255, 0.6)"
                       value={replyText}
-                      onChangeText={setReplyText}
-                      onFocus={() => setIsPaused(true)}
-                      onBlur={() => setIsPaused(false)}
+                      onChangeText={(txt) => {
+                        setReplyText(txt);
+                        if (txt.trim().length > 0) {
+                          setIsReplying(true);
+                        }
+                      }}
+                      onFocus={() => {
+                        setIsReplying(true);
+                        setIsPaused(true);
+                      }}
+                      onBlur={() => {
+                        if (!replyText.trim() && !isSendingReply) {
+                          setIsReplying(false);
+                          setIsPaused(false);
+                        }
+                      }}
                       returnKeyType="send"
                       onSubmitEditing={() => handleSendReply()}
                     />
